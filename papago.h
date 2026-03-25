@@ -111,7 +111,7 @@ papago_t*
 papago_new(void);
 
 /**
- * Retrieve curreent error message. Returns error message string or NULL if no
+ * Retrieve current error message. Returns error message string or NULL if no
  * error.
  */
 const char*
