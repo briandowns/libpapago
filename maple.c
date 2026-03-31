@@ -320,6 +320,9 @@ cache_load(const char *path)
 
     char *content = malloc(len + 1);
     size_t ret = fread(content, 1, len, fp);
+    if (ret == 0) {
+        return NULL;
+    }
 
     content[len] = 0;
     fclose(fp);
@@ -593,7 +596,7 @@ mp_render_file(mp_context_t *ctx, FILE *out, const char *filename,
     push_include(abs_path);
 
     char *content = cache_load(abs_path);
-    if (!content) {
+    if (content == NULL) {
         pop_include();
         return MP_ERR_UNABLE_TO_LOAD_INCLUDE;
     }

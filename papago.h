@@ -37,10 +37,6 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 
-#define	PAPAGO_VERSION_MAJOR 0
-#define	PAPAGO_VERSION_MINOR 1
-#define	PAPAGO_VERSION_PATCH 0
-
 #define PAPAGO_UNUSED(x) (void)x;
 
 typedef enum {
@@ -115,14 +111,14 @@ papago_new(void);
  * error.
  */
 const char*
-papago_error(papago_t *server);
+papago_error(const papago_t *server);
 
 /**
  * Configure the server. This must be called before papago_start. Returns 0 on
  * success or -1 on failure.
  */
 int
-papago_configure(papago_t *server, papago_config_t *config);
+papago_configure(papago_t *server, const papago_config_t *config);
 
 /**
  * Retrieves default configuration.
@@ -235,25 +231,25 @@ papago_req_query(papago_request_t *req, const char *key);
  * Retrieve request body. Returns body string or NULL.
  */
 const char*
-papago_req_body(papago_request_t *req);
+papago_req_body(const papago_request_t *req);
 
 /**
  * Retrieve request method. Returns HTTP method.
  */
 const char*
-papago_req_method(papago_request_t *req);
+papago_req_method(const papago_request_t *req);
 
 /**
  * Retrieve request path. Returns request path.
  */
 const char*
-papago_req_path(papago_request_t *req);
+papago_req_path(const papago_request_t *req);
 
 /**
  * Retrieve client IP address. Returns IP address string.
  */
 const char*
-papago_req_client_ip(papago_request_t *req);
+papago_req_client_ip(const papago_request_t *req);
 
 // response helpers
 

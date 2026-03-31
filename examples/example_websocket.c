@@ -35,10 +35,6 @@
  * - JSON responses
  * - Static file serving
  *
- * Build:
- *   make
- *   ./chat_demo
- *
  * Test:
  *   Open http://localhost:8484 in browser
  */

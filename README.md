@@ -1,8 +1,6 @@
 # papago
 
-Modern C REST API Framework
-
-Built on battle-tested libraries: libmicrohttpd (HTTP) + libwebsockets (WebSocket)
+Modern web framework designed to be full featured and powerful all while being extremely simple to use.
 
 ## Features
 
@@ -17,26 +15,14 @@ Built on battle-tested libraries: libmicrohttpd (HTTP) + libwebsockets (WebSocke
 - Thread-Safe - Built on proven concurrent architecture
 - Low Dependencies - Only requires libmicrohttpd + libwebsockets
 
-## Use Cases
-
-| Scenario | Features Used |
-|----------|---------------|
-| REST API | Routes, middleware, JSON responses |
-| Real-time Chat | WebSocket, broadcast, user sessions |
-| File Server | Static files, custom routes |
-| Authentication API | Middleware, headers, status codes |
-| IoT Hub | WebSocket, binary messages, broadcasting |
-| Webhook Receiver | POST routes, request body parsing |
-| Microservice | Lightweight, thread-safe, low overhead |
-
-### Dependencies
+## Dependencies
 
 * libnmicrohttpd
 * libwebsockets
 * jansson
 * openssl
-* libmaple (included)
-* liblogger (included)
+* libmaple (included @ latest version)
+* liblogger (included @ latest version)
 
 ### Build
 
@@ -45,6 +31,27 @@ make
 ```
 
 ## Quick Start
+
+Below is a very simple demonstration of how to create a single hander for "GET" requests. More examples can be found in the [examples](/examples) directory. For more examples of all of features, use the Makefile.
+
+```sh
+make example
+```
+
+```sh
+make example_ssl
+```
+
+```sh
+make example_websocket
+```
+
+or...
+
+
+```sh
+make all_examples
+```
 
 ### Hello World
 
@@ -83,7 +90,7 @@ main(void)
 
 Build and run:
 ```sh
-cc -o hello hello.c logger.c maple.c papago.c -lmicrohttpd -lwebsockets -lpthread -lm
+cc -o hello hello.c logger.c maple.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm
 ./hello
 ```
 

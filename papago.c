@@ -176,6 +176,10 @@ static int
 papago_add_kv(papago_kv_t **arr, size_t *count, const char *key,
               const char *value)
 {
+	if (arr == NULL || count == NULL || key == NULL || value == NULL) {
+		return -1;
+	}
+
 	papago_kv_t *new_arr = realloc(*arr, (*count + 1) * sizeof(papago_kv_t));
 	if (new_arr == NULL) {
 		return -1;
@@ -198,7 +202,7 @@ papago_add_kv(papago_kv_t **arr, size_t *count, const char *key,
 }
 
 static const char*
-papago_find_kv(papago_kv_t *arr, size_t count, const char *key)
+papago_find_kv(const papago_kv_t *arr, size_t count, const char *key)
 {
 	if (arr == NULL || key == NULL) {
 		return NULL;
@@ -211,17 +215,6 @@ papago_find_kv(papago_kv_t *arr, size_t count, const char *key)
 	}
 
 	return NULL;
-}
-
-const char*
-papago_version(void)
-{
-	static char version[32];
-
-	snprintf(version, sizeof(version), "%d.%d.%d", PAPAGO_VERSION_MAJOR,
-        PAPAGO_VERSION_MINOR, PAPAGO_VERSION_PATCH);
-
-	return version;
 }
 
 // configuration
@@ -266,24 +259,24 @@ papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
     }
 
 	// parse path with parameters
-	char *pattern_copy = papago_strdup(pattern);
-	char *path_copy = papago_strdup(path);
+	const char *pattern_copy = papago_strdup(pattern);
+	const char *path_copy = papago_strdup(path);
 
 	if (pattern_copy == NULL || path_copy == NULL) {
-		free(pattern_copy);
-		free(path_copy);
+		free((void *)pattern_copy);
+		free((void *)path_copy);
 
 		return false;
 	}
 
 	bool match = true;
-	char *pattern_token = strtok(pattern_copy, "/");
-	char *path_token = strtok(path_copy, "/");
+	const char *pattern_token = strtok((char*)pattern_copy, "/");
+	const char *path_token = strtok((char*)path_copy, "/");
 
 	while (pattern_token != NULL && path_token != NULL) {
 		if (pattern_token[0] == ':') {
 			// extract parameter
-			char *param_name = pattern_token + 1;
+			const char *param_name = pattern_token + 1;
 			if (params != NULL && param_count != NULL) {
 				papago_add_kv(params, param_count, param_name, path_token);
             }
@@ -300,46 +293,13 @@ papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
 		match = false;
     }
 
-	free(pattern_copy);
-	free(path_copy);
+	free((void*)pattern_copy);
+	free((void*)path_copy);
 
 	return match;
 }
 
 // request/Response Helpers
-
-typedef struct RequestContext {
-    char        client_ip[INET6_ADDRSTRLEN];
-    char        method[16];
-    char        url[2048];
-    struct timespec start_time;
-    int         response_code;
-    uint64_t    response_bytes;
-} RequestContext;
-
-static void
-get_client_ip(struct MHD_Connection *connection, char *buf,
-                          size_t buf_len)
-{
-    const union MHD_ConnectionInfo *info =
-        MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
-
-    if (!info || !info->client_addr) {
-        snprintf(buf, buf_len, "unknown");
-        return;
-    }
-
-    struct sockaddr *addr = info->client_addr;
-    if (addr->sa_family == AF_INET) {
-        inet_ntop(AF_INET, &((struct sockaddr_in *)addr)->sin_addr, buf,
-			buf_len);
-    } else if (addr->sa_family == AF_INET6) {
-        inet_ntop(AF_INET6, &((struct sockaddr_in6 *)addr)->sin6_addr, buf,
-			buf_len);
-    } else {
-        snprintf(buf, buf_len, "unknown");
-    }
-}
 
 const char*
 papago_req_header(papago_request_t *req, const char *key)
@@ -360,13 +320,13 @@ papago_req_query(papago_request_t *req, const char *key)
 }
 
 const char*
-papago_req_body(papago_request_t *req)
+papago_req_body(const papago_request_t *req)
 {
 	return req->body;
 }
 
 const char*
-papago_req_method(papago_request_t *req)
+papago_req_method(const papago_request_t *req)
 {
 	switch (req->method) {
 	case 0:
@@ -389,20 +349,20 @@ papago_req_method(papago_request_t *req)
 }
 
 const char*
-papago_req_path(papago_request_t *req)
+papago_req_path(const papago_request_t *req)
 {
 	return req->path;
 }
 
 const char*
-papago_req_client_ip(papago_request_t *req)
+papago_req_client_ip(const papago_request_t *req)
 {
 	const union MHD_ConnectionInfo *info = MHD_get_connection_info(
 		req->connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
 
 	if (info && info->client_addr->sa_family == AF_INET) {
 		struct sockaddr_in *sptr = (struct sockaddr_in *)info->client_addr;
-		inet_ntop(AF_INET, &sptr->sin_addr, req->client_ip, INET_ADDRSTRLEN);
+		inet_ntop(AF_INET, &sptr->sin_addr, (char*)req->client_ip, INET_ADDRSTRLEN);
 
 		return req->client_ip;
 	}
@@ -485,7 +445,7 @@ papago_res_sendfile(papago_response_t *res, const char *filepath)
 static void
 papago_log_request(papago_t *server, struct MHD_Connection *connection,
                    const char *url, const char *method, papago_status_t status,
-                   struct timeval *start_time, const char *version)
+                   const struct timeval *start_time, const char *version)
 {
 	PAPAGO_UNUSED(server);
 	
@@ -870,13 +830,13 @@ papago_new(void)
 }
 
 const char*
-papago_error(papago_t *server)
+papago_error(const papago_t *server)
 {
 	return server->error_message;
 }
 
 int
-papago_configure(papago_t *server, papago_config_t *config)
+papago_configure(papago_t *server, const papago_config_t *config)
 {
 	if (server == NULL || config == NULL) {
 		return -1;
@@ -1362,7 +1322,7 @@ papago_ws_get_client_ip(papago_ws_connection_t *conn)
 // URL Encoding/Decoding
 
 /**
- * URL-encode a string. Returns newly allocated string, caller must free.
+ * URL encode a string. Returns newly allocated string, caller must free.
  */
 char*
 papago_url_encode(const char *str)
@@ -1394,7 +1354,7 @@ papago_url_encode(const char *str)
 }
 
 /**
- * URL-decode a string. Returns newly allocated string, caller must free.
+ * URL decode a string. Returns newly allocated string, caller must free.
  */
 char*
 papago_url_decode(const char *str)
@@ -1409,7 +1369,7 @@ papago_url_decode(const char *str)
 		return NULL;
 	}
 
-    int value;
+    unsigned int value;
 	size_t j = 0;
 	for (size_t i = 0; i < len; i++) {
 		if (str[i] == '%' && i + 2 < len) {
@@ -1569,13 +1529,13 @@ _fmemopen(memstream_t **out_mem)
 }
 
 static const char*
-memstream_data(memstream_t *m)
+memstream_data(const memstream_t *m)
 {
     return m->data;
 }
 
 static size_t
-memstream_size(memstream_t *m)
+memstream_size(const memstream_t *m)
 {
     return m->size;
 }
@@ -1591,9 +1551,9 @@ papago_render_file(const char *tmpl_path, char *output,
 	va_list args;
 	va_start(args, output_size);
 	
-	const char *key, *value;
+	const char *key;
 	while ((key = va_arg(args, const char *)) != NULL) {
-		value = va_arg(args, const char *);
+		const char *value = va_arg(args, const char *);
 		if (value != NULL) {
 			mp_set_var(g_server->maple_ctx, key, value);
 		}
@@ -1632,9 +1592,9 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 	va_list args;
 	va_start(args, output_size);
 
-	const char *key, *value;
+	const char *key;
 	while ((key = va_arg(args, const char*)) != NULL && strcmp(key, "") != 0) {
-		value = va_arg(args, const char*);
+		const char *value = va_arg(args, const char*);
 		if (value != NULL) {
 			mp_set_var(g_server->maple_ctx, key, value);
 		}
@@ -1659,17 +1619,16 @@ int
 papago_res_render(papago_response_t *res, const char *tmpl, char *output,
                   size_t output_size, ...)
 {
-	va_list args;
-	const char *key, *value;
-	int result;
- 
 	if (res == NULL || tmpl == NULL) {
 		return -1;
 	}
 
+	va_list args;
 	va_start(args, output_size);
+
+	const char *key;
 	while ((key = va_arg(args, const char *)) != NULL) {
-		value = va_arg(args, const char *);
+		const char *value = va_arg(args, const char *);
 		if (value != NULL) {
 			mp_set_var(g_server->maple_ctx, key, value);
 		}

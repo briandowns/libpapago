@@ -35,7 +35,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 
-#define MAX_VARS    64
+#define MAX_VARS    256
 #define MAX_VAR_LEN 64
 #define MAX_FUNCS   64
 
@@ -79,7 +79,7 @@ typedef struct {
  */
 typedef struct {
     var_t vars[MAX_VARS];
-    int var_count;
+    uint16_t var_count;
     function_registry_t user_func_registry;
 } mp_context_t;
 

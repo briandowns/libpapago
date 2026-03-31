@@ -73,13 +73,13 @@ example: clean
 example_ssl: clean
 	$(CC) -o $@ logger.c maple.c papago.c examples/example_ssl.c $(CFLAGS) $(LDFLAGS)
 
-.PHONY: example_chat
-example_chat: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example_chat.c $(CFLAGS) $(LDFLAGS)
+.PHONY: example_websocket
+example_websocket: clean
+	$(CC) -o $@ logger.c maple.c papago.c examples/example_websocket.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_template
 example_template: clean
 	$(CC) -o $@ logger.c maple.c examples/template_example.c papago.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: all_examples
-all_examples: example example_ssl example_chat example_template
+all_examples: example example_ssl example_websocket example_template
