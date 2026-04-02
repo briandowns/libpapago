@@ -150,10 +150,10 @@ auth(papago_request_t *req, papago_response_t *res)
 }
 
 // global middleware - runs on ALL routes
-papago_use(server, logger);
+papago_middleware_add(server, logger);
 
 // path-specific - runs only on /api/* routes
-papago_use_path(server, "/api", auth);
+papago_middleware_path_add(server, "/api", auth);
 ```
 
 ### Websocket
