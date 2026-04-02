@@ -47,6 +47,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build All Examples
-        run: make all_examples
+        run: make examples_all
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
