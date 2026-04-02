@@ -32,7 +32,7 @@ make
 
 ## Quick Start
 
-Below is a very simple demonstration of how to create a single hander for "GET" requests. More examples can be found in the [examples](/examples) directory. For more examples of all of features, use the Makefile.
+Below is a very simple demonstration of how to create a single handler for `GET` requests. More examples can be found in the [examples](/examples) directory. For more examples of all of features, use the Makefile.
 
 ```sh
 make example

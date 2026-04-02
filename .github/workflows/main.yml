@@ -46,11 +46,7 @@ jobs:
         run: make example
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Example SSL
-        run: make example_ssl
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Chat Demo
-        run: make chat_demo
+      - name: Build All Examples
+        run: make all_examples
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
