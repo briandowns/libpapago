@@ -28,14 +28,7 @@ jobs:
       - name: Pull
         run: git pull origin master
       - name: Install Dependencies
-        run: |
-          if [ "${RUNNER_OS}" == "Linux" ]; then
-            sudo apt install -y make build-essential libssl-dev pkg-config libjansson-dev libwebsockets-dev libcurl4-openssl-dev libmicrohttpd-dev
-          elif [ "${RUNNER_OS}" == "macOS" ]; then
-            brew update
-            brew uninstall curl
-            brew install curl-openssl
-          fi
+        run: sudo apt install -y make build-essential libssl-dev pkg-config libjansson-dev libwebsockets-dev libcurl4-openssl-dev libmicrohttpd-dev
       - name: Compile Shared Object
         run: make
       # - name: Run tests
