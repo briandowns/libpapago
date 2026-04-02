@@ -614,6 +614,7 @@ main(void)
 
 	papago_config_t config = papago_default_config();
 	config.port = 8484;
+	config.enable_logging = true;
 	papago_configure(server, &config);
 
 	// add some demo users

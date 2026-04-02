@@ -88,6 +88,7 @@ typedef struct {
 	char *host;
 	bool enable_ssl;
 	bool enable_template_rendering;
+	bool enable_logging;
 	char *cert_file;
 	char *key_file;
 	FILE *log_output_dst;

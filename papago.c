@@ -231,6 +231,7 @@ papago_default_config(void)
 	config.port = DEFAULT_PORT;
 	config.host = DEFAULT_HOST;
 	config.enable_ssl = false;
+	config.enable_logging = false;
 	config.enable_template_rendering = false;
 	config.cert_file = NULL;
 	config.key_file = NULL;
@@ -476,19 +477,20 @@ papago_log_request(papago_t *server, struct MHD_Connection *connection,
 	long duration_ms = (end.tv_sec - start_time->tv_sec) * 1000L +
 		(end.tv_usec - start_time->tv_usec) / 1000L;
  
-	s_log(S_LOG_INFO,
-		s_log_string("remote", client_ip),
-        s_log_string("method", method),
-        s_log_string("path", url),
-        s_log_string("version", version ? version : "-"),
-        s_log_string("host", host ? host : "-"),
-        s_log_string("user_agent", user_agent ? user_agent : "-"),
-        s_log_int("status", (int)status),
-		s_log_int64("duration_ms", (int64_t)duration_ms));
+	if (server->config.enable_logging) {
+		s_log(S_LOG_INFO,
+			s_log_string("remote", client_ip),
+			s_log_string("method", method),
+			s_log_string("path", url),
+			s_log_string("version", version ? version : "-"),
+			s_log_string("host", host ? host : "-"),
+			s_log_string("user_agent", user_agent ? user_agent : "-"),
+			s_log_int("status", (int)status),
+			s_log_int64("duration_ms", (int64_t)duration_ms));
+	}
 }
 
 // libmicrohttpd Request Handler
-
 
 static enum MHD_Result
 papago_mhd_handler(void *cls, struct MHD_Connection *connection,
@@ -816,8 +818,6 @@ papago_new(void)
 		return NULL;
 	}
 
-	s_log_init(stdout);
-
 	server->config = papago_default_config();
 
 	pthread_mutex_init(&server->ws_mutex, NULL);
@@ -867,6 +867,10 @@ papago_start(papago_t *server)
 
 	char *cert_pem = NULL;
 	char *key_pem = NULL;
+
+	if (server->config.enable_logging) {
+		s_log_init(stdout);
+	}
 
 	// determine libmicrohttpd flags
 	unsigned int mhd_flags = MHD_USE_THREAD_PER_CONNECTION
@@ -955,6 +959,7 @@ papago_start(papago_t *server)
 			    server->config.key_file == NULL) {
 				fprintf(stderr, "SSL enabled but cert/key files missing\n");
 				MHD_stop_daemon(server->mhd_daemon);
+
 				return -1;
 			}
 
@@ -979,16 +984,21 @@ papago_start(papago_t *server)
 		papago_lws_thread_func, server);
 	}
 
-	s_log(S_LOG_INFO, 
-        s_log_string("msg", "server started"),
-        s_log_int("port", server->config.port),
-		s_log_string("type", server->config.enable_ssl ? "HTTPS" : "HTTP"));
+	if (server->config.enable_logging) {
+		s_log(S_LOG_INFO, 
+			s_log_string("msg", "server started"),
+			s_log_int("port", server->config.port),
+			s_log_string("type", server->config.enable_ssl ? "HTTPS" : "HTTP"));
+	}
+	
 
 	if (server->ws_endpoint_count > 0) {
-		s_log(S_LOG_INFO, 
-			s_log_string("msg", "websocket server started"),
-			s_log_int("port", server->config.port+1),
-			s_log_string("type", server->config.enable_ssl ? "WSS" : "WS"));
+		if (server->config.enable_logging) {
+			s_log(S_LOG_INFO, 
+				s_log_string("msg", "websocket server started"),
+				s_log_int("port", server->config.port+1),
+				s_log_string("type", server->config.enable_ssl ? "WSS" : "WS"));
+		}
 	}
 
 	// wait for shutdown signal using condition variable for instant response

@@ -166,6 +166,7 @@ main(void)
 	// configure with SSL enabled
 	config = papago_default_config();
 	config.port = 8443;
+	config.enable_logging = true;
 	config.enable_ssl = true;
 	config.cert_file = "server.crt";
 	config.key_file = "server.key";
