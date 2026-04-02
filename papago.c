@@ -145,7 +145,7 @@ static char*
 papago_strdup(const char *str)
 {
 	if (str == NULL) {
-		return (NULL);
+		return NULL;
     }
 
 	size_t len = strlen(str);
@@ -1144,14 +1144,14 @@ papago_patch(papago_t *server, const char *path, papago_handler_t handler,
 // middleware
 
 int
-papago_use(papago_t *server, papago_middleware_fn_t middleware)
+papago_middleware_add(papago_t *server, papago_middleware_fn_t middleware)
 {
-	return papago_use_path(server, NULL, middleware);
+	return papago_middleware_path_add(server, NULL, middleware);
 }
 
 int
-papago_use_path(papago_t *server, const char *path,
-                papago_middleware_fn_t middleware)
+papago_middleware_path_add(papago_t *server, const char *path,
+                           papago_middleware_fn_t middleware)
 {
 	if (server == NULL || middleware == NULL ||
 	    server->middleware_count >= PAPAGO_MAX_MIDDLEWARE) {
@@ -1319,7 +1319,7 @@ papago_ws_get_client_ip(papago_ws_connection_t *conn)
 	return (conn != NULL) ? conn->client_ip : NULL;
 }
 
-// URL Encoding/Decoding
+// URL encoding / decoding
 
 /**
  * URL encode a string. Returns newly allocated string, caller must free.
@@ -1333,8 +1333,9 @@ papago_url_encode(const char *str)
 
 	size_t len = strlen(str);
 	char *encoded = malloc(len * 3 + 1);
-	if (encoded == NULL)
+	if (encoded == NULL) {
 		return NULL;
+	}
 
 	size_t j = 0;
 	for (size_t i = 0; i < len; i++) {
@@ -1398,7 +1399,7 @@ typedef struct {
 } memstream_t;
 
 static ssize_t
-pms_read(void *cookie, char *buf, size_t size)
+ms_read(void *cookie, char *buf, size_t size)
 {
     memstream_t *m = cookie;
 
@@ -1416,7 +1417,7 @@ pms_read(void *cookie, char *buf, size_t size)
 }
 
 static ssize_t
-pms_write(void *cookie, const char *buf, size_t size)
+ms_write(void *cookie, const char *buf, size_t size)
 {
     memstream_t *m = cookie;
 
@@ -1442,7 +1443,7 @@ pms_write(void *cookie, const char *buf, size_t size)
 }
 
 static int
-pms_seek(void *cookie, off_t *offset, int whence)
+ms_seek(void *cookie, off_t *offset, int whence)
 {
     memstream_t *m = cookie;
     size_t newpos;
@@ -1468,7 +1469,7 @@ pms_seek(void *cookie, off_t *offset, int whence)
 }
 
 static int
-pms_close(void *cookie)
+ms_close(void *cookie)
 {
     memstream_t *m = cookie;
     free(m->data);
@@ -1478,7 +1479,8 @@ pms_close(void *cookie)
 }
 
 static
-memstream_t *pms_create(void)
+memstream_t*
+ms_create(void)
 {
     memstream_t *m = calloc(1, sizeof(*m));
     if (!m) {
@@ -1499,25 +1501,25 @@ memstream_t *pms_create(void)
 static FILE*
 _fmemopen(memstream_t **out_mem)
 {
-    memstream_t *m = pms_create();
+    memstream_t *m = ms_create();
     if (m == NULL) {
         return NULL;
     }
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
-    FILE *fp = funopen(m, pms_read, pms_write, pms_seek, pms_close);
+    FILE *fp = funopen(m, ms_read, ms_write, ms_seek, ms_close);
 #else
     cookie_io_functions_t io = {
-        .read  = pms_read,
-        .write = pms_write,
-        .seek  = pms_seek,
-        .close = pms_close
+        .read  = ms_read,
+        .write = ms_write,
+        .seek  = ms_seek,
+        .close = ms_close
     };
     FILE *fp = fopencookie(m, "w+", io);
 #endif
 
     if (fp == NULL) {
-        pms_close(m);
+        ms_close(m);
         return NULL;
     }
 

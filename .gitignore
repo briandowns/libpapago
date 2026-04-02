@@ -8,7 +8,7 @@ bin/*
 tests/tests
 example
 example_ssl
-example_chat
+example_websocket
 example_template
 debug_build
 

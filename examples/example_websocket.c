@@ -452,8 +452,7 @@ api_stats(papago_request_t *req, papago_response_t *res, void *user_data)
 
     char response[256];
 	snprintf(response, sizeof(response),
-	    "{\"users\":%zu,\"version\":\"%s\",\"uptime\":\"running\"}",
-	    user_count, papago_version());
+	    "{\"users\":%zu,\"uptime\":\"running\"}", user_count);
 
 	papago_res_json(res, response);
 }
@@ -635,7 +634,7 @@ main(void)
 	papago_get(server, "/api/stats", api_stats, NULL);
 
 	// protected API routes (require X-API-Key header)
-	papago_use_path(server, "/api/users", auth_middleware);
+	papago_middleware_path_add(server, "/api/users", auth_middleware);
 	papago_get(server, "/api/users", api_users_list, NULL);
 	papago_post(server, "/api/users", api_users_create, NULL);
 	papago_get(server, "/api/users/:id", api_users_get, NULL);

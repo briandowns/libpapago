@@ -143,7 +143,7 @@ auth(papago_request_t *req, papago_response_t *res)
     if (token == NULL) {
         papago_res_status(res, PAPAGO_STATUS_UNAUTHORIZED);
         papago_res_json(res, "{\"error\":\"unauthorized\"}");
-        return (false);  // stop processing
+        return false;  // stop processing
     }
 
     return true;

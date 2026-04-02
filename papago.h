@@ -198,14 +198,14 @@ papago_route(papago_t *server, papago_method_t method, const char *path,
  * Register global middleware. Returns 0 on success or -1 on failure.
  */
 int
-papago_use(papago_t *server, papago_middleware_fn_t middleware);
+papago_middleware_add(papago_t *server, papago_middleware_fn_t middleware);
 
 /**
- * Register path-specific middleware Returns 0 on success or -1 on failure.
+ * Register path-specific middleware. Returns 0 on success or -1 on failure.
  */
 int
-papago_use_path(papago_t *server, const char *path,
-                papago_middleware_fn_t middleware);
+papago_middleware_path_add(papago_t *server, const char *path,
+                           papago_middleware_fn_t middleware);
 
 // request helpers
 
@@ -348,12 +348,6 @@ papago_ws_set_userdata(papago_ws_connection_t *conn, void *data);
  */
 const char*
 papago_ws_get_client_ip(papago_ws_connection_t *conn);
-
-/**
- * Retrieve Papago version string. Returns version string.
- */
-const char*
-papago_version(void);
 
 /**
  * Retrieve current server instance. Returns current server or NULL.

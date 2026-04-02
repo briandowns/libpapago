@@ -128,7 +128,7 @@ ws_on_error(papago_ws_connection_t *conn, const char *error)
 int
 main(void)
 {
-	printf("papago example (v%s)\n", papago_version());
+	printf("papago example\n");
 
 	// setup signal handling
 	signal(SIGINT, signal_handler);

@@ -76,7 +76,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 int
 main(void)
 {
-	printf("papago template example (v%s)\n", papago_version());
+	printf("papago template exampleds\n");
 
 	// setup signal handling
 	signal(SIGINT, signal_handler);
