@@ -256,6 +256,7 @@ papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
 
 	// simple comparison if no parameters
 	if (strchr(pattern, ':') == NULL) {
+		printf("XXX - simple match: pattern=%s, path=%s\n", pattern, path);
 		return strcmp(pattern, path) == 0;
     }
 
@@ -264,17 +265,20 @@ papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
 	const char *path_copy = papago_strdup(path);
 
 	if (pattern_copy == NULL || path_copy == NULL) {
-		free((void *)pattern_copy);
-		free((void *)path_copy);
+		free((void*)pattern_copy);
+		free((void*)path_copy);
 
 		return false;
 	}
 
 	bool match = true;
-	const char *pattern_token = strtok((char*)pattern_copy, "/");
-	const char *path_token = strtok((char*)path_copy, "/");
+	char *pattern_saveptr = NULL;
+	char *path_saveptr = NULL;
+	const char *pattern_token = strtok_r((char*)pattern_copy, "/", &pattern_saveptr);
+	const char *path_token = strtok_r((char*)path_copy, "/", &path_saveptr);
 
 	while (pattern_token != NULL && path_token != NULL) {
+		printf("pattern_token: %s, path_token: %s\n", pattern_token, path_token);
 		if (pattern_token[0] == ':') {
 			// extract parameter
 			const char *param_name = pattern_token + 1;
@@ -286,8 +290,8 @@ papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
 			break;
 		}
 
-		pattern_token = strtok(NULL, "/");
-		path_token = strtok(NULL, "/");
+		pattern_token = strtok_r(NULL, "/", &pattern_saveptr);
+		path_token = strtok_r(NULL, "/", &path_saveptr);
 	}
 
 	if (pattern_token != NULL || path_token != NULL) {
@@ -594,6 +598,8 @@ papago_mhd_handler(void *cls, struct MHD_Connection *connection,
 	route_found = false;
 	for (size_t i = 0; i < server->route_count; i++) {
 		papago_route_t *route = &server->routes[i];
+		printf("XXX - checking route %s (method %d) against %s (method %d)\n",
+		    route->path, route->method, req->path, req->method);
 
 		if (route->method != req->method) {
 			continue;
