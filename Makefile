@@ -5,11 +5,14 @@ NAME = libpapago
 UNAME_S = $(shell uname -s)
 
 CFLAGS  = -O3 -fPIC -Wall -Wextra
-ifeq ($(UNAME_S),FreeBSD)
+ifneq (,$(filter $(UNAME_S),FreeBSD Darwin))
 	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
               $(shell pkg-config --cflags --libs libmicrohttpd) \
 			  $(shell pkg-config --cflags --libs jansson) \
 			  -lssl -lcrypto -lz
+endif
+ifeq ($(UNAME_S),Darwin)
+	CFLAGS += $(shell pkg-config --cflags --libs openssl)
 endif
 TEST_CFLAGS = -g -fPIC -Wall -Wextra
 LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm
