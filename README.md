@@ -112,7 +112,7 @@ papago_delete(server, "/users/:id", delete_user);
 
 // path parameters
 void
-user_handler(papago_request_t *req, papago_response_t *res)
+user_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     const char *id = papago_req_param(req, "id");
     // use id...
@@ -121,7 +121,7 @@ papago_get(server, "/users/:id", user_handler);
 
 // query parameters
 void
-search_handler(papago_request_t *req, papago_response_t *res)
+search_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     const char *q = papago_req_query(req, "q");
     const char *page = papago_req_query(req, "page");
@@ -135,7 +135,7 @@ papago_get(server, "/search", search_handler);
 ```c
 // auth middleware
 bool
-auth(papago_request_t *req, papago_response_t *res)
+auth(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     const char *token = papago_req_header(req, "Authorization");
 
@@ -208,7 +208,7 @@ ws.onmessage = (e) => console.log('Received:', e.data);
 
 ```c
 void
-handler(papago_request_t *req, papago_response_t *res)
+handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     // read request
     const char *header = papago_req_header(req, "Content-Type");

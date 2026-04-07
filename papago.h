@@ -152,7 +152,7 @@ papago_add_route(papago_t *server, papago_method_t method, const char *path,
                  papago_handler_t handler, void *user_data);
 
 /**
- * Register a GET route .Returns 0 on success or 1 on failure.
+ * Register a GET route. Returns 0 on success or 1 on failure.
  */
 uint8_t
 papago_get(papago_t *server, const char *path, papago_handler_t handler,
@@ -381,7 +381,7 @@ papago_render_file(const char *tmpl_path, char *output,
                    size_t output_size, ...);
 
 /**
- * Render template with variables. Returns 0 on success or 1 on failure.
+ * Render template with variables. Returns 0 on success.
  */
 uint8_t
 papago_render_template(const char *tmpl, char *output,
