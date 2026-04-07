@@ -116,9 +116,9 @@ papago_error(const papago_t *server);
 
 /**
  * Configure the server. This must be called before papago_start. Returns 0 on
- * success or -1 on failure.
+ * success or 1 on failure.
  */
-int
+uint8_t
 papago_configure(papago_t *server, const papago_config_t *config);
 
 /**
@@ -128,9 +128,9 @@ papago_config_t
 papago_default_config(void);
 
 /**
- * Start the server. (blocking) Returns 0 on success or -1 on failure.
+ * Start the server. (blocking) Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_start(papago_t *server);
 
 /**
@@ -152,59 +152,59 @@ papago_add_route(papago_t *server, papago_method_t method, const char *path,
                  papago_handler_t handler, void *user_data);
 
 /**
- * Register a GET route .Returns 0 on success or -1 on failure.
+ * Register a GET route .Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_get(papago_t *server, const char *path, papago_handler_t handler,
            void *user_data);
 
 /**
  * Register a POST route.
  */
-int
+uint8_t
 papago_post(papago_t *server, const char *path, papago_handler_t handler,
             void *user_data);
 
 /**
  * Register a PUT route.
  */
-int
+uint8_t
 papago_put(papago_t *server, const char *path, papago_handler_t handler,
            void *user_data);
 
 /**
  * Register a DELETE route.
  */
-int
+uint8_t
 papago_delete(papago_t *server, const char *path, papago_handler_t handler,
               void *user_data);
 
 /**
  * Register a PATCH route.
  */
-int
+uint8_t
 papago_patch(papago_t *server, const char *path, papago_handler_t handler,
              void *user_data);
 
 /**
- * Register a route for any method. Returns 0 on success or -1 on failure.
+ * Register a route for any method. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_route(papago_t *server, papago_method_t method, const char *path,
              papago_handler_t handler, void *user_data);
 
 // middleware
 
 /**
- * Register global middleware. Returns 0 on success or -1 on failure.
+ * Register global middleware. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_middleware_add(papago_t *server, papago_middleware_fn_t middleware);
 
 /**
- * Register path-specific middleware. Returns 0 on success or -1 on failure.
+ * Register path-specific middleware. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_middleware_path_add(papago_t *server, const char *path,
                            papago_middleware_fn_t middleware);
 
@@ -267,37 +267,37 @@ void
 papago_res_header(papago_response_t *res, const char *key, const char *value);
 
 /**
- * Send response body. Returns 0 on success or -1 on failure.
+ * Send response body. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_res_send(papago_response_t *res, const char *body);
 
 /**
- * Send JSON response. Returns 0 on success or -1 on failure.
+ * Send JSON response. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_res_json(papago_response_t *res, const char *json);
 
 /**
- * Send file as response. Returns 0 on success or -1 on failure.
+ * Send file as response. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_res_sendfile(papago_response_t *res, const char *filepath);
 
 // static files
 
 /**
- * Enable static file serving. Returns 0 on success or -1 on failure.
+ * Enable static file serving. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_static(papago_t *server, const char *directory);
 
 // websocket
 
 /**
- * Register websocket endpoint. Returns 0 on success or -1 on failure.
+ * Register websocket endpoint. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_ws_endpoint(papago_t *server, const char *path,
                    papago_ws_on_connect_t on_connect,
                    papago_ws_on_message_t on_message,
@@ -305,17 +305,17 @@ papago_ws_endpoint(papago_t *server, const char *path,
                    papago_ws_on_error_t on_error);
 
 /**
- * Send text message to websocket client. Returns 0 on success or -1 on
+ * Send text message to websocket client. Returns 0 on success or 1 on
  * failure.
  */
-int
+uint8_t
 papago_ws_send(papago_ws_connection_t *conn, const char *message);
 
 /**
- * Send binary message to websocket client. Returns 0 on success or -1 on
+ * Send binary message to websocket client. Returns 0 on success or 1 on
  * failure.
  */
-int
+uint8_t
 papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
                       size_t length);
 
@@ -323,7 +323,7 @@ papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
  * Broadcast message to all websocket clients. Returns: Number of clients
  * reached
  */
-int 
+uint16_t 
 papago_ws_broadcast(papago_t *server, const char *message);
 
 /**
@@ -373,15 +373,15 @@ papago_url_decode(const char *str);
 // template rendering
 
 /**
- * Render template string with variables. Returns 0 on success or -1 on
+ * Render template string with variables. Returns 0 on success or 1 on
  * failure.
  */
-int
+uint8_t
 papago_render_file(const char *tmpl_path, char *output,
                    size_t output_size, ...);
 
 /**
- * Render template with variables. Returns 0 on success or -1 on failure.
+ * Render template with variables. Returns 0 on success or 1 on failure.
  */
 uint8_t
 papago_render_template(const char *tmpl, char *output,

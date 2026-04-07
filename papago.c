@@ -387,7 +387,7 @@ papago_res_header(papago_response_t *res, const char *key, const char *value)
 	papago_add_kv(&res->headers, &res->header_count, key, value);
 }
 
-int
+uint8_t
 papago_res_send(papago_response_t *res, const char *body)
 {
 	if (res->body != NULL) {
@@ -401,19 +401,19 @@ papago_res_send(papago_response_t *res, const char *body)
 	return 0;
 }
 
-int
+uint8_t
 papago_res_json(papago_response_t *res, const char *json)
 {
 	papago_res_header(res, "Content-Type", "application/json");
 	return papago_res_send(res, json);
 }
 
-int
+uint8_t
 papago_res_sendfile(papago_response_t *res, const char *filepath)
 {
 	FILE *f = fopen(filepath, "rb");
 	if (f == NULL) {
-		return -1;
+		return 1;
 	}
 
 	fseek(f, 0, SEEK_END);
@@ -423,14 +423,14 @@ papago_res_sendfile(papago_response_t *res, const char *filepath)
 	char *content = malloc(size + 1);
 	if (content == NULL) {
 		fclose(f);
-		return -1;
+		return 1;
 	}
 
 	size_t ret = fread(content, 1, size, f);
     if (ret != (size_t)size) {
         free(content);
         fclose(f);
-        return -1;
+        return 1;
     }
 
 	content[size] = '\0';
@@ -841,11 +841,11 @@ papago_error(const papago_t *server)
 	return server->error_message;
 }
 
-int
+uint8_t
 papago_configure(papago_t *server, const papago_config_t *config)
 {
 	if (server == NULL || config == NULL) {
-		return -1;
+		return 1;
     }
 	server->config = *config;
 
@@ -861,11 +861,11 @@ suppress_lws_output(int level, const char *line)
 }
 #endif
 
-int
+uint8_t
 papago_start(papago_t *server)
 {
 	if (server == NULL) {
-		return -1;
+		return 1;
     }
 
 	g_server = server;
@@ -887,7 +887,7 @@ papago_start(papago_t *server)
 		if (server->maple_ctx == NULL) {
 			server->error_message = "failed to initialize Maple template engine";
 
-			return -1;
+			return 1;
 		}
 	}
 
@@ -897,7 +897,7 @@ papago_start(papago_t *server)
 		    server->config.key_file == NULL) {
             server->error_message = "SSL enabled but cert_file or key_file not set";
 
-			return -1;
+			return 1;
 		}
 
 		// load certificate and key into memory
@@ -911,7 +911,7 @@ papago_start(papago_t *server)
 			free(cert_pem);
 			free(key_pem);
 
-			return -1;
+			return 1;
 		}
 
 		mhd_flags |= MHD_USE_TLS;
@@ -946,7 +946,7 @@ papago_start(papago_t *server)
 			perror("Failed to start HTTP server");
 		}
 
-		return -1;
+		return 1;
 	}
 
     struct lws_context_creation_info info = {0};
@@ -966,7 +966,7 @@ papago_start(papago_t *server)
 				fprintf(stderr, "SSL enabled but cert/key files missing\n");
 				MHD_stop_daemon(server->mhd_daemon);
 
-				return -1;
+				return 1;
 			}
 
 			info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
@@ -982,7 +982,7 @@ papago_start(papago_t *server)
 			fprintf(stderr, "Failed to create libwebsockets context\n");
 			MHD_stop_daemon(server->mhd_daemon);
 	
-			return -1;
+			return 1;
 		}
 
 		// start websocket service thread
@@ -1100,13 +1100,13 @@ papago_destroy(papago_t *server)
 
 // routing 
 
-int
+uint8_t
 papago_route(papago_t *server, papago_method_t method,
              const char *path, papago_handler_t handler, void *user_data)
 {
 	if (server == NULL || path == NULL || handler == NULL ||
 	    server->route_count >= PAPAGO_MAX_ROUTES) {
-		return -1;
+		return 1;
     }
 
 	papago_route_t *route = &server->routes[server->route_count];
@@ -1122,35 +1122,35 @@ papago_route(papago_t *server, papago_method_t method,
 	return 0;
 }
 
-int
+uint8_t
 papago_get(papago_t *server, const char *path, papago_handler_t handler,
            void *user_data)
 {
 	return papago_route(server, PAPAGO_GET, path, handler, user_data); 
 }
 
-int
+uint8_t
 papago_post(papago_t *server, const char *path, papago_handler_t handler,
             void *user_data)
 {
 	return papago_route(server, PAPAGO_POST, path, handler, user_data); 
 }
 
-int
+uint8_t
 papago_put(papago_t *server, const char *path, papago_handler_t handler,
            void *user_data)
 {
 	return papago_route(server, PAPAGO_PUT, path, handler, user_data);
 }
 
-int
+uint8_t
 papago_delete(papago_t *server, const char *path, papago_handler_t handler,
               void *user_data)
 {
 	return papago_route(server, PAPAGO_DELETE, path, handler, user_data);
 }
 
-int
+uint8_t
 papago_patch(papago_t *server, const char *path, papago_handler_t handler,
              void *user_data)
 {
@@ -1159,19 +1159,19 @@ papago_patch(papago_t *server, const char *path, papago_handler_t handler,
 
 // middleware
 
-int
+uint8_t
 papago_middleware_add(papago_t *server, papago_middleware_fn_t middleware)
 {
 	return papago_middleware_path_add(server, NULL, middleware);
 }
 
-int
+uint8_t
 papago_middleware_path_add(papago_t *server, const char *path,
                            papago_middleware_fn_t middleware)
 {
 	if (server == NULL || middleware == NULL ||
 	    server->middleware_count >= PAPAGO_MAX_MIDDLEWARE) {
-		return -1;
+		return 1;
     }
 
 	papago_middleware_t *mw = &server->middleware[server->middleware_count];
@@ -1185,11 +1185,11 @@ papago_middleware_path_add(papago_t *server, const char *path,
 
 // static Files
 
-int
+uint8_t
 papago_static(papago_t *server, const char *directory)
 {
 	if (server == NULL || directory == NULL) {
-		return -1;
+		return 1;
     }
 
 	server->config.static_dir = papago_strdup(directory);
@@ -1199,7 +1199,7 @@ papago_static(papago_t *server, const char *directory)
 
 // websocket Functions
 
-int
+uint8_t
 papago_ws_endpoint(papago_t *server, const char *path,
                    papago_ws_on_connect_t on_connect,
                    papago_ws_on_message_t on_message,
@@ -1210,7 +1210,7 @@ papago_ws_endpoint(papago_t *server, const char *path,
 
 	if (server == NULL || path == NULL ||
 	    server->ws_endpoint_count >= PAPAGO_MAX_WS_ENDPOINTS) {
-		return -1;
+		return 1;
     }
 
 	endpoint = &server->ws_endpoints[server->ws_endpoint_count];
@@ -1225,17 +1225,17 @@ papago_ws_endpoint(papago_t *server, const char *path,
 	return 0;
 }
 
-int
+uint8_t
 papago_ws_send(papago_ws_connection_t *conn, const char *message)
 {
 	if (conn == NULL || conn->wsi == NULL || message == NULL) {
-		return -1;
+		return 1;
     }
 
 	size_t len = strlen(message);
 	unsigned char *buf = malloc(LWS_PRE + len);
 	if (buf == NULL) {
-		return -1;
+		return 1;
     }
 
 	memcpy(&buf[LWS_PRE], message, len);
@@ -1246,17 +1246,17 @@ papago_ws_send(papago_ws_connection_t *conn, const char *message)
 	return 0;
 }
 
-int
+uint8_t
 papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
                       size_t length)
 {
 	if (conn == NULL || conn->wsi == NULL || data == NULL) {
-		return -1;
+		return 1;
     }
 
 	unsigned char *buf = malloc(LWS_PRE + length);
 	if (buf == NULL) {
-		return -1;
+		return 1;
     }
 
 	memcpy(&buf[LWS_PRE], data, length);
@@ -1267,7 +1267,7 @@ papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
 	return 0;
 }
 
-int
+uint16_t
 papago_ws_broadcast(papago_t *server, const char *message)
 {
 	if (server == NULL || message == NULL) {
@@ -1282,7 +1282,7 @@ papago_ws_broadcast(papago_t *server, const char *message)
 
 	memcpy(&buf[LWS_PRE], message, len);
 
-	int count = 0;
+	uint16_t count = 0;
 	pthread_mutex_lock(&server->ws_mutex);
 
 	for (size_t i = 0; i < server->ws_connection_count; i++) {
@@ -1634,12 +1634,12 @@ memstream_size(const memstream_t *m)
     return m->size;
 }
 
-int
+uint8_t
 papago_render_file(const char *tmpl_path, char *output,
                    size_t output_size, ...)
 {
 	if (tmpl_path == NULL) {
-		return -1;
+		return 1;
 	}
  
 	va_list args;

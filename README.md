@@ -86,12 +86,14 @@ main(void)
 ```
 
 Build and run:
+
 ```sh
 cc -o hello hello.c logger.c maple.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm
 ./hello
 ```
 
 Test:
+
 ```sh
 curl http://localhost:8080/hello
 # {"message":"Hello, World!"}
@@ -113,7 +115,7 @@ void
 user_handler(papago_request_t *req, papago_response_t *res)
 {
     const char *id = papago_req_param(req, "id");
-    // Use id...
+    // use id...
 }
 papago_get(server, "/users/:id", user_handler);
 
