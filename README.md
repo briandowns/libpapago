@@ -1,5 +1,9 @@
 # papago
 
+<a href="https://github.com/badges/shields/actions/workflows/daily-tests.yml">
+        <img src="https://img.shields.io/github/actions/workflow/status/badges/shields/daily-tests.yml?label=daily%20tests"
+            alt="Daily Tests Status"></a>
+
 Modern web framework designed to be full featured and powerful all while being extremely simple to use.
 
 ## Features
@@ -32,7 +36,7 @@ make
 
 ## Quick Start
 
-Below is a very simple demonstration of how to create a single handler for `GET` requests. More examples can be found in the [examples](/examples) directory. For more examples of all of features, use the Makefile.
+Below is a very simple demonstration of how to create a handler for `GET` request. More examples can be found in the [examples](/examples) directory. Each example has a `Makefile` target or you can make every example with `make examples_all`.
 
 ```sh
 make example
@@ -44,13 +48,6 @@ make example_ssl
 
 ```sh
 make example_websocket
-```
-
-or...
-
-
-```sh
-make all_examples
 ```
 
 ### Hello World
