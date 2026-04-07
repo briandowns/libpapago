@@ -1,9 +1,5 @@
 # papago
 
-<a href="https://github.com/badges/shields/actions/workflows/daily-tests.yml">
-        <img src="https://img.shields.io/github/actions/workflow/status/badges/shields/daily-tests.yml?label=daily%20tests"
-            alt="Daily Tests Status"></a>
-
 Modern web framework designed to be full featured and powerful all while being extremely simple to use.
 
 ## Features
