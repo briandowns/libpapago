@@ -416,9 +416,15 @@ papago_res_sendfile(papago_response_t *res, const char *filepath)
 		return 1;
 	}
 
-	fseek(f, 0, SEEK_END);
+	if (fseek(f, 0, SEEK_END) != 0) {
+		fclose(f);
+		return 1;
+	}
 	long size = ftell(f);
-	fseek(f, 0, SEEK_SET);
+	if (fseek(f, 0, SEEK_SET) != 0) {
+		fclose(f);
+		return 1;
+	}
 
 	char *content = malloc(size + 1);
 	if (content == NULL) {
