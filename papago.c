@@ -1414,6 +1414,25 @@ typedef struct {
     size_t pos;
 } memstream_t;
 
+#if defined(__APPLE__)
+static int
+ms_read(void *cookie, char *buf, int size)
+{
+    memstream_t *m = cookie;
+
+    if (m->pos >= m->size)
+        return 0;
+
+    int remain = m->size - m->pos;
+    if (size > remain)
+        size = remain;
+
+    memcpy(buf, m->data + m->pos, size);
+    m->pos += size;
+
+    return size;
+}
+#else
 static ssize_t
 ms_read(void *cookie, char *buf, size_t size)
 {
@@ -1431,7 +1450,35 @@ ms_read(void *cookie, char *buf, size_t size)
 
     return size;
 }
+#endif
 
+#if defined(__APPLE__)
+static int
+ms_write(void *cookie, const char *buf, int size)
+{
+    memstream_t *m = cookie;
+
+    if (m->pos + size + 1 > m->capacity) {
+        size_t newcap = (m->pos + size + 1) * 2;
+        char *newdata = realloc(m->data, newcap);
+        if (!newdata) {
+			return 1;
+		}
+        m->data = newdata;
+        m->capacity = newcap;
+    }
+
+    memcpy(m->data + m->pos, buf, size);
+    m->pos += size;
+
+    if (m->pos > m->size)
+        m->size = m->pos;
+
+    m->data[m->size] = '\0';
+
+    return size;
+}
+#else
 static ssize_t
 ms_write(void *cookie, const char *buf, size_t size)
 {
@@ -1457,7 +1504,35 @@ ms_write(void *cookie, const char *buf, size_t size)
 
     return size;
 }
+#endif
 
+#if defined(__APPLE__)
+static fpos_t
+ms_seek(void *cookie, fpos_t offset, int whence)
+{
+    memstream_t *m = cookie;
+    size_t newpos;
+
+    if (whence == SEEK_SET) {
+        newpos = offset;
+	} else if (whence == SEEK_CUR) {
+        newpos = m->pos + offset;
+    } else if (whence == SEEK_END) {
+        newpos = m->size + offset;
+    } else {
+        return 1;
+    }
+
+    if (newpos > m->size) {
+        return 1;
+	}
+
+    m->pos = newpos;
+    offset = newpos;
+
+    return 0;
+}
+#else
 static int
 ms_seek(void *cookie, off_t *offset, int whence)
 {
@@ -1483,6 +1558,7 @@ ms_seek(void *cookie, off_t *offset, int whence)
 
     return 0;
 }
+#endif
 
 static int
 ms_close(void *cookie)
