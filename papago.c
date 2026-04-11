@@ -334,20 +334,24 @@ const char*
 papago_req_method(const papago_request_t *req)
 {
 	switch (req->method) {
-	case 0:
+	case PAPAGO_GET:
 		return "GET";
-	case 1:
+	case PAPAGO_POST:
 		return "POST";
-	case 2:
+	case PAPAGO_PUT:
 		return "PUT";
-	case 3:
+	case PAPAGO_DELETE:
 		return "DELETE";
-	case 4:
+	case PAPAGO_PATCH:
 		return "PATCH";
-	case 5:
+	case PAPAGO_HEAD:
 		return "HEAD";
-	case 6:
+	case PAPAGO_OPTIONS:
 		return "OPTIONS";
+	case PAPAGO_CONNECT:
+		return "CONNECT";
+	case PAPAGO_TRACE:
+		return "TRACE";
 	default:
 		return "UNKNOWN";
 	}
