@@ -490,7 +490,7 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 #define PAPAGO_STATUS_MESSAGE_LOCKED                          "Locked"
 #define PAPAGO_STATUS_MESSAGE_FAILED_DEPENDENCY               "Failed Dependency"
 #define PAPAGO_STATUS_MESSAGE_TOO_EARLY                       "Too Early"
-#define PAPAGO_STATUS_MESSAGE_UPGRADE_REQIUIRED               "Upgrade Required"
+#define PAPAGO_STATUS_MESSAGE_UPGRADE_REQUIRED                "Upgrade Required"
 #define PAPAGO_STATUS_MESSAGE_PRECONDITION_REQUIRED           "Precondition Required"
 #define PAPAGO_STATUS_MESSAGE_TOO_MANY_REQUESTS               "Too Many Requests"
 #define PAPAGO_STATUS_MESSAGE_REQUEST_HEADER_FIELDS_TOO_LARGE "Request Header Fields Too Large"
@@ -498,10 +498,10 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 #define PAPAGO_STATUS_MESSAGE_INTERNAL_SERVER_ERROR           "Internal Server Error"
 #define PAPAGO_STATUS_MESSAGE_NOT_IMPLEMENTED                 "Not Implemented"
 #define PAPAGO_STATUS_MESSAGE_BAD_GATEWAY                     "Bad Gateway"
-#define PAPAGO_STATUS_MESSAGE_UNAVAILABLE                     "Service Unavailable"
+#define PAPAGO_STATUS_MESSAGE_SERVICE_UNAVAILABLE             "Service Unavailable"
 #define PAPAGO_STATUS_MESSAGE_GATEWAY_TIMEOUT                 "Gateway Timeout"
 #define PAPAGO_STATUS_MESSAGE_HTTP_VERSION_NOT_SUPPORTED      "HTTP Version Not Supported"
-#define PAPAGO_STATUS_MESSAGE_VARIAN_ALSO_NEGOTIATES          "Variant Also Negotiates"
+#define PAPAGO_STATUS_MESSAGE_VARIANT_ALSO_NEGOTIATES          "Variant Also Negotiates"
 #define PAPAGO_STATUS_MESSAGE_INSUFFICIENT_STORAGE            "Insufficient Storage"
 #define PAPAGO_STATUS_MESSAGE_LOOP_DETECTED                   "Loop Detected"
 #define PAPAGO_STATUS_MESSAGE_NOT_EXTENDED                    "Not Extended"
@@ -547,11 +547,11 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 #define PAPAGO_REQUEST_HEADER_WARNING                        "Warning"
 
 #define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN      "Access-Control-Allow-Origin"
-#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN
-#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS    PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN
-#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_MAX_AGE           PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN
-#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_METHODS     PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN
-#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_HEADERS     PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS "Access-Control-Allow-Credentials"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS    "Access-Control-Expose-Headers"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_MAX_AGE           "Access-Control-Max-Age"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_METHODS     "Access-Control-Allow-Methods"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_HEADERS     "Access-Control-Allow-Headers"
 #define PAPAGO_RESPONSE_HEADER_ACCEPT_PATCH                     "Accept-Patch"
 #define PAPAGO_RESPONSE_HEADER_ACCEPT_RANGES                    "Accept-Ranges"
 #define PAPAGO_RESPONSE_HEADER_AGE                              "Age"
