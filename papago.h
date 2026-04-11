@@ -46,22 +46,72 @@ typedef enum {
 	PAPAGO_DELETE,
 	PAPAGO_PATCH,
 	PAPAGO_HEAD,
-	PAPAGO_OPTIONS
+	PAPAGO_CONNECT,
+	PAPAGO_OPTIONS,
+	PAPAGO_TRACE
 } papago_method_t;
 
 typedef enum {
+	PAPAGO_STATUS_CONTINUE = 100, // RFC 7231, 6.2.1
+	PAPAGO_STATUS_SWITCHING_PROTOCOLS = 101, // RFC 7231, 6.2.2
+	PAPAGO_STATUS_PROCESSING = 102, // RFC 2518, 10.1
+	PAPAGO_STATUS_EARLY_HINTS = 103, // RFC 8297
 	PAPAGO_STATUS_OK = 200,
 	PAPAGO_STATUS_CREATED = 201,
 	PAPAGO_STATUS_NO_CONTENT = 204,
+	PAPAGO_STATUS_RESET_CONTENT = 205, // RFC 7231, 6.3.6
+	PAPAGO_STATUS_PARTIAL_CONTENT = 206, // RFC 7233, 4.1
+	PAPAGO_STATUS_MULTI_STATUS = 207, // RFC 4918, 11.1
+	PAPAGO_STATUS_ALREADY_REPORTED = 208, // RFC 5842, 7.1
+	PAPAGO_STATUS_IM_USED = 226, // RFC 3229, 10.4.1
+	PAPAGO_STATUS_MULTIPLE_CHOICES = 300, // RFC 7231, 6.4.1
+	PAPAGO_STATUS_MOVED_PERMANENTLY = 301, // RFC 7231, 6.4.2
+	PAPAGO_STATUS_FOUND = 302, // RFC 7231, 6.4.3
+	PAPAGO_STATUS_SEE_OTHER = 303, // RFC 7231, 6.4.4
+	PAPAGO_STATUS_NOT_MODIFIED = 304, // RFC 7232, 4.1
+	PAPAGO_STATUS_USE_PROXY = 305, // RFC 7231, 6.4.5
+	PAPAGO_STATUS_TEMPORARY_REDIRECT = 307, // RFC 7231, 6.4.7
+	PAPAGO_STATUS_PERMANENT_REDIRECT = 308, // RFC 7538, 3.1
 	PAPAGO_STATUS_BAD_REQUEST = 400,
 	PAPAGO_STATUS_UNAUTHORIZED = 401,
 	PAPAGO_STATUS_FORBIDDEN = 403,
 	PAPAGO_STATUS_NOT_FOUND = 404,
 	PAPAGO_STATUS_METHOD_NOT_ALLOWED = 405,
-	PAPAGO_STATUS_TOO_MANY_REQUESTS = 429,
+	PAPAGO_STATUS_NOT_ACCEPTABLE = 406, // RFC 7231, 6.5.6
+	PAPAGO_STATUS_PROXY_AUTH_REQUIRED = 407, // RFC 7235, 3.2
+	PAPAGO_STATUS_REQUEST_TIMEOUT = 408, // RFC 7231, 6.5.7
+	PAPAGO_STATUS_CONFLICT = 409, // RFC 7231, 6.5.8
+	PAPAGO_STATUS_GONE = 410, // RFC 7231, 6.5.9
+	PAPAGO_STATUS_LENGTH_REQUIRED = 411, // RFC 7231, 6.5.10
+	PAPAGO_STATUS_PRECONDITION_FAILED = 412, // RFC 7232, 4.2
+	PAPAGO_STATUS_REQUEST_ENTITY_TOO_LARGE = 413, // RFC 7231, 6.5.11
+	PAPAGO_STATUS_REQUEST_URI_TOO_LONG = 414, // RFC 7231, 6.5.12
+	PAPAGO_STATUS_UNSUPPORTED_MEDIA_TYPE = 415, // RFC 7231, 6.5.13
+	PAPAGO_STATUS_REQUESTED_RANGE_NOT_SATISFIABLE = 416, // RFC 7233, 4.4
+	PAPAGO_STATUS_EXPECTATION_FAILED = 417, // RFC 7231, 6.5.14
+	PAPAGO_STATUS_TEAPOT = 418, // RFC 7168, 2.3.3
+	PAPAGO_STATUS_MISDIRECTED_REQUEST = 421, // RFC 7540, 9.1.2
+	PAPAGO_STATUS_UNPROCESSABLE_ENTITY = 422, // RFC 4918, 11.2
+	PAPAGO_STATUS_LOCKED = 423, // RFC 4918, 11.3
+	PAPAGO_STATUS_FAILED_DEPENDENCY = 424, // RFC 4918, 11.4
+	PAPAGO_STATUS_TOO_EARLY = 425, // RFC 8470, 5.2.
+	PAPAGO_STATUS_UPGRADE_REQUIRED = 426, // RFC 7231, 6.5.15
+	PAPAGO_STATUS_PRECONDITION_REQUIRED = 428, // RFC 6585, 3
+	PAPAGO_STATUS_TOO_MANY_REQUESTS = 429, // RFC 6585, 4
+	PAPAGO_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE = 431, // RFC 6585, 5
+	PAPAGO_STATUS_UNAVAILABLE_FOR_LEGAL_REASONS = 451, // RFC 7725, 3
 	PAPAGO_STATUS_INTERNAL_ERROR = 500,
-	PAPAGO_STATUS_NOT_IMPLEMENTED = 501
-} papago_status_t;
+	PAPAGO_STATUS_NOT_IMPLEMENTED = 501,
+	PAPAGO_STATUS_BAD_GATEWAY = 502, // RFC 7231, 6.6.3
+	PAPAGO_STATUS_SERVICE_UNAVAILABLE = 503, // RFC 7231, 6.6.4
+	PAPAGO_STATUS_GATEWAY_TIMEOUT = 504, // RFC 7231, 6.6.5
+	PAPAGO_STATUS_HTTP_VERSION_NOT_SUPPORTED = 505, // RFC 7231, 6.6.6
+	PAPAGO_STATUS_VARIANT_ALSO_NEGOTIATES = 506, // RFC 2295, 8.1
+	PAPAGO_STATUS_INSUFFICIENT_STORAGE = 507, // RFC 4918, 11.5
+	PAPAGO_STATUS_LOOP_DETECTED = 508, // RFC 5842, 7.2
+	PAPAGO_STATUS_NOT_EXTENDED = 510, // RFC 2774, 7
+	PAPAGO_STATUS_NETWORK_AUTHENTICATION_REQUIRED = 511 // RFC 6585, 6
+} papago_status_code_t;
 
 typedef struct papago_server papago_t;
 typedef struct papago_request papago_request_t;
@@ -258,7 +308,7 @@ papago_req_client_ip(const papago_request_t *req);
  * Set response status code.
  */
 void
-papago_res_status(papago_response_t *res, papago_status_t status);
+papago_res_status(papago_response_t *res, papago_status_code_t status);
 
 /**
  * Set response header.
@@ -393,6 +443,154 @@ papago_render_template(const char *tmpl, char *output,
 int
 papago_res_render(papago_response_t *res, const char *tmpl, char *output,
                   size_t output_size, ...);
+
+#define PAPAGO_STATUS_MESSAGE_CONTINUE                        "Continue"
+#define PAPAGO_STATUS_MESSAGE_SWITCHING_PROTOCOLS             "Switching Protocols"
+#define PAPAGO_STATUS_MESSAGE_PROCESS                         "Processing"
+#define PAPAGO_STATUS_MESSAGE_EARLY_HINTS                     "Early Hints"
+#define PAPAGO_STATUS_MESSAGE_OK                              "OK"
+#define PAPAGO_STATUS_MESSAGE_CREATED                         "Created"
+#define PAPAGO_STATUS_MESSAGE_ACCEPTED                        "Accepted"
+#define PAPAGO_STATUS_MESSAGE_NONAUTHORITATIVE_INFO           "Non-Authoritative Information"
+#define PAPAGO_STATUS_MESSAGE_NO_CONTENT                      "No Content"
+#define PAPAGO_STATUS_MESSAGE_RESET_CONTENT                   "Reset Content"
+#define PAPAGO_STATUS_MESSAGE_PARTIAL_CONTENT                 "Partial Content"
+#define PAPAGO_STATUS_MESSAGE_MULTI_STATUS                    "Multi-Status"
+#define PAPAGO_STATUS_MESSAGE_ALREADY_REPORTED                "Already Reported"
+#define PAPAGO_STATUS_MESSAGE_IM_USED                         "IM Used"
+#define PAPAGO_STATUS_MESSAGE_MULTIPLE_CHOICES                "Multiple Choices"
+#define PAPAGO_STATUS_MESSAGE_MOVED_PERMANENTLY               "Moved Permanently"
+#define PAPAGO_STATUS_MESSAGE_FOUND                           "Found"
+#define PAPAGO_STATUS_MESSAGE_SEE_OTHER                       "See Other"
+#define PAPAGO_STATUS_MESSAGE_NOT_MODIFIED                    "Not Modified"
+#define PAPAGO_STATUS_MESSAGE_USE_PROXY                       "Use Proxy"
+#define PAPAGO_STATUS_MESSAGE_TEMPORARY_REDIRECT              "Temporary Redirect"
+#define PAPAGO_STATUS_MESSAGE_PERMANENT_REDIRECT              "Permanent Redirect"
+#define PAPAGO_STATUS_MESSAGE_BAD_REQUEST                     "Bad Request"
+#define PAPAGO_STATUS_MESSAGE_UNAUTHORIZED                    "Unauthorized"
+#define PAPAGO_STATUS_MESSAGE_PAYMENT_REQUIRED                "Payment Required"
+#define PAPAGO_STATUS_MESSAGE_FORBIDDEN                       "Forbidden"
+#define PAPAGO_STATUS_MESSAGE_NOT_FOUND                       "Not Found"
+#define PAPAGO_STATUS_MESSAGE_METHOD_NOT_ALLOWED              "Method Not Allowed"
+#define PAPAGO_STATUS_MESSAGE_NOT_ACCEPTABLE                  "Not Acceptable"
+#define PAPAGO_STATUS_MESSAGE_PROXY_AUTH_REQUIRED             "Proxy Authentication Required"
+#define PAPAGO_STATUS_MESSAGE_REQUEST_TIMEOUT                 "Request Timeout"
+#define PAPAGO_STATUS_MESSAGE_CONFLICT                        "Conflict"
+#define PAPAGO_STATUS_MESSAGE_GONE                            "Gone"
+#define PAPAGO_STATUS_MESSAGE_LENGTH_REQUIRED                 "Length Required"
+#define PAPAGO_STATUS_MESSAGE_PRECONDITION_FAILED             "Precondition Failed"
+#define PAPAGO_STATUS_MESSAGE_REQUEST_ENTITY_TOO_LARGE        "Request Entity Too Large"
+#define PAPAGO_STATUS_MESSAGE_REQUEST_URI_TOO_LONG            "Request URI Too Long"
+#define PAPAGO_STATUS_MESSAGE_UNSUPPORTED_MEDIA_TYPE          "Unsupported Media Type"
+#define PAPAGO_STATUS_MESSAGE_REQUESTED_RANGE_NOT_SATISFIABLE "Requested Range Not Satisfiable"
+#define PAPAGO_STATUS_MESSAGE_EXPECTATION_FAILED              "Expectation Failed"
+#define PAPAGO_STATUS_MESSAGE_TEAPOT                          "I'm a teapot"
+#define PAPAGO_STATUS_MESSAGE_MISDIRECTED_REQUEST             "Misdirected Request"
+#define PAPAGO_STATUS_MESSAGE_UNPROCESSABLE_ENTITY            "Unprocessable Entity"
+#define PAPAGO_STATUS_MESSAGE_LOCKED                          "Locked"
+#define PAPAGO_STATUS_MESSAGE_FAILED_DEPENDENCY               "Failed Dependency"
+#define PAPAGO_STATUS_MESSAGE_TOO_EARLY                       "Too Early"
+#define PAPAGO_STATUS_MESSAGE_UPGRADE_REQUIRED                "Upgrade Required"
+#define PAPAGO_STATUS_MESSAGE_PRECONDITION_REQUIRED           "Precondition Required"
+#define PAPAGO_STATUS_MESSAGE_TOO_MANY_REQUESTS               "Too Many Requests"
+#define PAPAGO_STATUS_MESSAGE_REQUEST_HEADER_FIELDS_TOO_LARGE "Request Header Fields Too Large"
+#define PAPAGO_STATUS_MESSAGE_UNAVAILABLE_FOR_LEGAL_REASONS   "Unavailable For Legal Reasons"
+#define PAPAGO_STATUS_MESSAGE_INTERNAL_SERVER_ERROR           "Internal Server Error"
+#define PAPAGO_STATUS_MESSAGE_NOT_IMPLEMENTED                 "Not Implemented"
+#define PAPAGO_STATUS_MESSAGE_BAD_GATEWAY                     "Bad Gateway"
+#define PAPAGO_STATUS_MESSAGE_SERVICE_UNAVAILABLE             "Service Unavailable"
+#define PAPAGO_STATUS_MESSAGE_GATEWAY_TIMEOUT                 "Gateway Timeout"
+#define PAPAGO_STATUS_MESSAGE_HTTP_VERSION_NOT_SUPPORTED      "HTTP Version Not Supported"
+#define PAPAGO_STATUS_MESSAGE_VARIANT_ALSO_NEGOTIATES          "Variant Also Negotiates"
+#define PAPAGO_STATUS_MESSAGE_INSUFFICIENT_STORAGE            "Insufficient Storage"
+#define PAPAGO_STATUS_MESSAGE_LOOP_DETECTED                   "Loop Detected"
+#define PAPAGO_STATUS_MESSAGE_NOT_EXTENDED                    "Not Extended"
+#define PAPAGO_STATUS_MESSAGE_NETWORK_AUTHENTICATION_REQUIRED "Network Authentication Required"
+
+#define PAPAGO_REQUEST_HEADER_AIM                            "A-IM"
+#define PAPAGO_REQUEST_HEADER_ACCEPT                         "Accept"
+#define PAPAGO_REQUEST_HEADER_ACCEPT_CHARSET                 "Accept-Charset"
+#define PAPAGO_REQUEST_HEADER_ACCEPT_DATETIME                "Accept-Datetime"
+#define PAPAGO_REQUEST_HEADER_ACCEPT_ENCODING                "Accept-Encoding"
+#define PAPAGO_REQUEST_HEADER_ACCEPT_LANGUAGE                "Accept-Language"
+#define PAPAGO_REQUEST_HEADER_ACCEPT_CONTROL_REQUEST_METHOD  "Access-Control-Request-Method"
+#define PAPAGO_REQUEST_HEADER_ACCEPT_CONTROL_REQUEST_HEADERS "Access-Control-Request-Headers"
+#define PAPAGO_REQUEST_HEADER_AUTHORIZATION                  "Authorization"
+#define PAPAGO_REQUEST_HEADER_CACHE_CONTROL                  "Cache-Control"
+#define PAPAGO_REQUEST_HEADER_CONNECTION                     "Connection"
+#define PAPAGO_REQUEST_HEADER_CONTENT_ENCODING               "Content-Encoding"
+#define PAPAGO_REQUEST_HEADER_CONTENT_LENGTH                 "Content-Length"
+#define PAPAGO_REQUEST_HEADER_CONTENT_MD5                    "Content-MD5"
+#define PAPAGO_REQUEST_HEADER_CONTENT_TYPE                   "Content-Type"
+#define PAPAGO_REQUEST_HEADER_COOKIE                         "Cookie"
+#define PAPAGO_REQUEST_HEADER_DATE                           "Date"
+#define PAPAGO_REQUEST_HEADER_EXPECT                         "Expect"
+#define PAPAGO_REQUEST_HEADER_FORWARDED                      "Forwarded"
+#define PAPAGO_REQUEST_HEADER_FROM                           "From"
+#define PAPAGO_REQUEST_HEADER_HOST                           "Host"	
+#define PAPAGO_REQUEST_HEADER_HTTP2_SETTINGS                 "HTTP2-Settings"
+#define PAPAGO_REQUEST_HEADER_IF_MATCH                       "If-Match"
+#define PAPAGO_REQUEST_HEADER_IF_MODIFIED_SINCE              "If-Modified-Since"
+#define PAPAGO_REQUEST_HEADER_IF_NONE_MATCH                  "If-None-Match"
+#define PAPAGO_REQUEST_HEADER_IF_RANGE                       "If-Range"
+#define PAPAGO_REQUEST_HEADER_IF_UNMODIFIED_SINCE            "If-Unmodified-Since"
+#define PAPAGO_REQUEST_HEADER_MAX_FORWARDS                   "Max-Forwards"
+#define PAPAGO_REQUEST_HEADER_PRAGMA                         "Pragma"
+#define PAPAGO_REQUEST_HEADER_PROXY_AUTHORIZATION            "Proxy-Authorization"
+#define PAPAGO_REQUEST_HEADER_RANGE                          "Range"
+#define PAPAGO_REQUEST_HEADER_REFERRER                       "Referer"
+#define PAPAGO_REQUEST_HEADER_TE                             "TE"
+#define PAPAGO_REQUEST_HEADER_TRAILER                        "Trailer"	
+#define PAPAGO_REQUEST_HEADER_TRANSFER_ENCODING              "Transfer-Encoding"
+#define PAPAGO_REQUEST_HEADER_USER_AGENT                     "User-Agent"
+#define PAPAGO_REQUEST_HEADER_UPGRADE                        "Upgrade"
+#define PAPAGO_REQUEST_HEADER_WARNING                        "Warning"
+
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN      "Access-Control-Allow-Origin"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS "Access-Control-Allow-Credentials"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS    "Access-Control-Expose-Headers"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_MAX_AGE           "Access-Control-Max-Age"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_METHODS     "Access-Control-Allow-Methods"
+#define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_HEADERS     "Access-Control-Allow-Headers"
+#define PAPAGO_RESPONSE_HEADER_ACCEPT_PATCH                     "Accept-Patch"
+#define PAPAGO_RESPONSE_HEADER_ACCEPT_RANGES                    "Accept-Ranges"
+#define PAPAGO_RESPONSE_HEADER_AGE                              "Age"
+#define PAPAGO_RESPONSE_HEADER_ALLOW                            "Allow"	
+#define PAPAGO_RESPONSE_HEADER_ALT_SVC                          "Alt-Svc"
+#define PAPAGO_RESPONSE_HEADER_CACHE_CONTROL                    "Cache-Control"
+#define PAPAGO_RESPONSE_HEADER_CONNECTION                       "Connection"
+#define PAPAGO_RESPONSE_HEADER_CONTENT_DISPOSITION              "Content-Disposition"
+#define PAPAGO_RESPONSE_HEADER_CONTENT_ENCODING                 "Content-Encoding"
+#define PAPAGO_RESPONSE_HEADER_CONTENT_LANGUAGE                 "Content-Language"
+#define PAPAGO_RESPONSE_HEADER_CONTENT_LENGTH                   "Content-Length"
+#define PAPAGO_RESPONSE_HEADER_CONTENT_LOCATION                 "Content-Location"
+#define PAPAGO_RESPONSE_HEADER_CONTENT_MD5                      "Content-MD5"
+#define PAPAGO_RESPONSE_HEADER_CONTENT_RANGE                    "Content-Range"
+#define PAPAGO_RESPONSE_HEADER_CONTENT_TYPE                     "Content-Type"
+#define PAPAGO_RESPONSE_HEADER_DATE                             "Date"
+#define PAPAGO_RESPONSE_HEADER_DELTA_BASE                       "Delta-Base"
+#define PAPAGO_RESPONSE_HEADER_ETAG                             "ETag"
+#define PAPAGO_RESPONSE_HEADER_EXPIRES                          "Expires"
+#define PAPAGO_RESPONSE_HEADER_IM                               "IM"
+#define PAPAGO_RESPONSE_HEADER_LAST_MODIFIED                    "Last-Modified"
+#define PAPAGO_RESPONSE_HEADER_LINK                             "Link"
+#define PAPAGO_RESPONSE_HEADER_LOCATION                         "Location"
+#define PAPAGO_RESPONSE_HEADER_P3P                              "P3P"
+#define PAPAGO_RESPONSE_HEADER_PRAGMA                           "Pragma"
+#define PAPAGO_RESPONSE_HEADER_PROXY_AUTHENTICATE               "Proxy-Authenticate"
+#define PAPAGO_RESPONSE_HEADER_PUBLIC_KEY_PINS                  "Public-Key-Pins"
+#define PAPAGO_RESPONSE_HEADER_RETRY_AFTER                      "Retry-After"
+#define PAPAGO_RESPONSE_HEADER_SET_COOKIE                       "Set-Cookie"
+#define PAPAGO_RESPONSE_HEADER_STRICT_TRANSPORT_SECURITY        "Strict-Transport-Security"
+#define PAPAGO_RESPONSE_HEADER_TRAILER                          "Trailer"
+#define PAPAGO_RESPONSE_HEADER_TRANSFER_ENCODING                "Transfer-Encoding"
+#define PAPAGO_RESPONSE_HEADER_TK                               "Tk"
+#define PAPAGO_RESPONSE_HEADER_UPGRADE                          "Upgrade"
+#define PAPAGO_RESPONSE_HEADER_VARY                             "Vary"
+#define PAPAGO_RESPONSE_HEADER_VIA                              "Via"
+#define PAPAGO_RESPONSE_HEADER_WARNING                          "Warning"
+#define PAPAGO_RESPONSE_HEADER_WWW_AUTHENTICATE                 "WWW-Authenticate"
+#define PAPAGO_RESPONSE_HEADER_X_FRAME_OPTIONS                  "X-Frame-Options"
 
 #ifdef __cplusplus
 }
