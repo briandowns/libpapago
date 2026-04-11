@@ -81,7 +81,7 @@ struct papago_request {
  * Response structure 
  */
 struct papago_response {
-	papago_status_t status;
+	papago_status_code_t status;
 	char *body;
 	size_t body_length;
 	papago_kv_t *headers;
@@ -376,7 +376,7 @@ papago_req_client_ip(const papago_request_t *req)
 }
 
 void
-papago_res_status(papago_response_t *res, papago_status_t status)
+papago_res_status(papago_response_t *res, papago_status_code_t status)
 {
 	res->status = status;
 }
@@ -455,7 +455,7 @@ papago_res_sendfile(papago_response_t *res, const char *filepath)
 
 static void
 papago_log_request(papago_t *server, struct MHD_Connection *connection,
-                   const char *url, const char *method, papago_status_t status,
+                   const char *url, const char *method, papago_status_code_t status,
                    const struct timeval *start_time, const char *version)
 {
 	PAPAGO_UNUSED(server);
