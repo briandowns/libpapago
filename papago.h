@@ -137,8 +137,9 @@ typedef struct {
 	int port;
 	char *host;
 	bool enable_ssl;
-	bool enable_template_rendering;
 	bool enable_logging;
+	bool enable_template_rendering;
+	bool enable_rate_limiting;
 	char *cert_file;
 	char *key_file;
 	FILE *log_output_dst;
@@ -419,6 +420,24 @@ papago_url_encode(const char *str);
  */
 char*
 papago_url_decode(const char *str);
+
+// rate limiting
+
+/**
+ * Enable rate limiting by IP address
+ * max_requests: Maximum requests allowed
+ * window_seconds: Time window in seconds
+ */
+void
+papago_enable_rate_limit(papago_t *server, int max_requests,
+                         uint16_t window_seconds);
+ 
+/**
+ * Check if request should be rate limited
+ * Returns: true if rate limit exceeded, false otherwise
+ */
+bool
+papago_check_rate_limit(papago_request_t *req, papago_response_t *res);
 
 // template rendering
 

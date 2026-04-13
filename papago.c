@@ -126,6 +126,15 @@ struct papago_server {
 };
 
 /**
+ * Rate limit structure
+ */
+typedef struct {
+	char ip[INET6_ADDRSTRLEN];
+	int count;
+	time_t window_start;
+} papago_rate_limit_entry_t;
+
+/**
  * Global server for signal handling
  */
 static volatile papago_t *g_server = NULL;
