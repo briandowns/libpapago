@@ -434,8 +434,10 @@ papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
                          uint16_t window_seconds);
  
 /**
- * Check if request should be rate limited. Returns true if rate limit is
- * exceeded or false.
+ * Check if request has exceeded the rate limit. Returns true when the rate
+ * limit is exceeded. In that case, this function also mutates res by setting
+ * a 429 response, adding a `Retry-After` header, and marking the response as
+ * sent, otherwise returns false.
  */
 bool
 papago_check_rate_limit(papago_request_t *req, papago_response_t *res);

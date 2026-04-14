@@ -137,118 +137,6 @@ typedef struct {
 	time_t window_start;
 } papago_rate_limit_entry_t;
 
- 
-void
-papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
-                         uint16_t window_seconds)
-{
- 
-	if (server == NULL) {
-		return;
-	}
-
-	server->config.enable_rate_limiting = true;
-	server->config.rate_limit_requests = max_requests;
-	server->config.rate_limit_window = window_seconds;
-
-	if (server->rate_limit_map == NULL) {
-		server->rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
-		    sizeof(papago_rate_limit_entry_t));
-	}
-}
- 
-bool
-papago_check_rate_limit(papago_request_t *req, papago_response_t *res)
-{ 
-	papago_t *server = papago_get_current_server();
-	if (server == NULL || !server->config.enable_rate_limiting) {
-		return false;
-	}
-
-	// get client ip address
-	const union MHD_ConnectionInfo *conn_info = MHD_get_connection_info(req->connection,
-	    MHD_CONNECTION_INFO_CLIENT_ADDRESS);
-	if (conn_info == NULL) {
-		return false;
-	}
-
-	char client_ip[INET6_ADDRSTRLEN];
-	client_ip[0] = '\0';
-
-	if (conn_info->client_addr->sa_family == AF_INET) {
-		struct sockaddr_in *addr = (struct sockaddr_in *)conn_info->client_addr;
-		inet_ntop(AF_INET, &addr->sin_addr, client_ip, sizeof(client_ip));
-	} else if (conn_info->client_addr->sa_family == AF_INET6) {
-		struct sockaddr_in6 *addr = (struct sockaddr_in6 *)conn_info->client_addr;
-		inet_ntop(AF_INET6, &addr->sin6_addr, client_ip, sizeof(client_ip));
-	}
- 
-	if (client_ip[0] == '\0') {
-		return false;
-	}
- 
-	papago_rate_limit_entry_t *entries = (papago_rate_limit_entry_t *)server->rate_limit_map;
-	time_t now = time(NULL);
-	bool found = false;
-	int slot = -1;
- 
-	pthread_mutex_lock(&server->rate_limit_mutex);
- 
-	// find existing entry or free slot
-	for (size_t i = 0; i < MAX_RATE_LIMIT_ENTRIES; i++) {
-		if (entries[i].ip[0] == '\0') {
-			if (slot == -1) {
-				slot = i;
-			}
-				
-			continue;
-		}
- 
-		// clean expired entries
-		if (now - entries[i].window_start >= server->config.rate_limit_window) {
-			entries[i].ip[0] = '\0';
-			entries[i].count = 0;
-			if (slot == -1) {
-				slot = i;
-			}
-				
-			continue;
-		}
- 
-		// found existing entry
-		if (strcmp(entries[i].ip, client_ip) == 0) {
-			found = true;
-			entries[i].count++;
- 
-			// check if rate limit exceeded 
-			if (entries[i].count > server->config.rate_limit_requests) {
-				pthread_mutex_unlock(&server->rate_limit_mutex);
- 
-				// send rate limit response
-				papago_res_status(res, PAPAGO_STATUS_TOO_MANY_REQUESTS);
-
-				static char buf[32];
-				snprintf(buf, sizeof(buf), "%d", server->config.rate_limit_window);
-				papago_res_header(res, "Retry-After", buf);
-				papago_res_send(res, "rate limit exceeded");
- 
-				return true;
-			}
-			break;
-		}
-	}
- 
-	if (!found && slot != -1) {
-		strncpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
-		entries[slot].count = 1;
-		entries[slot].window_start = now;
-	}
- 
-	pthread_mutex_unlock(&server->rate_limit_mutex);
- 
-	return false;
-}
-
 /**
  * Global server for signal handling
  */
@@ -960,6 +848,7 @@ papago_new(void)
 
 	pthread_mutex_init(&server->ws_mutex, NULL);
 	pthread_mutex_init(&server->shutdown_mutex, NULL);
+	pthread_mutex_init(&server->rate_limit_mutex, NULL);
 	pthread_cond_init(&server->shutdown_cond, NULL);
 
 	server->ws_connection_count = 0;
@@ -1220,6 +1109,7 @@ papago_destroy(papago_t *server)
 	// destroy synchronization primitives
 	pthread_mutex_destroy(&server->ws_mutex);
 	pthread_mutex_destroy(&server->shutdown_mutex);
+	pthread_mutex_destroy(&server->rate_limit_mutex);
 	pthread_cond_destroy(&server->shutdown_cond);
 
 	// free template engine memory
@@ -1765,6 +1655,120 @@ static size_t
 memstream_size(const memstream_t *m)
 {
     return m->size;
+}
+
+void
+papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
+                         uint16_t window_seconds)
+{
+	if (server == NULL) {
+		return;
+	}
+
+	server->config.enable_rate_limiting = true;
+	server->config.rate_limit_requests = max_requests;
+	server->config.rate_limit_window = window_seconds;
+
+	if (server->rate_limit_map == NULL) {
+		void *rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
+			sizeof(papago_rate_limit_entry_t));
+		if (rate_limit_map == NULL) {
+			server->config.enable_rate_limiting = false;
+			return;
+		}
+		server->rate_limit_map = rate_limit_map;
+	}
+}
+ 
+bool
+papago_check_rate_limit(papago_request_t *req, papago_response_t *res)
+{ 
+	papago_t *server = papago_get_current_server();
+	if (server == NULL || !server->config.enable_rate_limiting) {
+		return false;
+	}
+
+	// get client ip address
+	const union MHD_ConnectionInfo *conn_info = MHD_get_connection_info(req->connection,
+	    MHD_CONNECTION_INFO_CLIENT_ADDRESS);
+	if (conn_info == NULL) {
+		return false;
+	}
+
+	char client_ip[INET6_ADDRSTRLEN];
+	client_ip[0] = '\0';
+
+	if (conn_info->client_addr->sa_family == AF_INET) {
+		struct sockaddr_in *addr = (struct sockaddr_in *)conn_info->client_addr;
+		inet_ntop(AF_INET, &addr->sin_addr, client_ip, sizeof(client_ip));
+	} else if (conn_info->client_addr->sa_family == AF_INET6) {
+		struct sockaddr_in6 *addr = (struct sockaddr_in6 *)conn_info->client_addr;
+		inet_ntop(AF_INET6, &addr->sin6_addr, client_ip, sizeof(client_ip));
+	}
+ 
+	if (client_ip[0] == '\0') {
+		return false;
+	}
+ 
+	papago_rate_limit_entry_t *entries = (papago_rate_limit_entry_t *)server->rate_limit_map;
+	time_t now = time(NULL);
+	bool found = false;
+	int slot = -1;
+ 
+	pthread_mutex_lock(&server->rate_limit_mutex);
+ 
+	// find existing entry or free slot
+	for (size_t i = 0; i < MAX_RATE_LIMIT_ENTRIES; i++) {
+		if (entries[i].ip[0] == '\0') {
+			if (slot == -1) {
+				slot = i;
+			}
+			continue;
+		}
+ 
+		// clean expired entries
+		if (now - entries[i].window_start >= server->config.rate_limit_window) {
+			entries[i].ip[0] = '\0';
+			entries[i].count = 0;
+			if (slot == -1) {
+				slot = i;
+			}
+			continue;
+		}
+ 
+		// found existing entry
+		if (strcmp(entries[i].ip, client_ip) == 0) {
+			found = true;
+			entries[i].count++;
+ 
+			// check if rate limit exceeded 
+			if (entries[i].count > server->config.rate_limit_requests) {
+				pthread_mutex_unlock(&server->rate_limit_mutex);
+ 
+				// send rate limit response
+				papago_res_status(res, PAPAGO_STATUS_TOO_MANY_REQUESTS);
+
+				char buf[32];
+				snprintf(buf, sizeof(buf), "%d", server->config.rate_limit_window);
+				papago_res_header(res, "Retry-After", buf);
+				papago_res_send(res, "rate limit exceeded");
+ 
+				return true;
+			}
+			break;
+		}
+	}
+ 
+	if (!found && slot != -1) {
+		strncpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
+		entries[slot].ip[sizeof(entries[slot].ip)-1] = '\0';
+		entries[slot].count = 1;
+		entries[slot].window_start = now;
+	}
+ 
+	pthread_mutex_unlock(&server->rate_limit_mutex);
+ 
+	return false;
 }
 
 uint8_t
