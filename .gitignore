@@ -10,6 +10,7 @@ example
 example_ssl
 example_websocket
 example_template
+example_rate_limit
 debug_build
 
 libpapago.dylib

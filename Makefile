@@ -84,5 +84,9 @@ example_websocket: clean
 example_template: clean
 	$(CC) -o $@ logger.c maple.c examples/template_example.c papago.c $(CFLAGS) $(LDFLAGS)
 
+.PHONY: example_rate_limit
+example_rate_limit: clean
+	$(CC) -o $@ logger.c maple.c papago.c examples/example_rate_limit.c $(CFLAGS) $(LDFLAGS)
+
 .PHONY: examples_all
-examples_all: example example_ssl example_websocket example_template
+examples_all: example example_ssl example_websocket example_template example_rate_limit
