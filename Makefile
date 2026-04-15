@@ -65,7 +65,7 @@ endif
 clean:
 	rm -f $(NAME).dylib
 	rm -f $(NAME).so
-	rm -f example example_ssl example_websocket example_template
+	rm -f example example_ssl example_websocket example_template example_rate_limit example_compression
 	rm -f tests/tests
 
 .PHONY: example

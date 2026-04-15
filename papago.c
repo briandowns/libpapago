@@ -546,9 +546,9 @@ papago_compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
 		return NULL;
 	}
  
-	stream.avail_in = data_len;
+	stream.avail_in = (uInt)data_len;
 	stream.next_in = (Bytef*)data;
-	stream.avail_out = max_compressed;
+	stream.avail_out = (uInt)max_compressed;
 	stream.next_out = (Bytef*)compressed;
  
 	// compress
@@ -719,16 +719,28 @@ send_response:
 		if (use_compression && compressed_body != NULL) {
 			mhd_response = MHD_create_response_from_buffer(compressed_len,
 				compressed_body, MHD_RESPMEM_MUST_FREE);
+			if (mhd_response == NULL) {
+				return MHD_NO;
+			}
+			
 
 			MHD_add_response_header(mhd_response, "Content-Encoding", "gzip");
+			MHD_add_response_header(mhd_response, "Vary", "Accept-Encoding");
 		} else {
 			mhd_response = MHD_create_response_from_buffer(res->body_length,
 				res->body != NULL ? res->body : "", MHD_RESPMEM_MUST_COPY);
+			if (mhd_response == NULL) {
+				free(compressed_body);
+				return MHD_NO;
+			}
 		}
 	} else {
 		// create MHD response
 		mhd_response = MHD_create_response_from_buffer(res->body_length,
 	    	res->body != NULL ? res->body : "", MHD_RESPMEM_MUST_COPY);
+		if (mhd_response == NULL) {
+			return MHD_NO;
+		}
 	}
 
 	// add headers
