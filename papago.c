@@ -16,6 +16,7 @@
 
 #include <libwebsockets.h>
 #include <microhttpd.h>
+#include <zlib.h>
 
 #include "logger.h"
 #include "maple.h"
@@ -246,6 +247,7 @@ papago_default_config(void)
 	config.enable_logging = false;
 	config.enable_template_rendering = false;
 	config.enable_rate_limiting = false;
+	config.enable_compression = false;
 	config.cert_file = NULL;
 	config.key_file = NULL;
 	config.static_dir = NULL;
@@ -516,6 +518,52 @@ papago_log_request(papago_t *server, struct MHD_Connection *connection,
 	}
 }
 
+// compression 
+
+/**
+ * Compress data using gzip.
+ */
+static char *
+papago_compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
+{
+	// estimate maximum compressed size
+	size_t max_compressed = compressBound(data_len);
+	char *compressed = malloc(max_compressed);
+	if (compressed == NULL) {
+		return NULL;
+	}
+ 
+	z_stream stream;
+	stream.zalloc = Z_NULL;
+	stream.zfree = Z_NULL;
+	stream.opaque = Z_NULL;
+ 
+	// use gzip format (windowBits = 15 + 16)
+	int ret = deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+		15 + 16, 8, Z_DEFAULT_STRATEGY);
+	if (ret != Z_OK) {
+		free(compressed);
+		return NULL;
+	}
+ 
+	stream.avail_in = data_len;
+	stream.next_in = (Bytef*)data;
+	stream.avail_out = max_compressed;
+	stream.next_out = (Bytef*)compressed;
+ 
+	// compress
+	if (deflate(&stream, Z_FINISH) != Z_STREAM_END) {
+		deflateEnd(&stream);
+		free(compressed);
+		return NULL;
+	}
+ 
+	*compressed_len = stream.total_out;
+	deflateEnd(&stream);
+ 
+	return compressed;
+}
+
 // libmicrohttpd Request Handler
 
 static enum MHD_Result
@@ -525,8 +573,8 @@ papago_mhd_handler(void *cls, struct MHD_Connection *connection,
                    void **con_cls)
 {
 	papago_t *server = (papago_t *)cls;
+	struct MHD_Response *mhd_response = NULL;
 	papago_request_t *req;
-	struct MHD_Response *mhd_response;
 	enum MHD_Result ret;
 	bool route_found;
 
@@ -640,11 +688,48 @@ papago_mhd_handler(void *cls, struct MHD_Connection *connection,
 
 send_response:
 	papago_log_request(server, connection, req->path, method, res->status,
-		&req->start_time, version); 
+		&req->start_time, version);
 
-	// create MHD response
-	mhd_response = MHD_create_response_from_buffer(res->body_length,
-	    res->body != NULL ? res->body : "", MHD_RESPMEM_MUST_COPY);
+	if (server->config.enable_compression) {
+		char *compressed_body = NULL;
+		size_t compressed_len = 0;
+
+		const char *accept_encoding = MHD_lookup_connection_value(connection,
+			MHD_HEADER_KIND, "Accept-Encoding");
+		bool use_compression = false;
+	
+		if (server->config.enable_compression && 
+			accept_encoding != NULL &&
+			strstr(accept_encoding, "gzip") != NULL &&
+			res->body != NULL && res->body_length > 0) {
+			
+			compressed_body = papago_compress_gzip(res->body, res->body_length,
+				&compressed_len);
+			
+			if (compressed_body != NULL && compressed_len < res->body_length) {
+				// compression successful and beneficial
+				use_compression = true;
+			} else {
+				// compression failed or not beneficial
+				free(compressed_body);
+				compressed_body = NULL;
+			}
+		}
+
+		if (use_compression && compressed_body != NULL) {
+			mhd_response = MHD_create_response_from_buffer(compressed_len,
+				compressed_body, MHD_RESPMEM_MUST_FREE);
+
+			MHD_add_response_header(mhd_response, "Content-Encoding", "gzip");
+		} else {
+			mhd_response = MHD_create_response_from_buffer(res->body_length,
+				res->body != NULL ? res->body : "", MHD_RESPMEM_MUST_COPY);
+		}
+	} else {
+		// create MHD response
+		mhd_response = MHD_create_response_from_buffer(res->body_length,
+	    	res->body != NULL ? res->body : "", MHD_RESPMEM_MUST_COPY);
+	}
 
 	// add headers
 	for (size_t i = 0; i < res->header_count; i++) {

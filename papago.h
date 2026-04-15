@@ -140,6 +140,7 @@ typedef struct {
 	bool enable_logging;
 	bool enable_template_rendering;
 	bool enable_rate_limiting;
+	bool enable_compression;
 	uint16_t rate_limit_requests;
 	uint16_t rate_limit_window;
 	char *cert_file;
@@ -436,7 +437,7 @@ papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
 /**
  * Check if request has exceeded the rate limit. Returns true when the rate
  * limit is exceeded. In that case, this function also mutates res by setting
- * a 429 response, adding a `Retry-After` header, and marking the response as
+ * a 429 response, adding a "Retry-After" header, and marking the response as
  * sent, otherwise returns false.
  */
 bool
