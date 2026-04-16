@@ -65,7 +65,7 @@ endif
 clean:
 	rm -f $(NAME).dylib
 	rm -f $(NAME).so
-	rm -f example example_ssl example_websocket example_template
+	rm -f example example_ssl example_websocket example_template example_rate_limit example_compression
 	rm -f tests/tests
 
 .PHONY: example
@@ -88,5 +88,9 @@ example_template: clean
 example_rate_limit: clean
 	$(CC) -o $@ logger.c maple.c papago.c examples/example_rate_limit.c $(CFLAGS) $(LDFLAGS)
 
+.PHONY: example_compression
+example_compression: clean
+	$(CC) -o $@ logger.c maple.c papago.c examples/example_compression.c $(CFLAGS) $(LDFLAGS)
+
 .PHONY: examples_all
-examples_all: example example_ssl example_websocket example_template example_rate_limit
+examples_all: example example_ssl example_websocket example_template example_rate_limit example_compression

@@ -93,6 +93,7 @@ main(void)
 	papago_config_t config = papago_default_config();
 	config.port = 8282;
 	config.enable_logging = true;
+    config.enable_compression = true;
 	papago_configure(server, &config);
 
     papago_enable_rate_limit(server, 5, 30);

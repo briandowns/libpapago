@@ -15,6 +15,7 @@ Modern web framework designed to be full featured and powerful all while being e
 - Thread-Safe - Built on proven concurrent architecture
 - Low Dependencies - Only requires libmicrohttpd + libwebsockets
 - Rate limiting by IP
+- Compression with Gzip
 
 ## Dependencies
 
