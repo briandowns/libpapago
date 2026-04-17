@@ -17,9 +17,12 @@
 #include <libwebsockets.h>
 #include <microhttpd.h>
 #include <zlib.h>
-
+#ifndef NO_LOGGER
 #include "logger.h"
+#endif
+#ifndef NO_TEMPLATE
 #include "maple.h"
+#endif
 #include "papago.h"
 
 #define	PAPAGO_MAX_ROUTES 256
@@ -118,7 +121,9 @@ struct papago_server {
 	size_t ws_endpoint_count;
 	pthread_t lws_thread;
 	volatile bool running;
+#ifndef NO_TEMPLATE
 	mp_context_t *maple_ctx;
+#endif
 	papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
 	size_t ws_connection_count;
 	pthread_mutex_t ws_mutex;
@@ -476,6 +481,15 @@ papago_log_request(papago_t *server, struct MHD_Connection *connection,
                    const char *url, const char *method, papago_status_code_t status,
                    const struct timeval *start_time, const char *version)
 {
+#ifdef NO_LOGGER
+	PAPAGO_UNUSED(server);
+	PAPAGO_UNUSED(connection);
+	PAPAGO_UNUSED(url);
+	PAPAGO_UNUSED(method);
+	PAPAGO_UNUSED(status);
+	PAPAGO_UNUSED(start_time);
+	PAPAGO_UNUSED(version);
+#else
 	PAPAGO_UNUSED(server);
 	
 	const union MHD_ConnectionInfo *conn_info = MHD_get_connection_info(
@@ -516,6 +530,7 @@ papago_log_request(papago_t *server, struct MHD_Connection *connection,
 			s_log_int("status", (int)status),
 			s_log_int64("duration_ms", (int64_t)duration_ms));
 	}
+#endif
 }
 
 // compression 
@@ -994,7 +1009,9 @@ papago_start(papago_t *server)
 	char *key_pem = NULL;
 
 	if (server->config.enable_logging) {
+#ifndef NO_LOGGER
 		s_log_init(stdout);
+#endif
 	}
 
 	// determine libmicrohttpd flags
@@ -1002,12 +1019,14 @@ papago_start(papago_t *server)
 		| MHD_USE_INTERNAL_POLLING_THREAD;
 
 	if (server->config.enable_template_rendering) {
+#ifndef NO_TEMPLATE
 		server->maple_ctx = mp_init();
 		if (server->maple_ctx == NULL) {
 			server->error_message = "failed to initialize Maple template engine";
 
 			return 1;
 		}
+#endif
 	}
 
 	// start libmicrohttpd daemon with optional SSL
@@ -1110,19 +1129,23 @@ papago_start(papago_t *server)
 	}
 
 	if (server->config.enable_logging) {
+#ifndef NO_LOGGER
 		s_log(S_LOG_INFO, 
 			s_log_string("msg", "server started"),
 			s_log_int("port", server->config.port),
 			s_log_string("type", server->config.enable_ssl ? "HTTPS" : "HTTP"));
+#endif
 	}
 	
 
 	if (server->ws_endpoint_count > 0) {
 		if (server->config.enable_logging) {
+#ifndef NO_LOGGER
 			s_log(S_LOG_INFO, 
 				s_log_string("msg", "websocket server started"),
 				s_log_int("port", server->config.port+1),
 				s_log_string("type", server->config.enable_ssl ? "WSS" : "WS"));
+#endif
 		}
 	}
 
@@ -1210,9 +1233,11 @@ papago_destroy(papago_t *server)
 	pthread_cond_destroy(&server->shutdown_cond);
 
 	// free template engine memory
+#ifndef NO_TEMPLATE
 	if (server->maple_ctx != NULL) {
 		mp_free(server->maple_ctx);
 	}
+#endif
 
 	free(server);
 	g_server = NULL;
@@ -1527,6 +1552,7 @@ papago_url_decode(const char *str)
 	return decoded;
 }
 
+#ifndef NO_TEMPLATE
 typedef struct {
     char *data;
     size_t size;
@@ -1753,6 +1779,7 @@ memstream_size(const memstream_t *m)
 {
     return m->size;
 }
+#endif 
 
 void
 papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
@@ -1872,6 +1899,10 @@ uint8_t
 papago_render_file(const char *tmpl_path, char *output,
                    size_t output_size, ...)
 {
+#ifdef NO_TEMPLATE
+	(void)tmpl_path; (void)output; (void)output_size;
+	return 1;
+#else
 	if (tmpl_path == NULL) {
 		return 1;
 	}
@@ -1900,11 +1931,16 @@ papago_render_file(const char *tmpl_path, char *output,
 	fclose(buf);
  
 	return 0;
+#endif
 }
  
 uint8_t
 papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 {
+#ifdef NO_TEMPLATE
+	(void)tmpl; (void)output; (void)output_size;
+	return 1;
+#else
 	if (tmpl == NULL) {
 		return 1;
 	}
@@ -1941,12 +1977,17 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 	fclose(buf);
  
 	return 0;
+#endif
 }
  
 int
 papago_res_render(papago_response_t *res, const char *tmpl, char *output,
                   size_t output_size, ...)
 {
+#ifdef NO_TEMPLATE
+	(void)res; (void)tmpl; (void)output; (void)output_size;
+	return -1;
+#else
 	if (res == NULL || tmpl == NULL) {
 		return -1;
 	}
@@ -1978,4 +2019,5 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 	papago_res_header(res, "Content-Type", "text/html; charset=utf-8");
  
 	return papago_res_send(res, output);
+#endif
 }

@@ -5,6 +5,15 @@ NAME = libpapago
 UNAME_S = $(shell uname -s)
 
 CFLAGS  = -O3 -fPIC -Wall -Wextra
+
+ifdef NO_LOGGER
+	CFLAGS += -DNO_LOGGER
+endif
+
+ifdef NO_TEMPLATE
+	CFLAGS += -DNO_TEMPLATE
+endif
+
 ifneq (,$(filter $(UNAME_S),FreeBSD Darwin))
 	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
               $(shell pkg-config --cflags --libs libmicrohttpd) \
