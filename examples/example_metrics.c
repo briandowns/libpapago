@@ -25,12 +25,13 @@
  * SUCH DAMAGE.
  */
 
-#include <jansson.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+
+#include <jansson.h>
 
 #include "../papago.h"
 
@@ -83,8 +84,15 @@ health_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 	PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-    json_t *root = json_pack("{s:s, s:i}", "status", "UP", "timestamp", time(NULL));
-	
+    json_t *root = json_pack("{s:s, s:o}",
+        "status", "UP",
+        "timestamp", json_integer((json_int_t)time(NULL)));
+	if (root == NULL) {
+        fprintf(stderr, "failed to create JSON\n");
+        papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        return;
+
+    }
     char *result = json_dumps(root, 0);
     if (result == NULL) {
         fprintf(stderr, "failed to serialize JSON\n");

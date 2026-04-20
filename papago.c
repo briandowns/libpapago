@@ -1,7 +1,9 @@
+#include <limits.h>
 #define _GNU_SOURCE
 
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -108,8 +110,8 @@ struct papago_ws_connection {
 typedef struct {
 	// request metrics
 	uint64_t total_requests;
-	uint64_t requests_by_method[9];
-	uint64_t requests_by_status[6];
+	uint64_t requests_by_method[10]; // GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, CONNECT, TRACE, UNKNOWN
+	uint64_t requests_by_status[7]; // 1xx, 2xx, 3xx, 4xx, 5xx, unknown
 	// timing metrics
 	uint64_t total_duration_ms;
 	uint64_t min_duration_ms;
@@ -513,7 +515,7 @@ update_metrics(papago_t *server, const char *url, const char *method,
 	server->metrics->total_requests++;
  
 	// by method
-	int method_idx = 5;
+	int method_idx = 9;
 	if (strcmp(method, "GET") == 0) {
 		method_idx = 0;
 	} else if (strcmp(method, "POST") == 0) {
@@ -536,15 +538,17 @@ update_metrics(papago_t *server, const char *url, const char *method,
 	server->metrics->requests_by_method[method_idx]++;
  
 	// by status
-	int status_idx = 4;
-	if (status >= 200 && status < 300) {
+	int status_idx = 5;
+	if (status >= 100 && status < 200) {
 		status_idx = 0;
-	} else if (status >= 300 && status < 400) {
+	} else if (status >= 200 && status < 300) {
 		status_idx = 1;
-	} else if (status >= 400 && status < 500) {
+	} else if (status >= 300 && status < 400) {
 		status_idx = 2;
-	} else if (status >= 500 && status < 600) {
+	} else if (status >= 400 && status < 500) {
 		status_idx = 3;
+	} else if (status >= 500 && status < 600) {
+		status_idx = 4;
 	}
 	server->metrics->requests_by_status[status_idx]++;
 
@@ -595,8 +599,6 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	PAPAGO_UNUSED(req);
 	PAPAGO_UNUSED(user_data);
 
-	double avg_duration;
- 
 	papago_t *server = papago_get_current_server();
 	if (server == NULL) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
@@ -610,7 +612,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	pthread_mutex_lock(&server->metrics->mutex);
  
 	// calculate average duration
-	avg_duration = server->metrics->total_requests > 0 ?
+	double avg_duration = server->metrics->total_requests > 0 ?
 	    (double)server->metrics->total_duration_ms / server->metrics->total_requests :
 	    0.0;
 
@@ -622,18 +624,34 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	    "# TYPE http_requests_total counter\n"
 	    "http_requests_total %lu\n\n",
 	    server->metrics->total_requests);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
  
 	len += snprintf(metrics + len, sizeof(metrics) - len,
 	    "# HELP http_request_duration_milliseconds HTTP request latencies\n"
 	    "# TYPE http_request_duration_milliseconds summary\n"
-	    "http_request_duration_milliseconds_min %lu\n"
-	    "http_request_duration_milliseconds_max %lu\n"
+	    "http_request_duration_milliseconds_min %" PRIu64 "\n"
+	    "http_request_duration_milliseconds_max %" PRIu64 "\n"
 	    "http_request_duration_milliseconds_avg %.2f\n"
-	    "http_request_duration_milliseconds_sum %lu\n\n",
-	    server->metrics->min_duration_ms == ULONG_MAX ? 0 : server->metrics->min_duration_ms,
+	    "http_request_duration_milliseconds_sum %" PRIu64 "\n\n",
+	    server->metrics->min_duration_ms == UINT_MAX ? 0 : server->metrics->min_duration_ms,
 	    server->metrics->max_duration_ms,
 	    avg_duration,
 	    server->metrics->total_duration_ms);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
  
 	len += snprintf(metrics + len, sizeof(metrics) - len,
 	    "# HELP http_requests_by_method Requests by HTTP method\n"
@@ -656,24 +674,52 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 		server->metrics->requests_by_method[6],
 		server->metrics->requests_by_method[7],
 		server->metrics->requests_by_method[8]);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
  
 	len += snprintf(metrics + len, sizeof(metrics) - len,
 	    "# HELP http_requests_by_status Requests by status code class\n"
 	    "# TYPE http_requests_by_status counter\n"
-	    "http_requests_by_status{status=\"2xx\"} %lu\n"
-	    "http_requests_by_status{status=\"3xx\"} %lu\n"
-	    "http_requests_by_status{status=\"4xx\"} %lu\n"
-	    "http_requests_by_status{status=\"5xx\"} %lu\n\n",
+		"http_requests_by_status{status=\"1xx\"} %" PRIu64 "\n"
+	    "http_requests_by_status{status=\"2xx\"} %" PRIu64 "\n"
+	    "http_requests_by_status{status=\"3xx\"} %" PRIu64 "\n"
+	    "http_requests_by_status{status=\"4xx\"} %" PRIu64 "\n"
+	    "http_requests_by_status{status=\"5xx\"} %" PRIu64 "\n"
+		"http_requests_by_status{status=\"other\"} %" PRIu64 "\n\n",
 	    server->metrics->requests_by_status[0],
 	    server->metrics->requests_by_status[1],
 	    server->metrics->requests_by_status[2],
-	    server->metrics->requests_by_status[3]);
+	    server->metrics->requests_by_status[3],
+		server->metrics->requests_by_status[4],
+		server->metrics->requests_by_status[5]);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
  
 	len += snprintf(metrics + len, sizeof(metrics) - len,
 	    "# HELP process_uptime_seconds Process uptime in seconds\n"
 	    "# TYPE process_uptime_seconds gauge\n"
 	    "process_uptime_seconds %ld\n\n",
 	    (long)uptime);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
  
 	// per-endpoint metrics
 	for (size_t i = 0; i < server->metrics->endpoint_count && len < (int)sizeof(metrics) - 256; i++) {
@@ -682,7 +728,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 		    server->metrics->endpoints[i].count : 0.0;
 		
 		len += snprintf(metrics + len, sizeof(metrics) - len,
-		    "http_requests_by_endpoint{endpoint=\"%s\"} %lu\n"
+		    "http_requests_by_endpoint{endpoint=\"%s\"} %" PRIu64 "\n"
 		    "http_request_duration_by_endpoint{endpoint=\"%s\"} %.2f\n",
 		    server->metrics->endpoints[i].path,
 		    server->metrics->endpoints[i].count,
@@ -721,16 +767,24 @@ log_request(papago_t *server, struct MHD_Connection *connection,
 		}
 	}
  
-	const char *user_agent = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
-	    "User-Agent");
+	const char *user_agent = MHD_lookup_connection_value(connection,
+		MHD_HEADER_KIND, "User-Agent");
 	const char *host = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
 		"Host");
 
 	struct timeval end;
 	gettimeofday(&end, NULL);
-	unsigned long duration_ms = (end.tv_sec - start_time->tv_sec) * 1000L +
-		(end.tv_usec - start_time->tv_usec) / 1000L;
+	// long duration_ms = (end.tv_sec - start_time->tv_sec) * 1000L +
+	// 	(end.tv_usec - start_time->tv_usec) / 1000L;
  
+	int64_t start_us = ((int64_t)start_time->tv_sec * 1000000LL) + (int64_t)start_time->tv_usec;
+	int64_t end_us = ((int64_t)end.tv_sec * 1000000LL) + (int64_t)end.tv_usec;
+	int64_t duration_us = (end_us - start_us) / 1000LL;
+	if (duration_us < 0) {
+		duration_us = 0;
+	}
+	uint64_t duration_ms = (uint64_t)duration_us;
+
 	if (server->config.enable_logging) {
 		s_log(S_LOG_INFO,
 			s_log_string("remote", client_ip),
@@ -1457,11 +1511,16 @@ papago_destroy(papago_t *server)
 	pthread_mutex_destroy(&server->ws_mutex);
 	pthread_mutex_destroy(&server->shutdown_mutex);
 	pthread_mutex_destroy(&server->rate_limit_mutex);
+	pthread_mutex_destroy(&server->metrics->mutex);
 	pthread_cond_destroy(&server->shutdown_cond);
 
 	// free template engine memory
 	if (server->maple_ctx != NULL) {
 		mp_free(server->maple_ctx);
+	}
+
+	if (server->metrics != NULL) {
+		free(server->metrics);
 	}
 
 	free(server);

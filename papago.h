@@ -472,8 +472,6 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
  
 /**
  * Prometheus metrics endpoint handler.
- * 
- * Register this with: papago_get(server, "/metrics", papago_metrics_handler);
  */
 void
 papago_metrics_handler(papago_request_t *req, papago_response_t *res,

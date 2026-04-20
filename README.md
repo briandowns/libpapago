@@ -222,6 +222,14 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
 }
 ```
 
+## Metrics
+
+To expose the Prometheus endpoint, register the metrics handler in your application.
+
+```c
+papago_get(server, "/metrics", papago_metrics_handler, NULL);
+```
+
 ### Threading Model
 
 - HTTP: Thread-per-connection (libmicrohttpd)
