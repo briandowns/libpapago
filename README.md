@@ -16,6 +16,7 @@ Modern web framework designed to be full featured and powerful all while being e
 - Low Dependencies - Only requires libmicrohttpd + libwebsockets
 - Rate limiting by IP
 - Compression with Gzip
+- Metrics collection and exposure via Prometheus endpoint
 
 ## Dependencies
 

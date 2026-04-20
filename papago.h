@@ -467,6 +467,18 @@ int
 papago_res_render(papago_response_t *res, const char *tmpl, char *output,
                   size_t output_size, ...);
 
+
+// metrics
+ 
+/**
+ * Prometheus metrics endpoint handler.
+ * 
+ * Register this with: papago_get(server, "/metrics", papago_metrics_handler);
+ */
+void
+papago_metrics_handler(papago_request_t *req, papago_response_t *res,
+                       void *user_data);
+
 #define PAPAGO_STATUS_MESSAGE_CONTINUE                        "Continue"
 #define PAPAGO_STATUS_MESSAGE_SWITCHING_PROTOCOLS             "Switching Protocols"
 #define PAPAGO_STATUS_MESSAGE_PROCESS                         "Processing"
