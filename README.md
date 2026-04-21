@@ -16,6 +16,7 @@ Modern web framework designed to be full featured and powerful all while being e
 - Low Dependencies - Only requires libmicrohttpd + libwebsockets
 - Rate limiting by IP
 - Compression with Gzip
+- Metrics collection and exposure via Prometheus endpoint
 
 ## Dependencies
 
@@ -219,6 +220,14 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
     papago_res_header(res, "X-Custom", "value");
     papago_res_json(res, "{\"status\":\"ok\"}");
 }
+```
+
+## Metrics
+
+To expose the Prometheus endpoint, register the metrics handler in your application.
+
+```c
+papago_get(server, "/metrics", papago_metrics_handler, NULL);
 ```
 
 ### Threading Model

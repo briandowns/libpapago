@@ -17,6 +17,8 @@ endif
 TEST_CFLAGS = -g -fPIC -Wall -Wextra
 LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm
 
+EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics
+
 # respect traditional UNIX paths
 INCDIR  = /usr/local/include
 LIBDIR  = /usr/local/lib
@@ -65,7 +67,7 @@ endif
 clean:
 	rm -f $(NAME).dylib
 	rm -f $(NAME).so
-	rm -f example example_ssl example_websocket example_template example_rate_limit example_compression
+	rm -f $(EXAMPLES)
 	rm -f tests/tests
 
 .PHONY: example
@@ -82,7 +84,7 @@ example_websocket: clean
 
 .PHONY: example_template
 example_template: clean
-	$(CC) -o $@ logger.c maple.c examples/template_example.c papago.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ logger.c maple.c examples/example_template.c papago.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_rate_limit
 example_rate_limit: clean
@@ -92,5 +94,9 @@ example_rate_limit: clean
 example_compression: clean
 	$(CC) -o $@ logger.c maple.c papago.c examples/example_compression.c $(CFLAGS) $(LDFLAGS)
 
+.PHONY: example_metrics
+example_metrics: clean
+	$(CC) -o $@ logger.c maple.c papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS)
+
 .PHONY: examples_all
-examples_all: example example_ssl example_websocket example_template example_rate_limit example_compression
+examples_all: $(EXAMPLES)
