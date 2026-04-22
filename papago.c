@@ -24,7 +24,7 @@
 #include "maple.h"
 #include "papago.h"
 
-#define	PAPAGO_MAX_ROUTES 256
+#define	PAPAGO_MAX_ROUTES 512
 #define	PAPAGO_MAX_MIDDLEWARE 64
 #define	PAPAGO_MAX_WS_ENDPOINTS	32
 #define MAX_WS_CONNECTIONS 256
@@ -146,17 +146,18 @@ struct papago_server {
 	papago_ws_endpoint_t ws_endpoints[PAPAGO_MAX_WS_ENDPOINTS];
 	size_t ws_endpoint_count;
 	pthread_t lws_thread;
-	volatile bool running;
-	mp_context_t *maple_ctx;
+	mp_context_t *template_ctx;
 	papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
 	size_t ws_connection_count;
 	pthread_mutex_t ws_mutex;
+	pthread_mutex_t template_mutex; // mutex for per request template rendering
 	pthread_mutex_t shutdown_mutex; // shutdown synchronization
 	pthread_mutex_t rate_limit_mutex;
 	pthread_cond_t shutdown_cond;
 	papago_metrics_t *metrics;
 	void *rate_limit_map;
     char *error_message;
+	volatile bool running;
 };
 
 /**
@@ -171,7 +172,7 @@ typedef struct {
 /**
  * Global server for signal handling
  */
-static volatile papago_t *g_server = NULL;
+static papago_t *g_server = NULL;
 
 /**
  * Get the current server instance
@@ -1225,6 +1226,7 @@ papago_new(void)
 	server->config = papago_default_config();
 
 	pthread_mutex_init(&server->ws_mutex, NULL);
+	pthread_mutex_init(&server->template_mutex, NULL);
 	pthread_mutex_init(&server->shutdown_mutex, NULL);
 	pthread_mutex_init(&server->rate_limit_mutex, NULL);
 	pthread_cond_init(&server->shutdown_cond, NULL);
@@ -1292,9 +1294,12 @@ papago_start(papago_t *server)
 		| MHD_USE_INTERNAL_POLLING_THREAD;
 
 	if (server->config.enable_template_rendering) {
-		server->maple_ctx = mp_init();
-		if (server->maple_ctx == NULL) {
-			server->error_message = "failed to initialize Maple template engine";
+		server->template_ctx = mp_init();
+		if (server->template_ctx == NULL) {
+			server->error_message = "failed to initialize template engine";
+			server->template_ctx = NULL;
+			server->running = false;
+			g_server = NULL;
 
 			return 1;
 		}
@@ -1383,6 +1388,8 @@ papago_start(papago_t *server)
 						s_log_string("key", server->config.key_file ? server->config.key_file : "NULL"));
 				}
 				MHD_stop_daemon(server->mhd_daemon);
+				server->running = false;
+				g_server = NULL;
 
 				return 1;
 			}
@@ -1404,7 +1411,9 @@ papago_start(papago_t *server)
 					s_log_string("ssl", server->config.enable_ssl ? "enabled" : "disabled"));
 			}
 			MHD_stop_daemon(server->mhd_daemon);
-	
+			server->running = false;
+			g_server = NULL;
+
 			return 1;
 		}
 
@@ -1509,14 +1518,15 @@ papago_destroy(papago_t *server)
 
 	// destroy synchronization primitives
 	pthread_mutex_destroy(&server->ws_mutex);
+	pthread_mutex_destroy(&server->template_mutex);
 	pthread_mutex_destroy(&server->shutdown_mutex);
 	pthread_mutex_destroy(&server->rate_limit_mutex);
 	pthread_mutex_destroy(&server->metrics->mutex);
 	pthread_cond_destroy(&server->shutdown_cond);
 
 	// free template engine memory
-	if (server->maple_ctx != NULL) {
-		mp_free(server->maple_ctx);
+	if (server->template_ctx != NULL) {
+		mp_free(server->template_ctx);
 	}
 
 	if (server->metrics != NULL) {
@@ -2184,25 +2194,44 @@ papago_render_file(const char *tmpl_path, char *output,
 	if (tmpl_path == NULL) {
 		return 1;
 	}
+
+	if (g_server == NULL) {
+		return 2;
+	}
  
+	if (g_server->template_ctx == NULL) {
+		return 3;
+	}
+
+	if (output == NULL || output_size == 0) {
+		return 4;
+	}
+
 	va_list args;
 	va_start(args, output_size);
-	
+
+	pthread_mutex_lock(&g_server->template_mutex);
 	const char *key;
 	while ((key = va_arg(args, const char *)) != NULL) {
 		const char *value = va_arg(args, const char *);
 		if (value != NULL) {
-			mp_set_var(g_server->maple_ctx, key, value);
+			mp_set_var(g_server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
 
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
-	uint8_t ret = mp_render_file(g_server->maple_ctx, buf, tmpl_path, ".");
-	if (ret != 0) {
-		return 4;
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return 5;
 	}
+	uint8_t ret = mp_render_file(g_server->template_ctx, buf, tmpl_path, ".");
+	if (ret != 0) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return 6;
+	}
+	pthread_mutex_unlock(&g_server->template_mutex);
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
@@ -2218,7 +2247,7 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 		return 1;
 	}
 
-	if (g_server->maple_ctx == NULL) {
+	if (g_server->template_ctx == NULL) {
 		return 2;
 	}
 
@@ -2229,26 +2258,33 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 	va_list args;
 	va_start(args, output_size);
 
+	pthread_mutex_lock(&g_server->template_mutex);
 	const char *key;
 	while ((key = va_arg(args, const char*)) != NULL && strcmp(key, "") != 0) {
 		const char *value = va_arg(args, const char*);
 		if (value != NULL) {
-			mp_set_var(g_server->maple_ctx, key, value);
+			mp_set_var(g_server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
 
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
-	uint8_t ret = mp_render_segment(g_server->maple_ctx, buf, tmpl, NULL, ".");
-	if (ret != 0) {
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
 		return 4;
 	}
+	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
+	if (ret != 0) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return 5;
+	}
+	pthread_mutex_unlock(&g_server->template_mutex);	
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
 	fclose(buf);
- 
+
 	return 0;
 }
  
@@ -2263,21 +2299,28 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 	va_list args;
 	va_start(args, output_size);
 
+	pthread_mutex_lock(&g_server->template_mutex);
 	const char *key;
 	while ((key = va_arg(args, const char *)) != NULL) {
 		const char *value = va_arg(args, const char *);
 		if (value != NULL) {
-			mp_set_var(g_server->maple_ctx, key, value);
+			mp_set_var(g_server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
  
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
-	uint8_t ret = mp_render_segment(g_server->maple_ctx, buf, tmpl, NULL, ".");
-	if (ret != 0) {
-		return 4;
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return -1;
 	}
+	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
+	if (ret != 0) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return -1;
+	}
+	pthread_mutex_unlock(&g_server->template_mutex);
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
