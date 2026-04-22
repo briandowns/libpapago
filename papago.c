@@ -150,7 +150,7 @@ struct papago_server {
 	papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
 	size_t ws_connection_count;
 	pthread_mutex_t ws_mutex;
-	pthread_mutex_t template_mutex; // mutex for per request tempate rendering
+	pthread_mutex_t template_mutex; // mutex for per request template rendering
 	pthread_mutex_t shutdown_mutex; // shutdown synchronization
 	pthread_mutex_t rate_limit_mutex;
 	pthread_cond_t shutdown_cond;
@@ -1297,6 +1297,9 @@ papago_start(papago_t *server)
 		server->template_ctx = mp_init();
 		if (server->template_ctx == NULL) {
 			server->error_message = "failed to initialize template engine";
+			server->template_ctx = NULL;
+			server->running = false;
+			g_server = NULL;
 
 			return 1;
 		}
@@ -1385,6 +1388,8 @@ papago_start(papago_t *server)
 						s_log_string("key", server->config.key_file ? server->config.key_file : "NULL"));
 				}
 				MHD_stop_daemon(server->mhd_daemon);
+				server->running = false;
+				g_server = NULL;
 
 				return 1;
 			}
@@ -1406,7 +1411,9 @@ papago_start(papago_t *server)
 					s_log_string("ssl", server->config.enable_ssl ? "enabled" : "disabled"));
 			}
 			MHD_stop_daemon(server->mhd_daemon);
-	
+			server->running = false;
+			g_server = NULL;
+
 			return 1;
 		}
 
@@ -2187,7 +2194,19 @@ papago_render_file(const char *tmpl_path, char *output,
 	if (tmpl_path == NULL) {
 		return 1;
 	}
+
+	if (g_server == NULL) {
+		return 2;
+	}
  
+	if (g_server->template_ctx == NULL) {
+		return 3;
+	}
+
+	if (output == NULL || output_size == 0) {
+		return 4;
+	}
+
 	va_list args;
 	va_start(args, output_size);
 
@@ -2203,10 +2222,14 @@ papago_render_file(const char *tmpl_path, char *output,
 
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return 5;
+	}
 	uint8_t ret = mp_render_file(g_server->template_ctx, buf, tmpl_path, ".");
 	if (ret != 0) {
 		pthread_mutex_unlock(&g_server->template_mutex);
-		return 4;
+		return 6;
 	}
 	pthread_mutex_unlock(&g_server->template_mutex);
 
@@ -2247,10 +2270,14 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return 4;
+	}
 	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
 	if (ret != 0) {
 		pthread_mutex_unlock(&g_server->template_mutex);
-		return 4;
+		return 5;
 	}
 	pthread_mutex_unlock(&g_server->template_mutex);	
 
@@ -2284,10 +2311,14 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
  
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return -1;
+	}
 	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
 	if (ret != 0) {
 		pthread_mutex_unlock(&g_server->template_mutex);
-		return 4;
+		return -1;
 	}
 	pthread_mutex_unlock(&g_server->template_mutex);
 
