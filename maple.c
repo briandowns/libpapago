@@ -143,7 +143,7 @@ register_builtin_func(const char *name, mp_func fn)
 {
     if (builtin_func_registry.count < MAX_FUNCS) {
         strncpy(builtin_func_registry.funcs[builtin_func_registry.count].name,
-            name, MAX_VAR_LEN);
+            name, MAX_VAR_NAME_LEN);
         builtin_func_registry.funcs[builtin_func_registry.count].fn = fn;
         builtin_func_registry.count++;
     }
@@ -174,16 +174,29 @@ mp_free(mp_context_t *ctx)
 void
 mp_set_var(mp_context_t *ctx, const char *name, const char *val)
 {
+    if (name == NULL || val == NULL) {
+        return;
+    }
+
     for (uint64_t i = 0; i < ctx->var_count; i++) {
         if (!strcmp(ctx->vars[i].key, name)) {
-            strncpy(ctx->vars[i].value, val, 255);
+#ifdef __FreeBSD__
+            strlcpy(ctx->vars[i].value, val, MAX_VAR_VAL_LEN);
+#else
+            strncpy(ctx->vars[i].value, val, MAX_VAR_VAL_LEN);
+#endif
             return;
         }
     }
         
     if (ctx->var_count < MAX_VARS) {
-        strncpy(ctx->vars[ctx->var_count].key, name, MAX_VAR_LEN);
-        strncpy(ctx->vars[ctx->var_count].value, val, 255);
+#ifdef __FreeBSD__
+        strlcpy(ctx->vars[ctx->var_count].key, name, MAX_VAR_NAME_LEN);
+        strlcpy(ctx->vars[ctx->var_count].value, val, MAX_VAR_VAL_LEN);
+#else
+        strncpy(ctx->vars[ctx->var_count].key, name, MAX_VAR_NAME_LEN);
+        strncpy(ctx->vars[ctx->var_count].value, val, MAX_VAR_VAL_LEN);
+#endif
         ctx->var_count++;
     }
 }
@@ -204,8 +217,13 @@ void
 mp_register_func(mp_context_t *ctx, const char* name, mp_func fn)
 {
     if (ctx->user_func_registry.count < MAX_FUNCS) {
+#ifdef __FreeBSD__
+        strlcpy(ctx->user_func_registry.funcs[ctx->user_func_registry.count].name,
+            name, MAX_VAR_NAME_LEN);
+#else
         strncpy(ctx->user_func_registry.funcs[ctx->user_func_registry.count].name,
-            name, MAX_VAR_LEN);
+            name, MAX_VAR_NAME_LEN);
+#endif
         ctx->user_func_registry.funcs[ctx->user_func_registry.count].fn = fn;
         ctx->user_func_registry.count++;
     }

@@ -462,6 +462,7 @@ papago_render_template(const char *tmpl, char *output,
 
 /**
  * Send rendered template as response. Returns 0 on success or -1 on failure.
+ * Since this is a variadic function, make sure to include the NULL sentinel.
  */
 int
 papago_res_render(papago_response_t *res, const char *tmpl, char *output,

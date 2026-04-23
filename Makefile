@@ -3,31 +3,35 @@ cc = cc
 NAME = libpapago
 
 UNAME_S = $(shell uname -s)
-
-CFLAGS  = -O3 -fPIC -Wall -Wextra
-ifneq (,$(filter $(UNAME_S),FreeBSD Darwin))
-	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
-              $(shell pkg-config --cflags --libs libmicrohttpd) \
-			  $(shell pkg-config --cflags --libs jansson) \
-			  -lssl -lcrypto -lz
-endif
-ifeq ($(UNAME_S),Darwin)
-	CFLAGS += $(shell pkg-config --cflags --libs openssl)
-endif
-TEST_CFLAGS = -g -fPIC -Wall -Wextra
-LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm
-
-EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics
-
+#
 # respect traditional UNIX paths
 INCDIR  = /usr/local/include
 LIBDIR  = /usr/local/lib
 
+CFLAGS  = -O3 -fPIC -Wall -Wextra
+ifeq ($(UNAME_S),Darwin)
+	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
+              $(shell pkg-config --cflags --libs libmicrohttpd) \
+			  $(shell pkg-config --cflags --libs jansson) \
+              $(shell pkg-config --cflags --libs openssl) \
+			  -lssl -lcrypto -lz
+endif
+
+TEST_CFLAGS = -g -fPIC -Wall -Wextra
+LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread
+
+ifeq ($(UNAME_S),FreeBSD)
+CFLAGS += -I$(INCDIR)
+TEST_CFLAGS += -I$(INCDIR)
+LDFLAGS += -L$(LIBDIR)
+endif
+
+EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics
+
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
 	$(CC) -dynamiclib -o $@ logger.c maple.c papago.c $(CFLAGS) $(LDFLAGS)
-endif
-ifeq ($(UNAME_S),Linux)
+else
 $(NAME).so: clean
 	$(CC) -shared -o $@ logger.c maple.c papago.c $(CFLAGS) $(LDFLAGS)
 endif
@@ -45,22 +49,18 @@ valgrind: tests
 .PHONY: install
 install: 
 	cp papago.h $(INCDIR)
-ifeq ($(UNAME_S),Linux)
-	cp papago.h $(INCDIR)
-	cp $(NAME).so $(LIBDIR)
-endif
 ifeq ($(UNAME_S),Darwin)
-	cp papago.h $(INCDIR)
 	cp $(NAME).dylib $(LIBDIR)
+else
+	cp $(NAME).so $(LIBDIR)
 endif
 
 uninstall:
 	rm -f $(INCDIR)/papago.h
-ifeq ($(UNAME_S),Linux)
-	rm -f $(INCDIR)/$(NAME).so
-endif
 ifeq ($(UNAME_S),Darwin)
 	rm -f $(INCDIR)/$(NAME).dylib
+else
+	rm -f $(INCDIR)/$(NAME).so
 endif
 
 .PHONY: clean
@@ -84,7 +84,7 @@ example_websocket: clean
 
 .PHONY: example_template
 example_template: clean
-	$(CC) -o $@ logger.c maple.c examples/example_template.c papago.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ logger.c maple.c examples/example_template.c papago.c $(TEST_CFLAGS) $(LDFLAGS)
 
 .PHONY: example_rate_limit
 example_rate_limit: clean

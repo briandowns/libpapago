@@ -1,9 +1,9 @@
-#include <limits.h>
 #define _GNU_SOURCE
 
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -583,8 +583,13 @@ update_metrics(papago_t *server, const char *url, const char *method,
  
 	// add new endpoint if not found and space available
 	if (!found && server->metrics->endpoint_count < 64) {
-		strncpy(server->metrics->endpoints[server->metrics->endpoint_count].path,
+#ifdef __FreeBSD__
+		strlcpy(server->metrics->endpoints[server->metrics->endpoint_count].path,
 		    url, 127);
+#else
+        strncpy(server->metrics->endpoints[server->metrics->endpoint_count].path,
+            url, 127);
+#endif
 		server->metrics->endpoints[server->metrics->endpoint_count].path[127] = '\0';
 		server->metrics->endpoints[server->metrics->endpoint_count].count = 1;
 		server->metrics->endpoints[server->metrics->endpoint_count].total_ms = duration_ms;
@@ -2037,7 +2042,7 @@ _fmemopen(memstream_t **out_mem)
         return NULL;
     }
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) //|| defined(__FreeBSD__)
     FILE *fp = funopen(m, ms_read, ms_write, ms_seek, ms_close);
 #else
     cookie_io_functions_t io = {
@@ -2176,7 +2181,11 @@ papago_check_rate_limit(papago_request_t *req, papago_response_t *res)
 	}
  
 	if (!found && slot != -1) {
-		strncpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
+#ifdef __FreeBSD__
+        strlcpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
+#else
+        strncpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
+#endif
 		entries[slot].ip[sizeof(entries[slot].ip)-1] = '\0';
 		entries[slot].count = 1;
 		entries[slot].window_start = now;
@@ -2301,8 +2310,8 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 
 	pthread_mutex_lock(&g_server->template_mutex);
 	const char *key;
-	while ((key = va_arg(args, const char *)) != NULL) {
-		const char *value = va_arg(args, const char *);
+	while ((key = va_arg(args, const char*)) != NULL) {
+		const char *value = va_arg(args, const char*);
 		if (value != NULL) {
 			mp_set_var(g_server->template_ctx, key, value);
 		}
