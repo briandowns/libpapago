@@ -35,9 +35,10 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 
-#define MAX_VARS    256
-#define MAX_VAR_LEN 64
-#define MAX_FUNCS   64
+#define MAX_VARS         256
+#define MAX_VAR_NAME_LEN 64
+#define MAX_VAR_VAL_LEN  512
+#define MAX_FUNCS        64
 
 #define MP_ERR_FILE_NOT_FOUND         1
 #define MP_ERR_INVALID_INCLUDE_SYNTAX 2
@@ -48,8 +49,8 @@ extern "C" {
  * var_t holds all variables stored in key/value pairs.
  */
 typedef struct {
-    char key[MAX_VAR_LEN];
-    char value[256];
+    char key[MAX_VAR_NAME_LEN];
+    char value[MAX_VAR_VAL_LEN];
 } var_t;
 
 /**
@@ -61,7 +62,7 @@ typedef char *(*mp_func)(char*);
  * function_t stores a template function.
  */
 typedef struct {
-    char name[MAX_VAR_LEN]; 
+    char name[MAX_VAR_NAME_LEN]; 
     mp_func fn;
 } function_t;
 

@@ -3,6 +3,10 @@ cc = cc
 NAME = libpapago
 
 UNAME_S = $(shell uname -s)
+#
+# respect traditional UNIX paths
+INCDIR  = /usr/local/include
+LIBDIR  = /usr/local/lib
 
 CFLAGS  = -O3 -fPIC -Wall -Wextra
 ifeq ($(UNAME_S),Darwin)
@@ -17,14 +21,12 @@ TEST_CFLAGS = -g -fPIC -Wall -Wextra
 LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread
 
 ifeq ($(UNAME_S),FreeBSD)
-LDFLAGS += -I/usr/local/include -L/usr/local/lib
+CFLAGS += -I$(INCDIR)
+TEST_CFLAGS += -I$(INCDIR)
+LDFLAGS += -L$(LIBDIR)
 endif
 
 EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics
-
-# respect traditional UNIX paths
-INCDIR  = /usr/local/include
-LIBDIR  = /usr/local/lib
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean

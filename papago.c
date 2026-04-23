@@ -1,9 +1,9 @@
-#include <limits.h>
 #define _GNU_SOURCE
 
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -583,7 +583,7 @@ update_metrics(papago_t *server, const char *url, const char *method,
  
 	// add new endpoint if not found and space available
 	if (!found && server->metrics->endpoint_count < 64) {
-#ifdef __FREEBSD__
+#ifdef __FreeBSD__
 		strlcpy(server->metrics->endpoints[server->metrics->endpoint_count].path,
 		    url, 127);
 #else
@@ -2181,7 +2181,7 @@ papago_check_rate_limit(papago_request_t *req, papago_response_t *res)
 	}
  
 	if (!found && slot != -1) {
-#ifdef __FREEBSD__
+#ifdef __FreeBSD__
         strlcpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
 #else
         strncpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
