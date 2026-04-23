@@ -1,6 +1,7 @@
 *.o
 *.so
 *.dynlib
+*.core
 
 .vscode/*
 *.dSYM/

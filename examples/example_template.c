@@ -65,7 +65,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	char rendered[1024];
 	uint8_t result = papago_res_render(res, html, rendered, sizeof(rendered),
-		"name", "Papago");
+		"name", "Papago", NULL);
 	if (result != 0) {
 		fprintf(stderr, "failed to render template\n");
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);

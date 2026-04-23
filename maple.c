@@ -182,8 +182,13 @@ mp_set_var(mp_context_t *ctx, const char *name, const char *val)
     }
         
     if (ctx->var_count < MAX_VARS) {
+#ifdef __FreeBSD__
+        strlcpy(ctx->vars[ctx->var_count].key, name, MAX_VAR_LEN);
+        strlcpy(ctx->vars[ctx->var_count].value, val, 255);
+#else
         strncpy(ctx->vars[ctx->var_count].key, name, MAX_VAR_LEN);
         strncpy(ctx->vars[ctx->var_count].value, val, 255);
+#endif
         ctx->var_count++;
     }
 }
