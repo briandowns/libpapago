@@ -42,8 +42,6 @@
 #define MAX_CACHED        64
 #define MAX_INCLUDE_STACK 32 
 
-#define IS_NULL_TERMINATED(str, max_len) ((str)[(max_len) - 1] == '\0')
-
 /**
  * cached_template_t 
  */
@@ -74,6 +72,15 @@ trim(char *s)
         *e-- = '\0';
     }
 }
+
+static inline bool
+is_null_terminated(const char *str, size_t max_len)
+{
+    return max_len > 0 && strnlen(str, max_len) < max_len;
+}
+
+#define IS_NULL_TERMINATED(str, max_len) \
+    is_null_terminated((str), (max_len))
 
 char*
 mp_upper(char *s)
@@ -154,8 +161,6 @@ register_builtin_func(const char *name, mp_func fn)
         builtin_func_registry.funcs[builtin_func_registry.count].fn = fn;
         builtin_func_registry.count++;
     }
-
-    printf("XXX - registering user func: %s\n", name);
 }
 
 mp_context_t*
@@ -220,10 +225,8 @@ mp_set_var(mp_context_t *ctx, const char *name, const char *val)
 char*
 get_var(mp_context_t *ctx, const char *key)
 {
-    printf("XXX - looking up var: %s\n", key);
     for (uint64_t i = 0; i < ctx->var_count; i++) {
         if (strcmp(ctx->vars[i].key, key) == 0) {
-            printf("XXX - found var: %s = %s\n", key, ctx->vars[i].value);
             return ctx->vars[i].value;
         }
     }
@@ -266,15 +269,13 @@ static mp_func
 find_func(mp_context_t *ctx, const char *name)
 {
     for (uint8_t i = 0; i < ctx->user_func_registry.count; i++) {
-        if (!strcmp(ctx->user_func_registry.funcs[i].name, name)) {
-            printf("XXX - found user func: %s\n", name);
+        if (strcmp(ctx->user_func_registry.funcs[i].name, name) == 0) {
             return ctx->user_func_registry.funcs[i].fn;
         }
     }
 
     for (uint8_t i = 0; i < builtin_func_registry.count; i++) {
         if (strcmp(builtin_func_registry.funcs[i].name, name) == 0) {
-            printf("XXX - found builtin func: %s\n", name);
             return builtin_func_registry.funcs[i].fn;
         }
     }
@@ -334,7 +335,7 @@ static cached_template_t*
 cache_lookup(const char *path)
 {
     for (uint8_t i = 0; i < cache_count; i++) {
-        if (!strcmp(cache[i].path, path)) {
+        if (strcmp(cache[i].path, path) == 0) {
             return &cache[i];
         }
     }
@@ -399,7 +400,7 @@ static bool
 is_included(const char *fullpath)
 {
     for (uint8_t i = 0; i < include_depth; i++) {
-        if (!strcmp(include_stack[i], fullpath)) {
+        if (strcmp(include_stack[i], fullpath) == 0) {
             return true;
         }
     }
@@ -615,7 +616,7 @@ parse_expr(mp_context_t *ctx, const char **str)
 static double
 eval_expr(mp_context_t *ctx, const char *expr)
 {
-    const char* p = expr;
+    const char *p = expr;
     return parse_expr(ctx, &p);
 }
 
@@ -674,19 +675,24 @@ html_escape(const char *s)
         switch (*s) {
             case '&':
                 strcpy(p, "&amp;");
-                p += 5; break;
+                p += 5;
+                break;
             case '<':
                 strcpy(p, "&lt;");
-                p += 4; break;
+                p += 4;
+                break;
             case '>':
                 strcpy(p, "&gt;");
-                p += 4; break;
+                p += 4;
+                break;
             case '"':
                 strcpy(p, "&quot;");
-                p += 6; break;
+                p += 6;
+                break;
             case '\'':
-            strcpy(p, "&#39;");
-                p += 5; break;
+                strcpy(p, "&#39;");
+                p += 5;
+                break;
             default:
                 *p++ = *s;
                 break;
@@ -706,8 +712,9 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
                   const char *end, const char *base_dir)
 {
     const char *p = tpl;
+    const size_t end_len = end ? strlen(end) : 0;
 
-    while (*p && (!end || strncmp(p, end, strlen(end)) != 0)) {
+    while (*p && (end == NULL || strncmp(p, end, end_len) != 0)) {
         if (*p == '{' && *(p + 1) == '{') {
             p += 2;
             char token[512];
@@ -765,7 +772,7 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
                 continue;
             }
 
-            if (!strncmp(token, "range ", 6)) {
+            if (strncmp(token, "range ", 6) == 0) {
                 char list[64];
                 strcpy(list, token + 6);
 
@@ -807,7 +814,7 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
                 continue;
             }
 
-            if (!strncmp(token, "include ", 8)) {
+            if (strncmp(token, "include ", 8) == 0) {
                 char fname[256];
                 
                 if (sscanf(token + 8, "\"%255[^\"]\"", fname) == 1) {
@@ -827,9 +834,7 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
             if (sscanf(token, "%63s %127[^\n]", func, arg) == 2) {
                 mp_func f = find_func(ctx, func);
                 if (f) {
-                    printf("XXX - running func: %s\n", func);
                     fprintf(out, "%s", html_escape(f(get_var(ctx, arg))));
-                    printf("XXX - finished running func: %s - var %s\n", func, get_var(ctx, arg));
                     continue;
                 }
             }
@@ -847,7 +852,7 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
                 }
             }
             
-            if (!strncmp(token, "safe ", 5)) {
+            if (strncmp(token, "safe ", 5) == 0) {
                 const char *var = token + 5;
 
                 while (isspace(*var)) {
