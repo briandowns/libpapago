@@ -17,7 +17,7 @@ jobs:
         platform:
           - linux/arm64/v8
           - linux/amd64
-        os: [ubuntu-latest]
+        os: [ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repo
@@ -28,7 +28,12 @@ jobs:
       - name: Pull
         run: git pull origin master
       - name: Install Dependencies
-        run: sudo apt install -y make build-essential libssl-dev pkg-config libjansson-dev libwebsockets-dev libcurl4-openssl-dev libmicrohttpd-dev
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            -o Acquire::Retries=5 \
+            make build-essential libssl-dev pkg-config libjansson-dev \
+            libwebsockets-dev libcurl4-openssl-dev libmicrohttpd-dev
       - name: Compile Shared Object
         run: make
       # - name: Run tests
