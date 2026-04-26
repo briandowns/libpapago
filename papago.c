@@ -21,6 +21,14 @@
 #include <zlib.h>
 #ifndef NO_LOGGER
 #include "logger.h"
+#else
+#define s_log(...) do {} while(0)
+#define S_LOG_INFO "info"
+#define S_LOG_ERROR "error"
+#define s_log_string(...) NULL
+#define s_log_int(...) NULL
+#define s_log_int64(...) NULL
+#define s_log_init(...) do {} while(0)
 #endif
 #ifndef NO_TEMPLATE
 #include "maple.h"
@@ -151,7 +159,7 @@ struct papago_server {
 	pthread_t lws_thread;
 	volatile bool running;
 #ifndef NO_TEMPLATE
-	mp_context_t *maple_ctx;
+	mp_context_t *template_ctx;
 #endif
 	papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
 	size_t ws_connection_count;
@@ -1565,10 +1573,14 @@ papago_destroy(papago_t *server)
 
 	// free template engine memory
 #ifndef NO_TEMPLATE
-	if (server->maple_ctx != NULL) {
-		mp_free(server->maple_ctx);
+	if (server->template_ctx != NULL) {
+		mp_free(server->template_ctx);
 	}
 #endif
+
+	if (server->metrics != NULL) {
+		free(server->metrics);
+	}
 
 	free(server);
 	g_server = NULL;
