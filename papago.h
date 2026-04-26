@@ -193,7 +193,7 @@ papago_start(papago_t *server);
 void
 papago_stop(papago_t *server);
 
-/*
+/**
  * Destroy server and free resources.
  */
 void
@@ -462,10 +462,22 @@ papago_render_template(const char *tmpl, char *output,
 
 /**
  * Send rendered template as response. Returns 0 on success or -1 on failure.
+ * Since this is a variadic function, make sure to include the NULL sentinel.
  */
 int
 papago_res_render(papago_response_t *res, const char *tmpl, char *output,
                   size_t output_size, ...);
+
+// metrics
+ 
+/**
+ * Prometheus metrics endpoint handler.
+ */
+void
+papago_metrics_handler(papago_request_t *req, papago_response_t *res,
+                       void *user_data);
+
+// HTTP status messages
 
 #define PAPAGO_STATUS_MESSAGE_CONTINUE                        "Continue"
 #define PAPAGO_STATUS_MESSAGE_SWITCHING_PROTOCOLS             "Switching Protocols"
@@ -529,6 +541,8 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 #define PAPAGO_STATUS_MESSAGE_LOOP_DETECTED                   "Loop Detected"
 #define PAPAGO_STATUS_MESSAGE_NOT_EXTENDED                    "Not Extended"
 #define PAPAGO_STATUS_MESSAGE_NETWORK_AUTHENTICATION_REQUIRED "Network Authentication Required"
+
+// HTTP request header values
 
 #define PAPAGO_REQUEST_HEADER_AIM                            "A-IM"
 #define PAPAGO_REQUEST_HEADER_ACCEPT                         "Accept"

@@ -25,19 +25,20 @@
  * SUCH DAMAGE.
  */
 
+#ifndef __MAPLE_H
+#define __MAPLE_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
- 
-#ifndef __MAPLE_H
-#define __MAPLE_H
 
 #include <stdint.h>
 #include <stdio.h>
 
-#define MAX_VARS    256
-#define MAX_VAR_LEN 64
-#define MAX_FUNCS   64
+#define MAX_VARS         256
+#define MAX_VAR_NAME_LEN 64
+#define MAX_VAR_VAL_LEN  512
+#define MAX_FUNCS        64
 
 #define MP_ERR_FILE_NOT_FOUND         1
 #define MP_ERR_INVALID_INCLUDE_SYNTAX 2
@@ -48,8 +49,8 @@ extern "C" {
  * var_t holds all variables stored in key/value pairs.
  */
 typedef struct {
-    char key[MAX_VAR_LEN];
-    char value[256];
+    char key[MAX_VARS];
+    char value[MAX_VARS];
 } var_t;
 
 /**
@@ -61,7 +62,7 @@ typedef char *(*mp_func)(char*);
  * function_t stores a template function.
  */
 typedef struct {
-    char name[MAX_VAR_LEN]; 
+    char name[MAX_VAR_NAME_LEN]; 
     mp_func fn;
 } function_t;
 
@@ -97,16 +98,21 @@ mp_free(mp_context_t *ctx);
 
 /**
  * mp_set_var store the given key/value pair in the given context. The name is
- * the name of variable and val is the value to be stored.
+ * the name of variable and val is the value to be stored. If the variable
+ * already exists, the value is updated. If the variable doesn't exist, a new
+ * variable is created. If the name or value is NULL or not null terminated, an
+ * 1 is returned.
  */
-void
+uint8_t
 mp_set_var(mp_context_t *ctx, const char *name, const char *val);
 
 /**
  * mp_register_func adds a user defined function to the context to be used
- * during template rendering.
+ * during template rendering. The name is the name of the function to be used
+ * in the template and fn is the function pointer. If the name or function
+ * pointer is NULL or if the name is not null terminated, an 1 is returned.
  */
-void
+uint8_t
 mp_register_func(mp_context_t *ctx, const char *name, mp_func fn);
 
 /**
@@ -133,7 +139,7 @@ mp_render_file(mp_context_t *ctx, FILE *out, const char *filename,
 const char*
 mp_err_lookup(const uint8_t code);
 
-#endif /** end __MAPLE_H */
 #ifdef __cplusplus
 }
 #endif
+#endif /** end __MAPLE_H */

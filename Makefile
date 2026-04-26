@@ -4,6 +4,10 @@ NAME = libpapago
 
 UNAME_S = $(shell uname -s)
 
+# respect traditional UNIX paths
+INCDIR  = /usr/local/include
+LIBDIR  = /usr/local/lib
+
 CFLAGS  = -O3 -fPIC -Wall -Wextra
 
 SRCS = papago.c
@@ -20,27 +24,29 @@ else
 	SRCS += maple.c
 endif
 
-ifneq (,$(filter $(UNAME_S),FreeBSD Darwin))
+ifeq ($(UNAME_S),Darwin)
 	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
               $(shell pkg-config --cflags --libs libmicrohttpd) \
 			  $(shell pkg-config --cflags --libs jansson) \
+              $(shell pkg-config --cflags --libs openssl) \
 			  -lssl -lcrypto -lz
 endif
-ifeq ($(UNAME_S),Darwin)
-	CFLAGS += $(shell pkg-config --cflags --libs openssl)
-endif
-TEST_CFLAGS = -g -fPIC -Wall -Wextra
-LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm
 
-# respect traditional UNIX paths
-INCDIR  = /usr/local/include
-LIBDIR  = /usr/local/lib
+TEST_CFLAGS = -g -fPIC -Wall -Wextra
+LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread
+
+ifeq ($(UNAME_S),FreeBSD)
+CFLAGS += -I$(INCDIR)
+TEST_CFLAGS += -I$(INCDIR)
+LDFLAGS += -L$(LIBDIR)
+endif
+
+EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
 	$(CC) -dynamiclib -o $@ $(SRCS) $(CFLAGS) $(LDFLAGS)
-endif
-ifeq ($(UNAME_S),Linux)
+else
 $(NAME).so: clean
 	$(CC) -shared -o $@ $(SRCS) $(CFLAGS) $(LDFLAGS)
 endif
@@ -58,29 +64,25 @@ valgrind: tests
 .PHONY: install
 install: 
 	cp papago.h $(INCDIR)
-ifeq ($(UNAME_S),Linux)
-	cp papago.h $(INCDIR)
-	cp $(NAME).so $(LIBDIR)
-endif
 ifeq ($(UNAME_S),Darwin)
-	cp papago.h $(INCDIR)
 	cp $(NAME).dylib $(LIBDIR)
+else
+	cp $(NAME).so $(LIBDIR)
 endif
 
 uninstall:
 	rm -f $(INCDIR)/papago.h
-ifeq ($(UNAME_S),Linux)
-	rm -f $(INCDIR)/$(NAME).so
-endif
 ifeq ($(UNAME_S),Darwin)
 	rm -f $(INCDIR)/$(NAME).dylib
+else
+	rm -f $(INCDIR)/$(NAME).so
 endif
 
 .PHONY: clean
 clean:
 	rm -f $(NAME).dylib
 	rm -f $(NAME).so
-	rm -f example example_ssl example_websocket example_template example_rate_limit example_compression
+	rm -f $(EXAMPLES)
 	rm -f tests/tests
 
 .PHONY: example
@@ -97,7 +99,7 @@ example_websocket: clean
 
 .PHONY: example_template
 example_template: clean
-	$(CC) -o $@ $(SRCS) examples/template_example.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ $(SRCS) examples/example_template.c $(TEST_CFLAGS) $(LDFLAGS)
 
 .PHONY: example_rate_limit
 example_rate_limit: clean
@@ -107,5 +109,9 @@ example_rate_limit: clean
 example_compression: clean
 	$(CC) -o $@ $(SRCS) examples/example_compression.c $(CFLAGS) $(LDFLAGS)
 
+.PHONY: example_metrics
+example_metrics: clean
+	$(CC) -o $@ $(SRCS) examples/example_metrics.c $(CFLAGS) $(LDFLAGS)
+
 .PHONY: examples_all
-examples_all: example example_ssl example_websocket example_template example_rate_limit example_compression
+examples_all: $(EXAMPLES)

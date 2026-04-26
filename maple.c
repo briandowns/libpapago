@@ -73,6 +73,15 @@ trim(char *s)
     }
 }
 
+static inline bool
+is_null_terminated(const char *str, size_t max_len)
+{
+    return max_len > 0 && strnlen(str, max_len) < max_len;
+}
+
+#define IS_NULL_TERMINATED(str, max_len) \
+    is_null_terminated((str), (max_len))
+
 char*
 mp_upper(char *s)
 {
@@ -142,8 +151,13 @@ static void
 register_builtin_func(const char *name, mp_func fn)
 {
     if (builtin_func_registry.count < MAX_FUNCS) {
+#ifdef __FreeBSD__
+        strlcpy(builtin_func_registry.funcs[builtin_func_registry.count].name,
+            name, MAX_VAR_NAME_LEN);
+#else
         strncpy(builtin_func_registry.funcs[builtin_func_registry.count].name,
-            name, MAX_VAR_LEN);
+            name, MAX_VAR_NAME_LEN);
+#endif
         builtin_func_registry.funcs[builtin_func_registry.count].fn = fn;
         builtin_func_registry.count++;
     }
@@ -171,28 +185,48 @@ mp_free(mp_context_t *ctx)
     }
 }
 
-void
+uint8_t
 mp_set_var(mp_context_t *ctx, const char *name, const char *val)
 {
+    if (name == NULL || val == NULL) {
+        return 1;
+    }
+
+    if (!IS_NULL_TERMINATED(name, strlen(name) + 1) || \
+        !IS_NULL_TERMINATED(val, strlen(val) + 1)) {
+        return 1;
+    }
+
     for (uint64_t i = 0; i < ctx->var_count; i++) {
-        if (!strcmp(ctx->vars[i].key, name)) {
-            strncpy(ctx->vars[i].value, val, 255);
-            return;
+        if (strcmp(ctx->vars[i].key, name) == 0) {
+#ifdef __FreeBSD__
+            strlcpy(ctx->vars[i].value, val, MAX_VARS);
+#else
+            strncpy(ctx->vars[i].value, val, MAX_VARS);
+#endif
+            return 0;
         }
     }
         
     if (ctx->var_count < MAX_VARS) {
-        strncpy(ctx->vars[ctx->var_count].key, name, MAX_VAR_LEN);
-        strncpy(ctx->vars[ctx->var_count].value, val, 255);
+#ifdef __FreeBSD__
+        strlcpy(ctx->vars[ctx->var_count].key, name, MAX_VARS);
+        strlcpy(ctx->vars[ctx->var_count].value, val, MAX_VARS);
+#else
+        strncpy(ctx->vars[ctx->var_count].key, name, MAX_VARS);
+        strncpy(ctx->vars[ctx->var_count].value, val, MAX_VARS);
+#endif
         ctx->var_count++;
     }
+
+    return 0;
 }
 
 char*
 get_var(mp_context_t *ctx, const char *key)
 {
     for (uint64_t i = 0; i < ctx->var_count; i++) {
-        if (!strcmp(ctx->vars[i].key, key)) {
+        if (strcmp(ctx->vars[i].key, key) == 0) {
             return ctx->vars[i].value;
         }
     }
@@ -200,15 +234,30 @@ get_var(mp_context_t *ctx, const char *key)
     return "";
 }
 
-void
+uint8_t
 mp_register_func(mp_context_t *ctx, const char* name, mp_func fn)
 {
+    if (name == NULL || fn == NULL) {
+        return 1;
+    }
+
+    if (!IS_NULL_TERMINATED(name, MAX_VAR_NAME_LEN)) {
+        return 1;
+    }
+
     if (ctx->user_func_registry.count < MAX_FUNCS) {
+#ifdef __FreeBSD__
+        strlcpy(ctx->user_func_registry.funcs[ctx->user_func_registry.count].name,
+            name, MAX_VAR_NAME_LEN);
+#else
         strncpy(ctx->user_func_registry.funcs[ctx->user_func_registry.count].name,
-            name, MAX_VAR_LEN);
+            name, MAX_VAR_NAME_LEN);
+#endif
         ctx->user_func_registry.funcs[ctx->user_func_registry.count].fn = fn;
         ctx->user_func_registry.count++;
     }
+
+    return 0;
 }
 
 /**
@@ -220,13 +269,13 @@ static mp_func
 find_func(mp_context_t *ctx, const char *name)
 {
     for (uint8_t i = 0; i < ctx->user_func_registry.count; i++) {
-        if (!strcmp(ctx->user_func_registry.funcs[i].name, name)) {
+        if (strcmp(ctx->user_func_registry.funcs[i].name, name) == 0) {
             return ctx->user_func_registry.funcs[i].fn;
         }
     }
 
     for (uint8_t i = 0; i < builtin_func_registry.count; i++) {
-        if (!strcmp(builtin_func_registry.funcs[i].name, name)) {
+        if (strcmp(builtin_func_registry.funcs[i].name, name) == 0) {
             return builtin_func_registry.funcs[i].fn;
         }
     }
@@ -234,7 +283,7 @@ find_func(mp_context_t *ctx, const char *name)
     return NULL;
 }
 
-/* file & cache handling */
+// file & cache handling
 
 /**
  * dirname_from_path gets the directory name from the given path.
@@ -286,7 +335,7 @@ static cached_template_t*
 cache_lookup(const char *path)
 {
     for (uint8_t i = 0; i < cache_count; i++) {
-        if (!strcmp(cache[i].path, path)) {
+        if (strcmp(cache[i].path, path) == 0) {
             return &cache[i];
         }
     }
@@ -341,7 +390,7 @@ cache_load(const char *path)
     return content;
 }
 
-/* include guards */
+// include guards
 
 /**
  * is_included checks to see if a template file at the given path has
@@ -351,7 +400,7 @@ static bool
 is_included(const char *fullpath)
 {
     for (uint8_t i = 0; i < include_depth; i++) {
-        if (!strcmp(include_stack[i], fullpath)) {
+        if (strcmp(include_stack[i], fullpath) == 0) {
             return true;
         }
     }
@@ -381,7 +430,7 @@ pop_include()
     }
 }
 
-/* expression parser with comparisons */
+// expression parser with comparisons
 
 // forward declaration for simplicity
 static double
@@ -567,7 +616,7 @@ parse_expr(mp_context_t *ctx, const char **str)
 static double
 eval_expr(mp_context_t *ctx, const char *expr)
 {
-    const char* p = expr;
+    const char *p = expr;
     return parse_expr(ctx, &p);
 }
 
@@ -626,19 +675,24 @@ html_escape(const char *s)
         switch (*s) {
             case '&':
                 strcpy(p, "&amp;");
-                p += 5; break;
+                p += 5;
+                break;
             case '<':
                 strcpy(p, "&lt;");
-                p += 4; break;
+                p += 4;
+                break;
             case '>':
                 strcpy(p, "&gt;");
-                p += 4; break;
+                p += 4;
+                break;
             case '"':
                 strcpy(p, "&quot;");
-                p += 6; break;
+                p += 6;
+                break;
             case '\'':
-            strcpy(p, "&#39;");
-                p += 5; break;
+                strcpy(p, "&#39;");
+                p += 5;
+                break;
             default:
                 *p++ = *s;
                 break;
@@ -658,8 +712,9 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
                   const char *end, const char *base_dir)
 {
     const char *p = tpl;
+    const size_t end_len = end ? strlen(end) : 0;
 
-    while (*p && (!end || strncmp(p, end, strlen(end)) != 0)) {
+    while (*p && (end == NULL || strncmp(p, end, end_len) != 0)) {
         if (*p == '{' && *(p + 1) == '{') {
             p += 2;
             char token[512];
@@ -717,7 +772,7 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
                 continue;
             }
 
-            if (!strncmp(token, "range ", 6)) {
+            if (strncmp(token, "range ", 6) == 0) {
                 char list[64];
                 strcpy(list, token + 6);
 
@@ -759,7 +814,7 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
                 continue;
             }
 
-            if (!strncmp(token, "include ", 8)) {
+            if (strncmp(token, "include ", 8) == 0) {
                 char fname[256];
                 
                 if (sscanf(token + 8, "\"%255[^\"]\"", fname) == 1) {
@@ -797,7 +852,7 @@ mp_render_segment(mp_context_t *ctx, FILE *out, const char *tpl,
                 }
             }
             
-            if (!strncmp(token, "safe ", 5)) {
+            if (strncmp(token, "safe ", 5) == 0) {
                 const char *var = token + 5;
 
                 while (isspace(*var)) {

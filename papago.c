@@ -1,8 +1,9 @@
-#include <openssl/crypto.h>
 #define _GNU_SOURCE
 
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <inttypes.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -16,6 +17,7 @@
 
 #include <libwebsockets.h>
 #include <microhttpd.h>
+#include <openssl/crypto.h>
 #include <zlib.h>
 #ifndef NO_LOGGER
 #include "logger.h"
@@ -25,7 +27,7 @@
 #endif
 #include "papago.h"
 
-#define	PAPAGO_MAX_ROUTES 256
+#define	PAPAGO_MAX_ROUTES 512
 #define	PAPAGO_MAX_MIDDLEWARE 64
 #define	PAPAGO_MAX_WS_ENDPOINTS	32
 #define MAX_WS_CONNECTIONS 256
@@ -106,6 +108,33 @@ struct papago_ws_connection {
 };
 
 /**
+ * Metrics structure
+ */
+typedef struct {
+	// request metrics
+	uint64_t total_requests;
+	uint64_t requests_by_method[10]; // GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, CONNECT, TRACE, UNKNOWN
+	uint64_t requests_by_status[7]; // 1xx, 2xx, 3xx, 4xx, 5xx, unknown
+	// timing metrics
+	uint64_t total_duration_ms;
+	uint64_t min_duration_ms;
+	uint64_t max_duration_ms;
+	// error tracking
+	uint64_t errors_4xx;
+	uint64_t errors_5xx;
+	// system metrics
+	time_t start_time;
+	// per-endpoint metrics (simple array for now)
+	struct {
+		char path[128];
+		uint64_t count;
+		uint64_t total_ms;
+	} endpoints[64];
+	uint8_t endpoint_count;
+	pthread_mutex_t	mutex;
+} papago_metrics_t;
+
+/**
  * Server structure
  */
 struct papago_server {
@@ -127,10 +156,12 @@ struct papago_server {
 	papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
 	size_t ws_connection_count;
 	pthread_mutex_t ws_mutex;
+	pthread_mutex_t template_mutex; // mutex for per request template rendering
 	pthread_mutex_t shutdown_mutex; // shutdown synchronization
-	pthread_cond_t shutdown_cond;
-	void *rate_limit_map;
 	pthread_mutex_t rate_limit_mutex;
+	pthread_cond_t shutdown_cond;
+	papago_metrics_t *metrics;
+	void *rate_limit_map;
     char *error_message;
 };
 
@@ -146,7 +177,7 @@ typedef struct {
 /**
  * Global server for signal handling
  */
-static volatile papago_t *g_server = NULL;
+static papago_t *g_server = NULL;
 
 /**
  * Get the current server instance
@@ -160,7 +191,7 @@ papago_get_current_server(void)
 // utility Functions
 
 static char*
-papago_strdup(const char *str)
+_strdup(const char *str)
 {
 	if (str == NULL) {
 		return NULL;
@@ -176,7 +207,7 @@ papago_strdup(const char *str)
 }
 
 static void
-papago_free_kv_array(papago_kv_t *arr, size_t count)
+free_kv_array(papago_kv_t *arr, size_t count)
 {
 	if (arr == NULL) {
 		return;
@@ -191,8 +222,7 @@ papago_free_kv_array(papago_kv_t *arr, size_t count)
 }
 
 static int
-papago_add_kv(papago_kv_t **arr, size_t *count, const char *key,
-              const char *value)
+add_kv(papago_kv_t **arr, size_t *count, const char *key, const char *value)
 {
 	if (arr == NULL || count == NULL || key == NULL || value == NULL) {
 		return -1;
@@ -203,8 +233,8 @@ papago_add_kv(papago_kv_t **arr, size_t *count, const char *key,
 		return -1;
     }
 
-	new_arr[*count].key = papago_strdup(key);
-	new_arr[*count].value = papago_strdup(value);
+	new_arr[*count].key = _strdup(key);
+	new_arr[*count].value = _strdup(value);
 
 	if (new_arr[*count].key == NULL || new_arr[*count].value == NULL) {
 		free(new_arr[*count].key);
@@ -220,7 +250,7 @@ papago_add_kv(papago_kv_t **arr, size_t *count, const char *key,
 }
 
 static const char*
-papago_find_kv(const papago_kv_t *arr, size_t count, const char *key)
+find_kv(const papago_kv_t *arr, size_t count, const char *key)
 {
 	if (arr == NULL || key == NULL) {
 		return NULL;
@@ -267,8 +297,8 @@ papago_default_config(void)
 // path parameter matching
 
 static bool
-papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
-                   size_t *param_count)
+match_route(const char *pattern, const char *path, papago_kv_t **params,
+            size_t *param_count)
 {
 	if (pattern == NULL || path == NULL) {
         return false;
@@ -280,8 +310,8 @@ papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
     }
 
 	// parse path with parameters
-	const char *pattern_copy = papago_strdup(pattern);
-	const char *path_copy = papago_strdup(path);
+	const char *pattern_copy = _strdup(pattern);
+	const char *path_copy = _strdup(path);
 
 	if (pattern_copy == NULL || path_copy == NULL) {
 		free((void*)pattern_copy);
@@ -302,7 +332,7 @@ papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
 			// extract parameter
 			const char *param_name = pattern_token + 1;
 			if (params != NULL && param_count != NULL) {
-				papago_add_kv(params, param_count, param_name, path_token);
+				add_kv(params, param_count, param_name, path_token);
             }
 		} else if (strcmp(pattern_token, path_token) != 0) {
 			match = false;
@@ -328,19 +358,19 @@ papago_match_route(const char *pattern, const char *path, papago_kv_t **params,
 const char*
 papago_req_header(papago_request_t *req, const char *key)
 {
-	return papago_find_kv(req->headers, req->header_count, key);
+	return find_kv(req->headers, req->header_count, key);
 }
 
 const char*
 papago_req_param(papago_request_t *req, const char *key)
 {
-	return papago_find_kv(req->params, req->param_count, key);
+	return find_kv(req->params, req->param_count, key);
 }
 
 const char*
 papago_req_query(papago_request_t *req, const char *key)
 {
-	return papago_find_kv(req->query, req->query_count, key);
+	return find_kv(req->query, req->query_count, key);
 }
 
 const char*
@@ -407,7 +437,7 @@ papago_res_status(papago_response_t *res, papago_status_code_t status)
 void
 papago_res_header(papago_response_t *res, const char *key, const char *value)
 {
-	papago_add_kv(&res->headers, &res->header_count, key, value);
+	add_kv(&res->headers, &res->header_count, key, value);
 }
 
 uint8_t
@@ -417,7 +447,7 @@ papago_res_send(papago_response_t *res, const char *body)
 		free(res->body);
     }
 
-	res->body = papago_strdup(body);
+	res->body = _strdup(body);
 	res->body_length = (body != NULL) ? strlen(body) : 0;
 	res->sent = true;
 
@@ -476,10 +506,258 @@ papago_res_sendfile(papago_response_t *res, const char *filepath)
 	return 0;
 }
 
+// metrics
+
 static void
-papago_log_request(papago_t *server, struct MHD_Connection *connection,
-                   const char *url, const char *method, papago_status_code_t status,
-                   const struct timeval *start_time, const char *version)
+update_metrics(papago_t *server, const char *url, const char *method,
+               papago_status_code_t status, uint64_t duration_ms)
+{
+	if (server == NULL) {
+		return;
+	}
+ 
+	pthread_mutex_lock(&server->metrics->mutex);
+ 
+	server->metrics->total_requests++;
+ 
+	// by method
+	int method_idx = 9;
+	if (strcmp(method, "GET") == 0) {
+		method_idx = 0;
+	} else if (strcmp(method, "POST") == 0) {
+		method_idx = 1;
+	} else if (strcmp(method, "PUT") == 0) {
+		method_idx = 2;
+	} else if (strcmp(method, "DELETE") == 0) {
+		method_idx = 3;
+	} else if (strcmp(method, "PATCH") == 0) {
+		method_idx = 4;
+	} else if (strcmp(method, "HEAD") == 0) {
+		method_idx = 5;
+	} else if  (strcmp(method, "OPTIONS") == 0) {
+		method_idx = 6;
+	} else if  (strcmp(method, "CONNECT") == 0) {
+		method_idx = 7;
+	} else if (strcmp(method, "TRACE") == 0) {
+		method_idx = 8;
+	}
+	server->metrics->requests_by_method[method_idx]++;
+ 
+	// by status
+	int status_idx = 5;
+	if (status >= 100 && status < 200) {
+		status_idx = 0;
+	} else if (status >= 200 && status < 300) {
+		status_idx = 1;
+	} else if (status >= 300 && status < 400) {
+		status_idx = 2;
+	} else if (status >= 400 && status < 500) {
+		status_idx = 3;
+	} else if (status >= 500 && status < 600) {
+		status_idx = 4;
+	}
+	server->metrics->requests_by_status[status_idx]++;
+
+	// error tracking
+	if (status >= 400 && status < 500) {
+		server->metrics->errors_4xx++;
+	}
+	if (status >= 500 && status < 600) {
+		server->metrics->errors_5xx++;
+	}
+ 
+	// duration metrics
+	server->metrics->total_duration_ms += duration_ms;
+	if (duration_ms < server->metrics->min_duration_ms) {
+		server->metrics->min_duration_ms = duration_ms;
+	}
+	if (duration_ms > server->metrics->max_duration_ms) {
+		server->metrics->max_duration_ms = duration_ms;
+	}
+ 
+	// per-endpoint metrics
+	bool found = false;
+	for (size_t i = 0; i < server->metrics->endpoint_count; i++) {
+		if (strcmp(server->metrics->endpoints[i].path, url) == 0) {
+			server->metrics->endpoints[i].count++;
+			server->metrics->endpoints[i].total_ms += duration_ms;
+			found = true;
+			break;
+		}
+	}
+ 
+	// add new endpoint if not found and space available
+	if (!found && server->metrics->endpoint_count < 64) {
+#ifdef __FreeBSD__
+		strlcpy(server->metrics->endpoints[server->metrics->endpoint_count].path,
+		    url, 127);
+#else
+        strncpy(server->metrics->endpoints[server->metrics->endpoint_count].path,
+            url, 127);
+#endif
+		server->metrics->endpoints[server->metrics->endpoint_count].path[127] = '\0';
+		server->metrics->endpoints[server->metrics->endpoint_count].count = 1;
+		server->metrics->endpoints[server->metrics->endpoint_count].total_ms = duration_ms;
+		server->metrics->endpoint_count++;
+	}
+ 
+	pthread_mutex_unlock(&server->metrics->mutex);
+}
+
+void
+papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+	PAPAGO_UNUSED(req);
+	PAPAGO_UNUSED(user_data);
+
+	papago_t *server = papago_get_current_server();
+	if (server == NULL) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_send(res, "# Metrics unavailable\n");
+		return;
+	}
+ 
+	time_t now = time(NULL);
+	time_t uptime = now - server->metrics->start_time;
+	
+	pthread_mutex_lock(&server->metrics->mutex);
+ 
+	// calculate average duration
+	double avg_duration = server->metrics->total_requests > 0 ?
+	    (double)server->metrics->total_duration_ms / server->metrics->total_requests :
+	    0.0;
+
+	char metrics[8192];
+
+	int len = 0;
+	len += snprintf(metrics + len, sizeof(metrics) - len,
+	    "# HELP http_requests_total Total number of HTTP requests\n"
+	    "# TYPE http_requests_total counter\n"
+	    "http_requests_total %lu\n\n",
+	    server->metrics->total_requests);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
+ 
+	len += snprintf(metrics + len, sizeof(metrics) - len,
+	    "# HELP http_request_duration_milliseconds HTTP request latencies\n"
+	    "# TYPE http_request_duration_milliseconds summary\n"
+	    "http_request_duration_milliseconds_min %" PRIu64 "\n"
+	    "http_request_duration_milliseconds_max %" PRIu64 "\n"
+	    "http_request_duration_milliseconds_avg %.2f\n"
+	    "http_request_duration_milliseconds_sum %" PRIu64 "\n\n",
+	    server->metrics->min_duration_ms == UINT_MAX ? 0 : server->metrics->min_duration_ms,
+	    server->metrics->max_duration_ms,
+	    avg_duration,
+	    server->metrics->total_duration_ms);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
+ 
+	len += snprintf(metrics + len, sizeof(metrics) - len,
+	    "# HELP http_requests_by_method Requests by HTTP method\n"
+	    "# TYPE http_requests_by_method counter\n"
+	    "http_requests_by_method{method=\"GET\"} %lu\n"
+	    "http_requests_by_method{method=\"POST\"} %lu\n"
+	    "http_requests_by_method{method=\"PUT\"} %lu\n"
+	    "http_requests_by_method{method=\"DELETE\"} %lu\n"
+	    "http_requests_by_method{method=\"PATCH\"} %lu\n"
+		"http_requests_by_method{method=\"HEAD\"} %lu\n"
+		"http_requests_by_method{method=\"OPTIONS\"} %lu\n"
+		"http_requests_by_method{method=\"CONNECT\"} %lu\n"
+		"http_requests_by_method{method=\"TRACE\"} %lu\n\n",
+	    server->metrics->requests_by_method[0],
+	    server->metrics->requests_by_method[1],
+	    server->metrics->requests_by_method[2],
+	    server->metrics->requests_by_method[3],
+	    server->metrics->requests_by_method[4],
+		server->metrics->requests_by_method[5],
+		server->metrics->requests_by_method[6],
+		server->metrics->requests_by_method[7],
+		server->metrics->requests_by_method[8]);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
+ 
+	len += snprintf(metrics + len, sizeof(metrics) - len,
+	    "# HELP http_requests_by_status Requests by status code class\n"
+	    "# TYPE http_requests_by_status counter\n"
+		"http_requests_by_status{status=\"1xx\"} %" PRIu64 "\n"
+	    "http_requests_by_status{status=\"2xx\"} %" PRIu64 "\n"
+	    "http_requests_by_status{status=\"3xx\"} %" PRIu64 "\n"
+	    "http_requests_by_status{status=\"4xx\"} %" PRIu64 "\n"
+	    "http_requests_by_status{status=\"5xx\"} %" PRIu64 "\n"
+		"http_requests_by_status{status=\"other\"} %" PRIu64 "\n\n",
+	    server->metrics->requests_by_status[0],
+	    server->metrics->requests_by_status[1],
+	    server->metrics->requests_by_status[2],
+	    server->metrics->requests_by_status[3],
+		server->metrics->requests_by_status[4],
+		server->metrics->requests_by_status[5]);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
+ 
+	len += snprintf(metrics + len, sizeof(metrics) - len,
+	    "# HELP process_uptime_seconds Process uptime in seconds\n"
+	    "# TYPE process_uptime_seconds gauge\n"
+	    "process_uptime_seconds %ld\n\n",
+	    (long)uptime);
+	if (len >= (int)sizeof(metrics)) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "metrics response truncated due to size limit"));
+		}
+		return;
+	}
+ 
+	// per-endpoint metrics
+	for (size_t i = 0; i < server->metrics->endpoint_count && len < (int)sizeof(metrics) - 256; i++) {
+		double ep_avg = server->metrics->endpoints[i].count > 0 ?
+		    (double)server->metrics->endpoints[i].total_ms / 
+		    server->metrics->endpoints[i].count : 0.0;
+		
+		len += snprintf(metrics + len, sizeof(metrics) - len,
+		    "http_requests_by_endpoint{endpoint=\"%s\"} %" PRIu64 "\n"
+		    "http_request_duration_by_endpoint{endpoint=\"%s\"} %.2f\n",
+		    server->metrics->endpoints[i].path,
+		    server->metrics->endpoints[i].count,
+		    server->metrics->endpoints[i].path,
+		    ep_avg);
+	}
+ 
+	pthread_mutex_unlock(&server->metrics->mutex);
+ 
+	papago_res_header(res, "Content-Type", 
+	    "text/plain; version=0.0.4; charset=utf-8");
+	papago_res_send(res, metrics);
+}
+
+static void
+log_request(papago_t *server, struct MHD_Connection *connection,
+            const char *url, const char *method, papago_status_code_t status,
+            const struct timeval *start_time, const char *version)
 {
 #ifdef NO_LOGGER
 	PAPAGO_UNUSED(server);
@@ -509,16 +787,24 @@ papago_log_request(papago_t *server, struct MHD_Connection *connection,
 		}
 	}
  
-	const char *user_agent = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
-	    "User-Agent");
+	const char *user_agent = MHD_lookup_connection_value(connection,
+		MHD_HEADER_KIND, "User-Agent");
 	const char *host = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
 		"Host");
 
 	struct timeval end;
 	gettimeofday(&end, NULL);
-	long duration_ms = (end.tv_sec - start_time->tv_sec) * 1000L +
-		(end.tv_usec - start_time->tv_usec) / 1000L;
+	// long duration_ms = (end.tv_sec - start_time->tv_sec) * 1000L +
+	// 	(end.tv_usec - start_time->tv_usec) / 1000L;
  
+	int64_t start_us = ((int64_t)start_time->tv_sec * 1000000LL) + (int64_t)start_time->tv_usec;
+	int64_t end_us = ((int64_t)end.tv_sec * 1000000LL) + (int64_t)end.tv_usec;
+	int64_t duration_us = (end_us - start_us) / 1000LL;
+	if (duration_us < 0) {
+		duration_us = 0;
+	}
+	uint64_t duration_ms = (uint64_t)duration_us;
+
 	if (server->config.enable_logging) {
 		s_log(S_LOG_INFO,
 			s_log_string("remote", client_ip),
@@ -538,8 +824,8 @@ papago_log_request(papago_t *server, struct MHD_Connection *connection,
 /**
  * Compress data using gzip.
  */
-static char *
-papago_compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
+static char*
+compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
 {
 	// estimate maximum compressed size
 	size_t max_compressed = compressBound(data_len);
@@ -579,13 +865,12 @@ papago_compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
 	return compressed;
 }
 
-// libmicrohttpd Request Handler
+// libmicrohttpd request handler
 
 static enum MHD_Result
-papago_mhd_handler(void *cls, struct MHD_Connection *connection,
-                   const char *url, const char *method, const char *version,
-                   const char *upload_data, size_t *upload_data_size,
-                   void **con_cls)
+mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
+            const char *method, const char *version, const char *upload_data,
+            size_t *upload_data_size, void **con_cls)
 {
 	papago_t *server = (papago_t *)cls;
 	struct MHD_Response *mhd_response = NULL;
@@ -602,7 +887,7 @@ papago_mhd_handler(void *cls, struct MHD_Connection *connection,
 
 		gettimeofday(&req->start_time, NULL);
 
-		req->path = papago_strdup(url);
+		req->path = _strdup(url);
 		req->connection = connection;
 
 		// parse method
@@ -651,9 +936,9 @@ papago_mhd_handler(void *cls, struct MHD_Connection *connection,
 		free(req->path);
 		free(req->body);
 
-		papago_free_kv_array(req->headers, req->header_count);
-		papago_free_kv_array(req->params, req->param_count);
-		papago_free_kv_array(req->query, req->query_count);
+		free_kv_array(req->headers, req->header_count);
+		free_kv_array(req->params, req->param_count);
+		free_kv_array(req->query, req->query_count);
     
 		free(req);
 
@@ -688,7 +973,7 @@ papago_mhd_handler(void *cls, struct MHD_Connection *connection,
 			continue;
 		}
 
-		if (papago_match_route(route->path, req->path, &req->params,
+		if (match_route(route->path, req->path, &req->params,
 		    &req->param_count)) {
 			route->handler(req, res, route->user_data);
 			route_found = true;
@@ -702,8 +987,16 @@ papago_mhd_handler(void *cls, struct MHD_Connection *connection,
 	}
 
 send_response:
-	papago_log_request(server, connection, req->path, method, res->status,
+	log_request(server, connection, req->path, method, res->status,
 		&req->start_time, version);
+
+	struct timeval end;
+	gettimeofday(&end, NULL);
+	int64_t start_us = ((int64_t)req->start_time.tv_sec * 1000000LL) + (int64_t)req->start_time.tv_usec;
+	int64_t end_us = ((int64_t)end.tv_sec * 1000000LL) + (int64_t)end.tv_usec;
+	int64_t duration_ms = (end_us - start_us) / 1000LL;
+	if (duration_ms < 0) duration_ms = 0;
+	update_metrics(server, req->path, method, res->status, (uint64_t)duration_ms);
 
 	if (server->config.enable_compression) {
 		char *compressed_body = NULL;
@@ -718,7 +1011,7 @@ send_response:
 			strstr(accept_encoding, "gzip") != NULL &&
 			res->body != NULL && res->body_length > 0) {
 			
-			compressed_body = papago_compress_gzip(res->body, res->body_length,
+			compressed_body = compress_gzip(res->body, res->body_length,
 				&compressed_len);
 			
 			if (compressed_body != NULL && compressed_len < res->body_length) {
@@ -771,13 +1064,13 @@ send_response:
 	free(req->path);
 	free(req->body);
 
-	papago_free_kv_array(req->headers, req->header_count);
-	papago_free_kv_array(req->params, req->param_count);
-	papago_free_kv_array(req->query, req->query_count);
+	free_kv_array(req->headers, req->header_count);
+	free_kv_array(req->params, req->param_count);
+	free_kv_array(req->query, req->query_count);
 
 	free(req);
 	free(res->body);
-	papago_free_kv_array(res->headers, res->header_count);
+	free_kv_array(res->headers, res->header_count);
 	free(res);
 
 	return ret;
@@ -786,8 +1079,8 @@ send_response:
 // libwebsockets Protocol Handler
 
 static int
-papago_lws_callback(struct lws *wsi, enum lws_callback_reasons reason,
-                    void *user, void *in, size_t len)
+lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
+             void *in, size_t len)
 {
 	papago_ws_connection_t *conn = (papago_ws_connection_t*)user;
 	papago_t *server;
@@ -882,7 +1175,7 @@ papago_lws_callback(struct lws *wsi, enum lws_callback_reasons reason,
 static struct lws_protocols papago_lws_protocols[] = {
     {
         .name = "papgo-ws",
-        .callback = papago_lws_callback,
+        .callback = lws_callback,
         .per_session_data_size = sizeof(papago_ws_connection_t),
         .rx_buffer_size = 4096,
     },
@@ -898,7 +1191,7 @@ static struct lws_protocols papago_lws_protocols[] = {
  * websocket thread
  */
 static void*
-papago_lws_thread_func(void *arg)
+lws_thread_func(void *arg)
 {
 	papago_t *server = (papago_t *)arg;
 
@@ -917,7 +1210,7 @@ papago_lws_thread_func(void *arg)
  * Load file contents into memory
  */
 static char*
-papago_load_file(const char *filepath)
+load_file(const char *filepath)
 {
 	FILE *f = fopen(filepath, "rb");
 	if (f == NULL) {
@@ -959,12 +1252,22 @@ papago_new(void)
 	server->config = papago_default_config();
 
 	pthread_mutex_init(&server->ws_mutex, NULL);
+	pthread_mutex_init(&server->template_mutex, NULL);
 	pthread_mutex_init(&server->shutdown_mutex, NULL);
 	pthread_mutex_init(&server->rate_limit_mutex, NULL);
 	pthread_cond_init(&server->shutdown_cond, NULL);
 
 	server->ws_connection_count = 0;
 	server->rate_limit_map = NULL;
+
+	server->metrics = calloc(1, sizeof(papago_metrics_t));
+	if (server->metrics == NULL) {
+		free(server);
+		return NULL;
+	}
+	server->metrics->start_time = time(NULL);
+	server->metrics->min_duration_ms = ULONG_MAX;
+	pthread_mutex_init(&server->metrics->mutex, NULL);
 
 	return server;
 }
@@ -1022,9 +1325,12 @@ papago_start(papago_t *server)
 
 	if (server->config.enable_template_rendering) {
 #ifndef NO_TEMPLATE
-		server->maple_ctx = mp_init();
-		if (server->maple_ctx == NULL) {
-			server->error_message = "failed to initialize Maple template engine";
+		server->template_ctx = mp_init();
+		if (server->template_ctx == NULL) {
+			server->error_message = "failed to initialize template engine";
+			server->template_ctx = NULL;
+			server->running = false;
+			g_server = NULL;
 
 			return 1;
 		}
@@ -1044,13 +1350,17 @@ papago_start(papago_t *server)
 		}
 
 		// load certificate and key into memory
-		cert_pem = papago_load_file(server->config.cert_file);
-		key_pem = papago_load_file(server->config.key_file);
+		cert_pem = load_file(server->config.cert_file);
+		key_pem = load_file(server->config.key_file);
 
 		if (cert_pem == NULL || key_pem == NULL) {
-			fprintf(stderr, "Failed to load certificate files\n");
-			fprintf(stderr, "  Certificate: %s\n", server->config.cert_file);
-			fprintf(stderr, "  Key: %s\n", server->config.key_file);
+			if (server->config.enable_logging) {
+				s_log(S_LOG_ERROR, 
+					s_log_string("msg", "failed to load SSL certificate or key"),
+					s_log_string("cert", server->config.cert_file),
+					s_log_string("key", server->config.key_file));
+			}
+			
 			free(cert_pem);
 			free(key_pem);
 
@@ -1063,7 +1373,7 @@ papago_start(papago_t *server)
 			mhd_flags,
 			server->config.port,
 		    NULL, NULL,
-			&papago_mhd_handler, server,
+			&mhd_handler, server,
 			MHD_OPTION_HTTPS_MEM_KEY, key_pem,
 			MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
 			MHD_OPTION_END);
@@ -1076,7 +1386,7 @@ papago_start(papago_t *server)
 			mhd_flags,
 			server->config.port,
             NULL, NULL,
-			&papago_mhd_handler, server,
+			&mhd_handler, server,
 			MHD_OPTION_END);
 	}
 
@@ -1106,8 +1416,15 @@ papago_start(papago_t *server)
 		if (server->config.enable_ssl) {
 			if (server->config.cert_file == NULL ||
 			    server->config.key_file == NULL) {
-				fprintf(stderr, "SSL enabled but cert/key files missing\n");
+				if (server->config.enable_logging) {
+					s_log(S_LOG_ERROR, 
+						s_log_string("msg", "SSL enabled but cert_file or key_file not set for WebSocket"),
+						s_log_string("cert", server->config.cert_file ? server->config.cert_file : "NULL"),
+						s_log_string("key", server->config.key_file ? server->config.key_file : "NULL"));
+				}
 				MHD_stop_daemon(server->mhd_daemon);
+				server->running = false;
+				g_server = NULL;
 
 				return 1;
 			}
@@ -1122,15 +1439,22 @@ papago_start(papago_t *server)
 		#endif
 		server->lws_context = lws_create_context(&info);
 		if (server->lws_context == NULL) {
-			fprintf(stderr, "Failed to create libwebsockets context\n");
+			if (server->config.enable_logging) {
+				s_log(S_LOG_ERROR, 
+					s_log_string("msg", "failed to create libwebsockets context"),
+					s_log_int("port", info.port),
+					s_log_string("ssl", server->config.enable_ssl ? "enabled" : "disabled"));
+			}
 			MHD_stop_daemon(server->mhd_daemon);
-	
+			server->running = false;
+			g_server = NULL;
+
 			return 1;
 		}
 
 		// start websocket service thread
 		pthread_create(&server->lws_thread, NULL,
-		papago_lws_thread_func, server);
+		lws_thread_func, server);
 	}
 
 	if (server->config.enable_logging) {
@@ -1233,8 +1557,10 @@ papago_destroy(papago_t *server)
 
 	// destroy synchronization primitives
 	pthread_mutex_destroy(&server->ws_mutex);
+	pthread_mutex_destroy(&server->template_mutex);
 	pthread_mutex_destroy(&server->shutdown_mutex);
 	pthread_mutex_destroy(&server->rate_limit_mutex);
+	pthread_mutex_destroy(&server->metrics->mutex);
 	pthread_cond_destroy(&server->shutdown_cond);
 
 	// free template engine memory
@@ -1261,8 +1587,8 @@ papago_route(papago_t *server, papago_method_t method,
 
 	papago_route_t *route = &server->routes[server->route_count];
 	route->method = method;
-	route->path = papago_strdup(path);
-	route->path_pattern = papago_strdup(path);
+	route->path = _strdup(path);
+	route->path_pattern = _strdup(path);
 	route->handler = handler;
 	route->has_params = (strchr(path, ':') != NULL);
     route->user_data = user_data;
@@ -1325,7 +1651,7 @@ papago_middleware_path_add(papago_t *server, const char *path,
     }
 
 	papago_middleware_t *mw = &server->middleware[server->middleware_count];
-	mw->path = (path != NULL) ? papago_strdup(path) : NULL;
+	mw->path = (path != NULL) ? _strdup(path) : NULL;
 	mw->fn = middleware;
 
 	server->middleware_count++;
@@ -1342,7 +1668,7 @@ papago_static(papago_t *server, const char *directory)
 		return 1;
     }
 
-	server->config.static_dir = papago_strdup(directory);
+	server->config.static_dir = _strdup(directory);
 
 	return 0;
 }
@@ -1364,7 +1690,7 @@ papago_ws_endpoint(papago_t *server, const char *path,
     }
 
 	endpoint = &server->ws_endpoints[server->ws_endpoint_count];
-	endpoint->path = papago_strdup(path);
+	endpoint->path = _strdup(path);
 	endpoint->on_connect = on_connect;
 	endpoint->on_message = on_message;
 	endpoint->on_close = on_close;
@@ -1749,7 +2075,7 @@ _fmemopen(memstream_t **out_mem)
         return NULL;
     }
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) //|| defined(__FreeBSD__)
     FILE *fp = funopen(m, ms_read, ms_write, ms_seek, ms_close);
 #else
     cookie_io_functions_t io = {
@@ -1889,7 +2215,11 @@ papago_check_rate_limit(papago_request_t *req, papago_response_t *res)
 	}
  
 	if (!found && slot != -1) {
-		strncpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
+#ifdef __FreeBSD__
+        strlcpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
+#else
+        strncpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
+#endif
 		entries[slot].ip[sizeof(entries[slot].ip)-1] = '\0';
 		entries[slot].count = 1;
 		entries[slot].window_start = now;
@@ -1914,25 +2244,44 @@ papago_render_file(const char *tmpl_path, char *output,
 	if (tmpl_path == NULL) {
 		return 1;
 	}
+
+	if (g_server == NULL) {
+		return 2;
+	}
  
+	if (g_server->template_ctx == NULL) {
+		return 3;
+	}
+
+	if (output == NULL || output_size == 0) {
+		return 4;
+	}
+
 	va_list args;
 	va_start(args, output_size);
-	
+
+	pthread_mutex_lock(&g_server->template_mutex);
 	const char *key;
 	while ((key = va_arg(args, const char *)) != NULL) {
 		const char *value = va_arg(args, const char *);
 		if (value != NULL) {
-			mp_set_var(g_server->maple_ctx, key, value);
+			mp_set_var(g_server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
 
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
-	uint8_t ret = mp_render_file(g_server->maple_ctx, buf, tmpl_path, ".");
-	if (ret != 0) {
-		return 4;
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return 5;
 	}
+	uint8_t ret = mp_render_file(g_server->template_ctx, buf, tmpl_path, ".");
+	if (ret != 0) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return 6;
+	}
+	pthread_mutex_unlock(&g_server->template_mutex);
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
@@ -1956,7 +2305,7 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 		return 1;
 	}
 
-	if (g_server->maple_ctx == NULL) {
+	if (g_server->template_ctx == NULL) {
 		return 2;
 	}
 
@@ -1967,26 +2316,33 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 	va_list args;
 	va_start(args, output_size);
 
+	pthread_mutex_lock(&g_server->template_mutex);
 	const char *key;
 	while ((key = va_arg(args, const char*)) != NULL && strcmp(key, "") != 0) {
 		const char *value = va_arg(args, const char*);
 		if (value != NULL) {
-			mp_set_var(g_server->maple_ctx, key, value);
+			mp_set_var(g_server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
 
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
-	uint8_t ret = mp_render_segment(g_server->maple_ctx, buf, tmpl, NULL, ".");
-	if (ret != 0) {
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
 		return 4;
 	}
+	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
+	if (ret != 0) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return 5;
+	}
+	pthread_mutex_unlock(&g_server->template_mutex);	
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
 	fclose(buf);
- 
+
 	return 0;
 #endif
 }
@@ -2009,21 +2365,28 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 	va_list args;
 	va_start(args, output_size);
 
+	pthread_mutex_lock(&g_server->template_mutex);
 	const char *key;
-	while ((key = va_arg(args, const char *)) != NULL) {
-		const char *value = va_arg(args, const char *);
+	while ((key = va_arg(args, const char*)) != NULL) {
+		const char *value = va_arg(args, const char*);
 		if (value != NULL) {
-			mp_set_var(g_server->maple_ctx, key, value);
+			mp_set_var(g_server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
  
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
-	uint8_t ret = mp_render_segment(g_server->maple_ctx, buf, tmpl, NULL, ".");
-	if (ret != 0) {
-		return 4;
+	if (buf == NULL) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return -1;
 	}
+	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
+	if (ret != 0) {
+		pthread_mutex_unlock(&g_server->template_mutex);
+		return -1;
+	}
+	pthread_mutex_unlock(&g_server->template_mutex);
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
