@@ -1011,6 +1011,8 @@ papago_start(papago_t *server)
 	if (server->config.enable_logging) {
 #ifndef NO_LOGGER
 		s_log_init(stdout);
+#else 
+        server->config.enable_logging = false;
 #endif
 	}
 
@@ -1026,6 +1028,9 @@ papago_start(papago_t *server)
 
 			return 1;
 		}
+#else 
+		server->error_message = "template rendering enabled but support was compiled out";
+		return 1;
 #endif
 	}
 
@@ -1779,7 +1784,7 @@ memstream_size(const memstream_t *m)
 {
     return m->size;
 }
-#endif 
+#endif
 
 void
 papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
@@ -1901,6 +1906,9 @@ papago_render_file(const char *tmpl_path, char *output,
 {
 #ifdef NO_TEMPLATE
 	(void)tmpl_path; (void)output; (void)output_size;
+	if (output != NULL && output_size > 0) {
+		output[0] = '\0';
+	}
 	return 1;
 #else
 	if (tmpl_path == NULL) {
@@ -1939,6 +1947,9 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 {
 #ifdef NO_TEMPLATE
 	(void)tmpl; (void)output; (void)output_size;
+	if (output != NULL && output_size > 0) {
+		output[0] = '\0';
+	}
 	return 1;
 #else
 	if (tmpl == NULL) {
@@ -1986,6 +1997,9 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 {
 #ifdef NO_TEMPLATE
 	(void)res; (void)tmpl; (void)output; (void)output_size;
+	if (output != NULL && output_size > 0) {
+		output[0] = '\0';
+	}
 	return -1;
 #else
 	if (res == NULL || tmpl == NULL) {
