@@ -6,10 +6,13 @@ Modern web framework designed to be full featured and powerful all while being e
 
 - RESTful Routing - GET, POST, PUT, DELETE, PATCH support
 - Path Parameters - Dynamic routes like `/users/:id`
+- Wildcard URIs - Example: `/api/v1/*` 
 - Query Parameters - Parse URL query strings
 - HTML Templates - Easy dynamic content via server side templating
 - Middleware System - Global and path-specific middleware
+- File stream - video / audio / large files, zero-copy, automatic MIME type detection
 - WebSocket Support - Real-time bidirectional communication
+- Embedded File Support - Embed HTML, JS, CSS, etc into the application
 - JSON Responses - Built-in JSON helpers
 - Static Files - Serve files from directories
 - Thread-Safe - Built on proven concurrent architecture
@@ -17,6 +20,14 @@ Modern web framework designed to be full featured and powerful all while being e
 - Rate limiting by IP
 - Compression with Gzip
 - Metrics collection and exposure via Prometheus endpoint
+
+### MIME Types Supported
+HTML, CSS, JS, JSON, XML, TXT
+PNG, JPG, GIF, SVG, ICO, WebP
+MP4, WebM, OGG
+MP3, WAV, M4A
+PDF, ZIP, TAR, GZ
+WOFF, WOFF2, TTF
 
 ## Dependencies
 

@@ -12,6 +12,7 @@
 #include <strings.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -41,8 +42,8 @@ typedef struct {
 	char *path;
 	char *path_pattern;
 	papago_handler_t handler;
-	bool has_params;
     void *user_data;
+	bool has_params;
 } papago_route_t;
 
 typedef struct {
@@ -90,7 +91,10 @@ struct papago_response {
 	size_t body_length;
 	papago_kv_t *headers;
 	size_t header_count;
+	FILE *stream_file;
+	size_t stream_file_size;
 	bool sent;
+	bool is_stream_file;
 };
 
 /**
@@ -155,6 +159,7 @@ struct papago_server {
 	pthread_mutex_t rate_limit_mutex;
 	pthread_cond_t shutdown_cond;
 	papago_metrics_t *metrics;
+	const papago_embedded_file_t *embedded_files;
 	void *rate_limit_map;
     char *error_message;
 	volatile bool running;
@@ -300,7 +305,7 @@ match_route(const char *pattern, const char *path, papago_kv_t **params,
     }
 
 	// simple comparison if no parameters
-	if (strchr(pattern, ':') == NULL) {
+	if (strchr(pattern, ':') == NULL && strchr(pattern, '*') == NULL) {
 		return strcmp(pattern, path) == 0;
     }
 
@@ -322,13 +327,40 @@ match_route(const char *pattern, const char *path, papago_kv_t **params,
 	const char *path_token = strtok_r((char*)path_copy, "/", &path_saveptr);
 
 	while (pattern_token != NULL && path_token != NULL) {
-		printf("pattern_token: %s, path_token: %s\n", pattern_token, path_token);
-		if (pattern_token[0] == ':') {
-			// extract parameter
+		if (strcmp(pattern_token, "*") == 0) {
+			// wildcard: matches all remaining path segments
+			// reconstruct the remainder and store it as param "*"
+			if (params != NULL && param_count != NULL) {
+				char remainder[4096];
+				remainder[0] = '\0';
+				size_t off = 0;
+				const char *pt = path_token;
+				char *ps = path_saveptr;
+
+				while (pt != NULL) {
+					size_t seg_len = strlen(pt);
+
+					if (off + seg_len + 2 < sizeof(remainder)) {
+						if (off > 0) {
+							remainder[off++] = '/';
+						}
+
+						memcpy(remainder + off, pt, seg_len);
+						off += seg_len;
+						remainder[off] = '\0';
+					}
+					pt = strtok_r(NULL, "/", &ps);
+				}
+				add_kv(params, param_count, "*", remainder);
+			}
+			match = true;
+			break;
+		} else if (pattern_token[0] == ':') {
+			// extract named parameter
 			const char *param_name = pattern_token + 1;
 			if (params != NULL && param_count != NULL) {
 				add_kv(params, param_count, param_name, path_token);
-            }
+			}
 		} else if (strcmp(pattern_token, path_token) != 0) {
 			match = false;
 			break;
@@ -338,9 +370,10 @@ match_route(const char *pattern, const char *path, papago_kv_t **params,
 		path_token = strtok_r(NULL, "/", &path_saveptr);
 	}
 
-	if (pattern_token != NULL || path_token != NULL) {
+	if ((pattern_token != NULL || path_token != NULL) &&
+		!(pattern_token != NULL && strcmp(pattern_token, "*") == 0)) {
 		match = false;
-    }
+	}
 
 	free((void*)pattern_copy);
 	free((void*)path_copy);
@@ -457,6 +490,62 @@ papago_res_json(papago_response_t *res, const char *json)
 }
 
 uint8_t
+papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
+                         const char *mime_type)
+{
+	if (res == NULL || filepath == NULL) {
+		return 1;
+	}
+ 
+	// check if file exists and get size
+	struct stat st;
+	if (stat(filepath, &st) != 0) {
+		if (g_server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "file not found"),
+			s_log_string("filepath", filepath));
+		}
+		return 1;
+	}
+
+	FILE *fp = fopen(filepath, "rb");
+	if (fp == NULL) {
+		if (g_server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "cannot open file"),
+				s_log_string("filepath", filepath));
+		}
+		return 1;
+	}
+ 
+	int fd = fileno(fp);
+	if (fd < 0) {
+		fclose(fp);
+		return 1;
+	}
+ 
+	// set content type
+	if (mime_type != NULL) {
+		papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, mime_type);
+	} else {
+		papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
+			papago_mime_type(filepath));
+	}
+ 
+	// set content length
+	char size_str[64];
+	snprintf(size_str, sizeof(size_str), "%ld", (long)st.st_size);
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, size_str);
+ 
+	// mark response as file-based for special handling
+	res->stream_file = fp;
+	res->stream_file_size = st.st_size;
+	res->is_stream_file = true;
+ 
+	return 0;
+}
+
+uint8_t
 papago_res_sendfile(papago_response_t *res, const char *filepath)
 {
 	FILE *f = fopen(filepath, "rb");
@@ -498,7 +587,7 @@ papago_res_sendfile(papago_response_t *res, const char *filepath)
 	res->body_length = size;
 	res->sent = true;
 
-	return 0;
+	return papago_res_sendfile_mime(res, filepath, NULL);
 }
 
 // metrics
@@ -977,6 +1066,36 @@ send_response:
 	log_request(server, connection, req->path, method, res->status,
 		&req->start_time, version);
 
+	if (res->is_stream_file && res->stream_file != NULL) {
+		int fd = fileno(res->stream_file);
+		
+		mhd_response = MHD_create_response_from_fd(res->stream_file_size, fd);
+		
+		// add headers
+		for (size_t i = 0; i < res->header_count; i++) {
+			MHD_add_response_header(mhd_response, res->headers[i].key,
+				res->headers[i].value);
+		}
+		
+		/* Send response */
+		ret = MHD_queue_response(connection, res->status, mhd_response);
+		MHD_destroy_response(mhd_response);
+		
+		// file will be closed by MHD after sending
+
+		free(req->path);
+		free(req->body);
+		free_kv_array(req->headers, req->header_count);
+		free_kv_array(req->params, req->param_count);
+		free_kv_array(req->query, req->query_count);
+		free(req);
+		
+		free_kv_array(res->headers, res->header_count);
+		free(res);
+		
+		return ret;
+	}
+
 	if (server->config.enable_compression) {
 		char *compressed_body = NULL;
 		size_t compressed_len = 0;
@@ -1238,6 +1357,7 @@ papago_new(void)
 
 	server->ws_connection_count = 0;
 	server->rate_limit_map = NULL;
+	server->embedded_files = NULL;
 
 	server->metrics = calloc(1, sizeof(papago_metrics_t));
 	if (server->metrics == NULL) {
@@ -1627,18 +1747,139 @@ papago_middleware_path_add(papago_t *server, const char *path,
 	return 0;
 }
 
-// static Files
+/*
+ * Embedded Static Files
+ */
+ 
+static const papago_embedded_file_t *g_embedded_files = NULL;
+ 
+void
+papago_register_embedded_files(papago_t *server, const papago_embedded_file_t *files)
+{
+	PAPAGO_UNUSED(server);
+	g_embedded_files = files;
+}
+ 
+void
+papago_serve_embedded_handler(papago_request_t *req, papago_response_t *res,
+                              void *user_data)
+{
+	PAPAGO_UNUSED(user_data);
+ 
+	if (g_embedded_files == NULL) {
+		papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+		papago_res_send(res, "No embedded files registered");
+		return;
+	}
+ 
+	const char *path = papago_req_path(req);
+ 
+	// default to /index.html if requesting "/"
+	if (strncmp(path, "/", 1) == 0) {
+		path = "/index.html";
+	}
+		
+	// find file
+	char *data_copy;
+	for (size_t i = 0; g_embedded_files[i].path != NULL; i++) {
+		if (strcmp(g_embedded_files[i].path, path) == 0) {
+			// found file so serve it
+			papago_res_header(res, "Content-Type",
+			    g_embedded_files[i].content_type);
+			
+			// copy data to send (papago_res_send expects null-terminated string)
+			data_copy = malloc(g_embedded_files[i].size + 1);
+			if (data_copy != NULL) {
+				memcpy(data_copy, g_embedded_files[i].data,
+					g_embedded_files[i].size);
+				data_copy[g_embedded_files[i].size] = '\0';
+				
+				// set body directly
+				res->body = data_copy;
+				res->body_length = g_embedded_files[i].size;
+			}
+			return;
+		}
+	}
+ 
+	// not found
+	papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+	papago_res_send(res, "file not found");
+}
 
-uint8_t
-papago_static(papago_t *server, const char *directory)
+// static file serving
+void
+papago_set_static_dir(papago_t *server, const char *directory)
 {
 	if (server == NULL || directory == NULL) {
-		return 1;
-    }
-
+		return;
+	}
+ 
+	if (server->config.static_dir != NULL) {
+		free((void *)server->config.static_dir);
+	} 
 	server->config.static_dir = _strdup(directory);
+}
+ 
+void
+papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
+                            void *user_data)	
+{
+	PAPAGO_UNUSED(user_data);
 
-	return 0;
+	char filepath[1024];
+ 
+	g_server = papago_get_current_server();
+	if (g_server == NULL || g_server->config.static_dir == NULL) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_send(res, "static directory not configured");
+		return;
+	}
+ 
+	const char *path = papago_req_path(req);
+ 
+	// prevent directory traversal
+	if (strstr(path, "..") != NULL) {
+		papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
+		papago_res_send(res, "invalid path");
+		return;
+	}
+ 
+	// build full file path
+	snprintf(filepath, sizeof(filepath), "%s%s", 
+	    g_server->config.static_dir, path);
+ 
+	// check if file exists
+	struct stat st;
+	if (stat(filepath, &st) != 0) {
+		papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+		papago_res_send(res, "file not found");
+		return;
+	}
+ 
+	// check if it's a regular file
+	if (!S_ISREG(st.st_mode)) {
+		// default to index.html for directories
+		if (S_ISDIR(st.st_mode)) {
+			snprintf(filepath, sizeof(filepath), "%s%s/index.html",
+			    g_server->config.static_dir, path);
+			
+			if (stat(filepath, &st) != 0 || !S_ISREG(st.st_mode)) {
+				papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
+				papago_res_send(res, "directory listing not allowed");
+				return;
+			}
+		} else {
+			papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
+			papago_res_send(res, "not a regular file");
+			return;
+		}
+	}
+
+	if (papago_res_sendfile(res, filepath) != 0) {
+		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_send(res, "failed to serve file");
+	}
 }
 
 // websocket Functions
@@ -2302,7 +2543,7 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
                   size_t output_size, ...)
 {
 	if (res == NULL || tmpl == NULL) {
-		return -1;
+		return 1;
 	}
 
 	va_list args;
@@ -2322,12 +2563,12 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
     FILE *buf = _fmemopen(&mem);
 	if (buf == NULL) {
 		pthread_mutex_unlock(&g_server->template_mutex);
-		return -1;
+		return 1;
 	}
 	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
 	if (ret != 0) {
 		pthread_mutex_unlock(&g_server->template_mutex);
-		return -1;
+		return 1;
 	}
 	pthread_mutex_unlock(&g_server->template_mutex);
 
@@ -2339,4 +2580,121 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 	papago_res_header(res, "Content-Type", "text/html; charset=utf-8");
  
 	return papago_res_send(res, output);
+}
+
+// streaming
+
+const char*
+papago_mime_type(const char *filename)
+{
+	if (filename == NULL) {
+		return "application/octet-stream";
+	}
+ 
+	size_t len = strlen(filename);
+	const char *ext = NULL;
+ 
+	// find last dot
+	for (size_t i = len; i > 0; i--) {
+		if (filename[i - 1] == '.') {
+			ext = &filename[i];
+			break;
+		}
+		if (filename[i - 1] == '/') {
+			break;
+		}
+	}
+ 
+	if (ext == NULL) {
+		return "application/octet-stream";
+	}
+ 
+	// common MIME types
+	if (strcasecmp(ext, "html") == 0 || strcasecmp(ext, "htm") == 0) {
+		return "text/html; charset=utf-8";
+	}
+	if (strcasecmp(ext, "css") == 0) {
+		return "text/css; charset=utf-8";
+	}
+	if (strcasecmp(ext, "js") == 0) {
+		return "application/javascript; charset=utf-8";
+	}
+	if (strcasecmp(ext, "json") == 0) {
+		return "application/json";
+	}
+	if (strcasecmp(ext, "xml") == 0) {
+		return "application/xml";
+	}
+	if (strcasecmp(ext, "txt") == 0) {
+		return "text/plain; charset=utf-8";
+	}
+	
+	// images
+	if (strcasecmp(ext, "png") == 0) {
+		return "image/png";
+	}
+	if (strcasecmp(ext, "jpg") == 0 || strcasecmp(ext, "jpeg") == 0) {
+		return "image/jpeg";
+	}
+	if (strcasecmp(ext, "gif") == 0) {
+		return "image/gif";
+	}
+	if (strcasecmp(ext, "svg") == 0) {
+		return "image/svg+xml";
+	}
+	if (strcasecmp(ext, "ico") == 0) {
+		return "image/x-icon";
+	}
+	if (strcasecmp(ext, "webp") == 0) {
+		return "image/webp";
+	}
+	
+	// video
+	if (strcasecmp(ext, "mp4") == 0) {
+		return "video/mp4";
+	}
+	if (strcasecmp(ext, "webm") == 0) {
+		return "video/webm";
+	}
+	if (strcasecmp(ext, "ogg") == 0) {
+		return "video/ogg";
+	}
+	
+	// audio
+	if (strcasecmp(ext, "mp3") == 0) {
+		return "audio/mpeg";
+	}
+	if (strcasecmp(ext, "wav") == 0) {
+		return "audio/wav";
+	}
+	if (strcasecmp(ext, "m4a") == 0) {
+		return "audio/mp4";
+	}
+	
+	// Documents
+	if (strcasecmp(ext, "pdf") == 0) {
+		return "application/pdf";
+	}
+	if (strcasecmp(ext, "zip") == 0) {
+		return "application/zip";
+	}
+	if (strcasecmp(ext, "tar") == 0) {
+		return "application/x-tar";
+	}
+	if (strcasecmp(ext, "gz") == 0) {
+		return "application/gzip";
+	}
+	
+	// fonts
+	if (strcasecmp(ext, "woff") == 0) {
+		return "font/woff";
+	}
+	if (strcasecmp(ext, "woff2") == 0) {
+		return "font/woff2";
+	}
+	if (strcasecmp(ext, "ttf") == 0) {
+		return "font/ttf";
+	}
+ 
+	return "application/octet-stream";
 }

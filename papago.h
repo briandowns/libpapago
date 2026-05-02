@@ -136,11 +136,6 @@ typedef void (*papago_ws_on_error_t)(papago_ws_connection_t *conn,
 typedef struct {
 	int port;
 	char *host;
-	bool enable_ssl;
-	bool enable_logging;
-	bool enable_template_rendering;
-	bool enable_rate_limiting;
-	bool enable_compression;
 	uint16_t rate_limit_requests;
 	uint16_t rate_limit_window;
 	char *cert_file;
@@ -150,6 +145,11 @@ typedef struct {
 	int thread_pool_size;
 	size_t max_body_size;
 	bool enable_cors;
+	bool enable_ssl;
+	bool enable_logging;
+	bool enable_template_rendering;
+	bool enable_rate_limiting;
+	bool enable_compression;
 } papago_config_t;
 
 // server management
@@ -338,13 +338,46 @@ papago_res_json(papago_response_t *res, const char *json);
 uint8_t
 papago_res_sendfile(papago_response_t *res, const char *filepath);
 
+// static content embedding
+ 
+// embedded file entry
+typedef struct {
+	const char	*path;         // virtual path (e.g., "/index.html")
+	const char	*content_type; // MIME type
+	const unsigned char *data; // file data
+	size_t		size;
+} papago_embedded_file_t;
+ 
+/**
+ * Register embedded files.
+ * An array of embedded files (terminated with path = NULL)
+ */
+void
+papago_register_embedded_files(papago_t *server,
+                               const papago_embedded_file_t *files);
+ 
+/**
+ * Serve embedded file handler. Use with catch-all route.
+ */
+void
+papago_serve_embedded_handler(papago_request_t *req, papago_response_t *res,
+                              void *user_data);
+
 // static files
 
 /**
- * Enable static file serving. Returns 0 on success or 1 on failure.
+ * Set static files directory
  */
-uint8_t
-papago_static(papago_t *server, const char *directory);
+void
+papago_set_static_dir(papago_t *server, const char *directory);
+ 
+/**
+ * Static file handler serves files from static directory. Use with
+ * papago_get(server, "/static/*", papago_serve_static_handler, NULL);
+ */
+void
+papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
+                            void *user_data);
 
 // websocket
 
@@ -476,6 +509,29 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 void
 papago_metrics_handler(papago_request_t *req, papago_response_t *res,
                        void *user_data);
+
+// streaming
+ 
+/**
+ * Stream a file as the response. Automatically detects MIME type from
+ * file extension. Efficiently serves files of any size without loading into
+ * memory. Returns 0 on success or 1 on error.
+ */
+uint8_t
+papago_res_sendfile(papago_response_t *res, const char *filepath);
+ 
+/**
+ * Stream a file with custom MIME type. Returns 0 on success or 1 on error.
+ */
+uint8_t
+papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
+                         const char *mime_type);
+ 
+/**
+ * Get MIME type from file extension. Returns MIME type (e.g., "text/html").
+ */
+const char*
+papago_mime_type(const char *filename);
 
 // HTTP status messages
 
