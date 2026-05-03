@@ -7,6 +7,7 @@
 *.dSYM/
 bin/*
 tests/tests
+
 example
 example_ssl
 example_websocket
@@ -14,6 +15,8 @@ example_template
 example_rate_limit
 example_compression
 example_metrics
+example_streaming
+example_embedded
 debug_build
 
 libpapago.dylib
@@ -22,3 +25,5 @@ libpapago.a
 
 server.crt
 server.key
+
+*.mp*

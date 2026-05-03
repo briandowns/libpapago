@@ -26,7 +26,7 @@ TEST_CFLAGS += -I$(INCDIR)
 LDFLAGS += -L$(LIBDIR)
 endif
 
-EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics
+EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
@@ -97,6 +97,14 @@ example_compression: clean
 .PHONY: example_metrics
 example_metrics: clean
 	$(CC) -o $@ logger.c maple.c papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_streaming
+example_streaming: clean
+	$(CC) -o $@ logger.c maple.c papago.c examples/example_streaming.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_embedded
+example_embedded: clean
+	$(CC) -o $@ logger.c maple.c papago.c examples/example_embedded.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)
