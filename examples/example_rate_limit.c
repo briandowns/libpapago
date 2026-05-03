@@ -79,11 +79,9 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 int
 main(void)
 {
-	// setup signal handling
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-	// create server
 	server = papago_new();
 	if (server == NULL) {
 		fprintf(stderr, "failed to create server\n");

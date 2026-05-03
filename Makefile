@@ -18,7 +18,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 TEST_CFLAGS = -g -fPIC -Wall -Wextra
-LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread
+LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread -llogger -lmaple
 
 ifeq ($(UNAME_S),FreeBSD)
 CFLAGS += -I$(INCDIR)
@@ -30,15 +30,15 @@ EXAMPLES = example example_ssl example_websocket example_template example_rate_l
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
-	$(CC) -dynamiclib -o $@ logger.c maple.c papago.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -dynamiclib -o $@ papago.c $(CFLAGS) $(LDFLAGS)
 else
 $(NAME).so: clean
-	$(CC) -shared -o $@ logger.c maple.c papago.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -shared -o $@ papago.c $(CFLAGS) $(LDFLAGS)
 endif
 
 .PHONY: tests
 tests: clean
-	$(CC) -o tests/tests tests/crosscheck.c tests/papago_test.c logger.c maple.c papago.c $(TEST_CFLAGS) $(LDFLAGS)
+	$(CC) -o tests/tests tests/crosscheck.c tests/papago_test.c papago.c $(TEST_CFLAGS) $(LDFLAGS)
 	tests/tests
 	rm -f tests/tests
 
@@ -72,39 +72,39 @@ clean:
 
 .PHONY: example
 example: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_ssl
 example_ssl: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example_ssl.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_ssl.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_websocket
 example_websocket: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example_websocket.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_websocket.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_template
 example_template: clean
-	$(CC) -o $@ logger.c maple.c examples/example_template.c papago.c $(TEST_CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ examples/example_template.c papago.c $(TEST_CFLAGS) $(LDFLAGS)
 
 .PHONY: example_rate_limit
 example_rate_limit: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example_rate_limit.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_rate_limit.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_compression
 example_compression: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example_compression.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_compression.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_metrics
 example_metrics: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_streaming
 example_streaming: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example_streaming.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_streaming.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_embedded
 example_embedded: clean
-	$(CC) -o $@ logger.c maple.c papago.c examples/example_embedded.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_embedded.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)
