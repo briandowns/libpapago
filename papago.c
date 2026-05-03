@@ -500,10 +500,10 @@ papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
 	// check if file exists and get size
 	struct stat st;
 	if (stat(filepath, &st) != 0) {
-		if (g_server->config.enable_logging) {
+		if (g_server != NULL && g_server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "file not found"),
-			s_log_string("filepath", filepath));
+				s_log_string("filepath", filepath));
 		}
 		return 1;
 	}
@@ -535,7 +535,7 @@ papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
 	// set content length
 	char size_str[64];
 	snprintf(size_str, sizeof(size_str), "%ld", (long)st.st_size);
-	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, size_str);
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_LENGTH, size_str);
  
 	// mark response as file-based for special handling
 	res->stream_file = fp;
@@ -1070,6 +1070,10 @@ send_response:
 		int fd = fileno(res->stream_file);
 		
 		mhd_response = MHD_create_response_from_fd(res->stream_file_size, fd);
+		if (mhd_response == NULL) {
+			fclose(res->stream_file);
+			return MHD_NO;
+		}
 		
 		// add headers
 		for (size_t i = 0; i < res->header_count; i++) {
@@ -1077,7 +1081,7 @@ send_response:
 				res->headers[i].value);
 		}
 		
-		/* Send response */
+		// send response
 		ret = MHD_queue_response(connection, res->status, mhd_response);
 		MHD_destroy_response(mhd_response);
 		
@@ -1775,7 +1779,7 @@ papago_serve_embedded_handler(papago_request_t *req, papago_response_t *res,
 	const char *path = papago_req_path(req);
  
 	// default to /index.html if requesting "/"
-	if (strncmp(path, "/", 1) == 0) {
+	if (strcmp(path, "/") == 0) {
 		path = "/index.html";
 	}
 		
@@ -1814,10 +1818,6 @@ papago_set_static_dir(papago_t *server, const char *directory)
 	if (server == NULL || directory == NULL) {
 		return;
 	}
- 
-	if (server->config.static_dir != NULL) {
-		free((void *)server->config.static_dir);
-	} 
 	server->config.static_dir = _strdup(directory);
 }
  
