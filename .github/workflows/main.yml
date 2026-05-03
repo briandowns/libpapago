@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt update -y
           sudo apt install -y --no-install-recommends -o Acquire::Retries=5 \
-            git make build-essential libssl-dev pkg-config libjansson-dev && \
+            git make build-essential libssl-dev pkg-config libjansson-dev \
             libwebsockets-dev libcurl4-openssl-dev libmicrohttpd-dev && \
             git clone https://github.com/briandowns/libmaple.git && \
             cd libmaple && make && sudo make install && \
