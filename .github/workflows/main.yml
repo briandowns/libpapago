@@ -32,8 +32,8 @@ jobs:
         run: git pull origin master
       - name: Install Dependencies
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt update -y
+          sudo apt install -y --no-install-recommends \
             -o Acquire::Retries=5 \
             git make build-essential libssl-dev pkg-config libjansson-dev \
             libwebsockets-dev libcurl4-openssl-dev libmicrohttpd-dev \
@@ -44,8 +44,8 @@ jobs:
             cd liblogger && make && sudo make install && \
             cd .. && rm -rf liblogger && \
             sudo ldconfig && \
-            sudo apt-get autoremove -y && \
-            sudo apt-get clean -y && \
+            sudo apt autoremove -y && \
+            sudo apt clean -y && \
             sudo rm -rf /var/lib/apt/lists/* && \
             sudo rm -rf /tmp/* /var/tmp/* && \
             echo "Dependencies installed successfully"
