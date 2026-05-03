@@ -332,12 +332,6 @@ papago_res_send(papago_response_t *res, const char *body);
 uint8_t
 papago_res_json(papago_response_t *res, const char *json);
 
-/**
- * Send file as response. Returns 0 on success or 1 on failure.
- */
-uint8_t
-papago_res_sendfile(papago_response_t *res, const char *filepath);
-
 // static content embedding
  
 // embedded file entry

@@ -129,11 +129,9 @@ static const papago_embedded_file_t embedded_files[] = {
 int
 main(void)
 {
-	// setup signal handling
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-	// create server
 	server = papago_new();
 	if (server == NULL) {
 		fprintf(stderr, "failed to create server\n");
@@ -146,7 +144,7 @@ main(void)
 	papago_configure(server, &config);
 
     papago_register_embedded_files(server, embedded_files);
-    papago_get(server, "/api/*", papago_serve_embedded_handler, NULL);
+    papago_get(server, "/*", papago_serve_embedded_handler, NULL);
 
 	// start server (blocking)
 	if (papago_start(server) != 0) {
