@@ -175,13 +175,13 @@ main(void)
 	papago_configure(server, &config);
 
 	// register HTTP routes
-	papago_get(server, "/", index_handler, NULL);
-	papago_get(server, "/slow", slow_handler, NULL);
-	papago_get(server, "/error", error_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/slow", slow_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/error", error_handler, NULL);
 
     // register observability endpoints
-	papago_get(server, "/metrics", papago_metrics_handler, NULL); 
-	papago_get(server, "/health", health_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/health", health_handler, NULL);
 
 	// start server (blocking)
 	if (papago_start(server) != 0) {

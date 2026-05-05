@@ -49,7 +49,7 @@ signal_handler(int sig)
 }
 
 
-/*
+/**
  * Generate large JSON response for compression testing
  */
 void
@@ -136,10 +136,10 @@ main(void)
     config.enable_compression = true;
 	papago_configure(server, &config);
 
-	papago_get(server, "/large", large_handler, NULL);
-	papago_get(server, "/small", small_handler, NULL);
-	papago_get(server, "/info", info_handler, NULL);
-	papago_get(server, "/", info_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/large", large_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/small", small_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/info", info_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/", info_handler, NULL);
 
 	papago_start(server);
 	papago_destroy(server);

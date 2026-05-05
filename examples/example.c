@@ -145,9 +145,9 @@ main(void)
 	papago_configure(server, &config);
 
 	// register HTTP routes
-	papago_get(server, "/", index_handler, NULL);
-	papago_get(server, "/api/hello", api_hello_handler, NULL);
-	papago_get(server, "/user/:username", user_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/user/:username", user_handler, NULL);
 
 	// register websocket endpoint
 	papago_ws_endpoint(server, "/ws",

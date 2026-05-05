@@ -632,15 +632,15 @@ main(void)
 	user_count = 2;
 
 	// register HTTP routes
-	papago_get(server, "/", index_handler, NULL);
-	papago_get(server, "/api/stats", api_stats, NULL);
+	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/api/stats", api_stats, NULL);
 
 	// protected API routes (require X-API-Key header)
 	papago_middleware_path_add(server, "/api/users", auth_middleware);
-	papago_get(server, "/api/users", api_users_list, NULL);
-	papago_post(server, "/api/users", api_users_create, NULL);
-	papago_get(server, "/api/users/:id", api_users_get, NULL);
-	papago_delete(server, "/api/users/:id", api_users_delete, NULL);
+	papago_route(server, PAPAGO_GET, "/api/users", api_users_list, NULL);
+	papago_route(server, PAPAGO_POST, "/api/users", api_users_create, NULL);
+	papago_route(server, PAPAGO_GET, "/api/users/:id", api_users_get, NULL);
+	papago_route(server, PAPAGO_DELETE, "/api/users/:id", api_users_delete, NULL);
 
 	// register websocket endpoint
 	papago_ws_endpoint(server, "/ws", ws_on_connect, ws_on_message,

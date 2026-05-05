@@ -1696,41 +1696,6 @@ papago_route(papago_t *server, papago_method_t method,
 	return 0;
 }
 
-uint8_t
-papago_get(papago_t *server, const char *path, papago_handler_t handler,
-           void *user_data)
-{
-	return papago_route(server, PAPAGO_GET, path, handler, user_data); 
-}
-
-uint8_t
-papago_post(papago_t *server, const char *path, papago_handler_t handler,
-            void *user_data)
-{
-	return papago_route(server, PAPAGO_POST, path, handler, user_data); 
-}
-
-uint8_t
-papago_put(papago_t *server, const char *path, papago_handler_t handler,
-           void *user_data)
-{
-	return papago_route(server, PAPAGO_PUT, path, handler, user_data);
-}
-
-uint8_t
-papago_delete(papago_t *server, const char *path, papago_handler_t handler,
-              void *user_data)
-{
-	return papago_route(server, PAPAGO_DELETE, path, handler, user_data);
-}
-
-uint8_t
-papago_patch(papago_t *server, const char *path, papago_handler_t handler,
-             void *user_data)
-{
-	return papago_route(server, PAPAGO_PATCH, path, handler, user_data);
-}
-
 // middleware
 
 uint8_t
@@ -1760,7 +1725,6 @@ papago_middleware_path_add(papago_t *server, const char *path,
 /*
  * Embedded Static Files
  */
- 
 static const papago_embedded_file_t *g_embedded_files = NULL;
  
 void
