@@ -17,8 +17,12 @@
 #include <unistd.h>
 
 #include <libwebsockets.h>
+#ifdef WITH_LOGGER
 #include <logger.h>
+#endif
+#ifdef WITH_MAPLE
 #include <maple.h>
+#endif
 #include <microhttpd.h>
 #include <openssl/crypto.h>
 #include <zlib.h>
@@ -150,7 +154,9 @@ struct papago_server {
 	papago_ws_endpoint_t ws_endpoints[PAPAGO_MAX_WS_ENDPOINTS];
 	size_t ws_endpoint_count;
 	pthread_t lws_thread;
+#ifdef WITH_MAPLE
 	mp_context_t *template_ctx;
+#endif
 	papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
 	size_t ws_connection_count;
 	pthread_mutex_t ws_mutex;
@@ -500,21 +506,25 @@ papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
 	// check if file exists and get size
 	struct stat st;
 	if (stat(filepath, &st) != 0) {
+#ifdef WITH_LOGGER
 		if (g_server != NULL && g_server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "file not found"),
 				s_log_string("filepath", filepath));
 		}
+#endif
 		return 1;
 	}
 
 	FILE *fp = fopen(filepath, "rb");
 	if (fp == NULL) {
+#ifdef WITH_LOGGER
 		if (g_server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "cannot open file"),
 				s_log_string("filepath", filepath));
 		}
+#endif
 		return 1;
 	}
  
@@ -721,10 +731,12 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	    server->metrics->total_requests);
 	if (len >= (int)sizeof(metrics)) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+#ifdef WITH_LOGGER
 		if (server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "metrics response truncated due to size limit"));
 		}
+#endif
 		return;
 	}
  
@@ -741,10 +753,12 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	    server->metrics->total_duration_ms);
 	if (len >= (int)sizeof(metrics)) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+#ifdef WITH_LOGGER
 		if (server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "metrics response truncated due to size limit"));
 		}
+#endif
 		return;
 	}
  
@@ -771,10 +785,12 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 		server->metrics->requests_by_method[8]);
 	if (len >= (int)sizeof(metrics)) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+#ifdef WITH_LOGGER
 		if (server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "metrics response truncated due to size limit"));
 		}
+#endif
 		return;
 	}
  
@@ -795,10 +811,12 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 		server->metrics->requests_by_status[5]);
 	if (len >= (int)sizeof(metrics)) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+#ifdef WITH_LOGGER
 		if (server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "metrics response truncated due to size limit"));
 		}
+#endif
 		return;
 	}
  
@@ -809,10 +827,12 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	    (long)uptime);
 	if (len >= (int)sizeof(metrics)) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+#ifdef WITH_LOGGER
 		if (server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "metrics response truncated due to size limit"));
 		}
+#endif
 		return;
 	}
  
@@ -880,6 +900,7 @@ log_request(papago_t *server, struct MHD_Connection *connection,
 	}
 	uint64_t duration_ms = (uint64_t)duration_us;
 
+#ifdef WITH_LOGGER
 	if (server->config.enable_logging) {
 		s_log(S_LOG_INFO,
 			s_log_string("remote", client_ip),
@@ -891,6 +912,7 @@ log_request(papago_t *server, struct MHD_Connection *connection,
 			s_log_int("status", (int)status),
 			s_log_int64("duration_ms", (int64_t)duration_ms));
 	}
+#endif
 
 	update_metrics(server, url, method, status, (uint64_t)duration_ms);
 }
@@ -1414,14 +1436,17 @@ papago_start(papago_t *server)
 	char *cert_pem = NULL;
 	char *key_pem = NULL;
 
+#ifdef WITH_LOGGER
 	if (server->config.enable_logging) {
 		s_log_init(stdout);
 	}
+#endif
 
 	// determine libmicrohttpd flags
 	unsigned int mhd_flags = MHD_USE_THREAD_PER_CONNECTION
 		| MHD_USE_INTERNAL_POLLING_THREAD;
 
+#ifdef WITH_MAPLE
 	if (server->config.enable_template_rendering) {
 		server->template_ctx = mp_init();
 		if (server->template_ctx == NULL) {
@@ -1433,6 +1458,7 @@ papago_start(papago_t *server)
 			return 1;
 		}
 	}
+#endif
 
 	// start libmicrohttpd daemon with optional SSL
 	if (server->config.enable_ssl) {
@@ -1448,13 +1474,14 @@ papago_start(papago_t *server)
 		key_pem = load_file(server->config.key_file);
 
 		if (cert_pem == NULL || key_pem == NULL) {
+#ifdef WITH_LOGGER
 			if (server->config.enable_logging) {
 				s_log(S_LOG_ERROR, 
 					s_log_string("msg", "failed to load SSL certificate or key"),
 					s_log_string("cert", server->config.cert_file),
 					s_log_string("key", server->config.key_file));
 			}
-			
+#endif
 			free(cert_pem);
 			free(key_pem);
 
@@ -1510,12 +1537,14 @@ papago_start(papago_t *server)
 		if (server->config.enable_ssl) {
 			if (server->config.cert_file == NULL ||
 			    server->config.key_file == NULL) {
+#ifdef WITH_LOGGER
 				if (server->config.enable_logging) {
 					s_log(S_LOG_ERROR, 
 						s_log_string("msg", "SSL enabled but cert_file or key_file not set for WebSocket"),
 						s_log_string("cert", server->config.cert_file ? server->config.cert_file : "NULL"),
 						s_log_string("key", server->config.key_file ? server->config.key_file : "NULL"));
 				}
+#endif
 				MHD_stop_daemon(server->mhd_daemon);
 				server->running = false;
 				g_server = NULL;
@@ -1533,12 +1562,14 @@ papago_start(papago_t *server)
 		#endif
 		server->lws_context = lws_create_context(&info);
 		if (server->lws_context == NULL) {
+#ifdef WITH_LOGGER
 			if (server->config.enable_logging) {
 				s_log(S_LOG_ERROR, 
 					s_log_string("msg", "failed to create libwebsockets context"),
 					s_log_int("port", info.port),
 					s_log_string("ssl", server->config.enable_ssl ? "enabled" : "disabled"));
 			}
+#endif
 			MHD_stop_daemon(server->mhd_daemon);
 			server->running = false;
 			g_server = NULL;
@@ -1551,21 +1582,24 @@ papago_start(papago_t *server)
 		lws_thread_func, server);
 	}
 
+#ifdef WITH_LOGGER
 	if (server->config.enable_logging) {
 		s_log(S_LOG_INFO, 
 			s_log_string("msg", "server started"),
 			s_log_int("port", server->config.port),
 			s_log_string("type", server->config.enable_ssl ? "HTTPS" : "HTTP"));
 	}
-	
+#endif
 
 	if (server->ws_endpoint_count > 0) {
+#ifdef WITH_LOGGER
 		if (server->config.enable_logging) {
 			s_log(S_LOG_INFO, 
 				s_log_string("msg", "websocket server started"),
 				s_log_int("port", server->config.port+1),
 				s_log_string("type", server->config.enable_ssl ? "WSS" : "WS"));
 		}
+#endif
 	}
 
 	// wait for shutdown signal using condition variable for instant response
@@ -1653,10 +1687,12 @@ papago_destroy(papago_t *server)
 	pthread_mutex_destroy(&server->metrics->mutex);
 	pthread_cond_destroy(&server->shutdown_cond);
 
+#ifdef WITH_MAPLE
 	// free template engine memory
 	if (server->template_ctx != NULL) {
 		mp_free(server->template_ctx);
 	}
+#endif
 
 	if (server->metrics != NULL) {
 		free(server->metrics);
@@ -2255,6 +2291,7 @@ ms_close(void *cookie)
     return 0;
 }
 
+#ifdef WITH_MAPLE
 static
 memstream_t*
 ms_create(void)
@@ -2274,6 +2311,7 @@ ms_create(void)
     m->data[0] = '\0';
     return m;
 }
+
 
 static FILE*
 _fmemopen(memstream_t **out_mem)
@@ -2318,6 +2356,7 @@ memstream_size(const memstream_t *m)
 {
     return m->size;
 }
+#endif
 
 void
 papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
@@ -2437,6 +2476,7 @@ papago_check_rate_limit(papago_request_t *req, papago_response_t *res)
 	return false;
 }
 
+#ifdef WITH_MAPLE
 uint8_t
 papago_render_file(const char *tmpl_path, char *output,
                    size_t output_size, ...)
@@ -2581,6 +2621,7 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
  
 	return papago_res_send(res, output);
 }
+#endif
 
 // streaming
 

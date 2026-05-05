@@ -2,8 +2,11 @@ cc = cc
 
 NAME = libpapago
 
+WITH_LOGGER ?= 0
+WITH_MAPLE ?= 0
+
 UNAME_S = $(shell uname -s)
-#
+
 # respect traditional UNIX paths
 INCDIR  = /usr/local/include
 LIBDIR  = /usr/local/lib
@@ -18,7 +21,17 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 TEST_CFLAGS = -g -fPIC -Wall -Wextra
-LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread -llogger -lmaple
+LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread
+
+ifeq ($(WITH_LOGGER),1)
+    LDFLAGS += -llogger
+    CFLAGS += -DWITH_LOGGER
+endif
+
+ifeq ($(WITH_MAPLE),1)
+    LDFLAGS += -lmaple
+    CFLAGS += -DWITH_MAPLE
+endif
 
 ifeq ($(UNAME_S),FreeBSD)
 CFLAGS += -I$(INCDIR)

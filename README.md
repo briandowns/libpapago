@@ -16,7 +16,6 @@ Modern web framework designed to be full featured and powerful all while being e
 - JSON Responses - Built-in JSON helpers
 - Static Files - Serve files from directories
 - Thread-Safe - Built on proven concurrent architecture
-- Low Dependencies - Only requires libmicrohttpd + libwebsockets
 - Rate limiting by IP
 - Compression with Gzip
 - Metrics collection and exposure via Prometheus endpoint
