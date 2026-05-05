@@ -45,7 +45,8 @@
 #include <string.h>
 #include <time.h>
 
-#include "../logger.h"
+#include <logger.h>
+
 #include "../papago.h"
 
 static papago_t *server = NULL;

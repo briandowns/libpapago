@@ -17,12 +17,12 @@
 #include <unistd.h>
 
 #include <libwebsockets.h>
+#include <logger.h>
+#include <maple.h>
 #include <microhttpd.h>
 #include <openssl/crypto.h>
 #include <zlib.h>
 
-#include "logger.h"
-#include "maple.h"
 #include "papago.h"
 
 #define	PAPAGO_MAX_ROUTES 512

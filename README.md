@@ -35,8 +35,8 @@ WOFF, WOFF2, TTF
 * libwebsockets
 * jansson
 * openssl
-* libmaple (included @ latest version)
-* liblogger (included @ latest version)
+* libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
+* liblogger - [Structured(json) Logger](https://github.com/briandowns/liblogger)
 
 ### Build
 

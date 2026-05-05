@@ -10,6 +10,9 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     strategy:
@@ -29,11 +32,22 @@ jobs:
         run: git pull origin master
       - name: Install Dependencies
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends \
-            -o Acquire::Retries=5 \
-            make build-essential libssl-dev pkg-config libjansson-dev \
-            libwebsockets-dev libcurl4-openssl-dev libmicrohttpd-dev
+          sudo apt update -y
+          sudo apt install -y --no-install-recommends -o Acquire::Retries=5 \
+            git make build-essential libssl-dev pkg-config libjansson-dev \
+            libwebsockets-dev libcurl4-openssl-dev libmicrohttpd-dev && \
+            git clone https://github.com/briandowns/libmaple.git && \
+            cd libmaple && make && sudo make install && \
+            cd .. && rm -rf libmaple && \
+            git clone https://github.com/briandowns/liblogger.git && \
+            cd liblogger && make && sudo make install && \
+            cd .. && rm -rf liblogger && \
+            sudo ldconfig && \
+            sudo apt autoremove -y && \
+            sudo apt clean -y && \
+            sudo rm -rf /var/lib/apt/lists/* && \
+            sudo rm -rf /tmp/* /var/tmp/* && \
+            echo "Dependencies installed successfully"
       - name: Compile Shared Object
         run: make
       # - name: Run tests
