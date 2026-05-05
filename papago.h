@@ -289,6 +289,12 @@ const char*
 papago_req_body(const papago_request_t *req);
 
 /**
+ * Retrieve request body length. Returns body length or 0.
+ */
+uint64_t
+papago_req_body_len(const papago_request_t *req);
+
+/**
  * Retrieve request method. Returns HTTP method.
  */
 const char*
