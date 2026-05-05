@@ -407,6 +407,12 @@ papago_req_body(const papago_request_t *req)
 	return req->body;
 }
 
+uint64_t
+papago_req_body_len(const papago_request_t *req)
+{
+	return req->body_length;
+}
+
 const char*
 papago_req_method(const papago_request_t *req)
 {
