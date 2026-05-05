@@ -201,45 +201,6 @@ papago_destroy(papago_t *server);
 
 // routing
 
-int
-papago_add_route(papago_t *server, papago_method_t method, const char *path,
-                 papago_handler_t handler, void *user_data);
-
-/**
- * Register a GET route. Returns 0 on success or 1 on failure.
- */
-uint8_t
-papago_get(papago_t *server, const char *path, papago_handler_t handler,
-           void *user_data);
-
-/**
- * Register a POST route.
- */
-uint8_t
-papago_post(papago_t *server, const char *path, papago_handler_t handler,
-            void *user_data);
-
-/**
- * Register a PUT route.
- */
-uint8_t
-papago_put(papago_t *server, const char *path, papago_handler_t handler,
-           void *user_data);
-
-/**
- * Register a DELETE route.
- */
-uint8_t
-papago_delete(papago_t *server, const char *path, papago_handler_t handler,
-              void *user_data);
-
-/**
- * Register a PATCH route.
- */
-uint8_t
-papago_patch(papago_t *server, const char *path, papago_handler_t handler,
-             void *user_data);
-
 /**
  * Register a route for any method. Returns 0 on success or 1 on failure.
  */

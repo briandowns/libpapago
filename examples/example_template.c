@@ -96,7 +96,7 @@ main(void)
 	papago_configure(server, &config);
 
 	// register HTTP routes
-	papago_get(server, "/", index_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 
 	printf("Server starting on:\n");
 	printf("  HTTP:      http://%s:%d\n", config.host, config.port);

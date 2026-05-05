@@ -144,7 +144,8 @@ main(void)
 	papago_configure(server, &config);
 
     papago_register_embedded_files(server, embedded_files);
-    papago_get(server, "/*", papago_serve_embedded_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/*", papago_serve_embedded_handler,
+		NULL);
 
 	// start server (blocking)
 	if (papago_start(server) != 0) {

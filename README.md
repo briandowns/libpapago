@@ -85,7 +85,7 @@ main(void)
 	config.port = 8080;
 	papago_configure(server, &config);
 	
-	papago_get(server, "/hello", hello_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
 	
 	papago_start(server); // blocking
 	
@@ -115,10 +115,10 @@ curl http://localhost:8080/hello
 
 ```c
 // basic routes
-papago_get(server, "/", index_handler, NULL);
-papago_post(server, "/users", create_user, NULL);
-papago_put(server, "/users/:id", update_user, NULL);
-papago_delete(server, "/users/:id", delete_user, NULL);
+papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+papago_route(server, PAPAGO_POST, "/users", create_user, NULL);
+papago_route(server, PAPAGO_PUT, "/users/:id", update_user, NULL);
+papago_route(server, PAPAGO_DELETE, "/users/:id", delete_user, NULL);
 
 // path parameters
 void
@@ -127,7 +127,7 @@ user_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     const char *id = papago_req_param(req, "id");
     // use id...
 }
-papago_get(server, "/users/:id", user_handler, NULL);
+papago_route(server, PAPAGO_GET, "/users/:id", user_handler, NULL);
 
 // query parameters
 void
@@ -137,7 +137,7 @@ search_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     const char *page = papago_req_query(req, "page");
     // use q and page...
 }
-papago_get(server, "/search", search_handler, NULL);
+papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
 ```
 
 ### Middleware
@@ -238,7 +238,7 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
 To expose the Prometheus endpoint, register the metrics handler in your application.
 
 ```c
-papago_get(server, "/metrics", papago_metrics_handler, NULL);
+papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, NULL);
 ```
 
 ### Threading Model

@@ -282,11 +282,11 @@ main(void)
 	papago_configure(server, &config);
 
 	// register routes
-	papago_get(server, "/", index_handler, NULL);
-	papago_get(server, "/files", list_files_handler, NULL);
-	papago_get(server, "/files/:filename", serve_file_handler, NULL);
-	papago_get(server, "/download/:filename", download_handler, NULL);
-	papago_get(server, "/video/:filename", video_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/files", list_files_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/files/:filename", serve_file_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/download/:filename", download_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/video/:filename", video_handler, NULL);
 
 	printf("Serving files from: %s\n\n", files_dir);
 	printf("Server running on http://localhost:8484\n\n");
