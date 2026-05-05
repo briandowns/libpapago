@@ -33,7 +33,7 @@ $(NAME).dylib: clean
 	$(CC) -dynamiclib -o $@ papago.c $(CFLAGS) $(LDFLAGS)
 else
 $(NAME).so: clean
-	$(CC) -shared -o $@ papago.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -shared -o $@ papago.c $(LDFLAGS) $(CFLAGS) 
 endif
 
 .PHONY: tests
