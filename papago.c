@@ -174,20 +174,6 @@ typedef struct {
 	time_t window_start;
 } papago_rate_limit_entry_t;
 
-/**
- * Global server for signal handling
- */
-static papago_t *g_server = NULL;
-
-/**
- * Get the current server instance
- */
-papago_t*
-papago_get_current_server(void)
-{
-	return (papago_t *)g_server;
-}
-
 // utility Functions
 
 static char*
@@ -491,22 +477,23 @@ papago_res_send(papago_response_t *res, const char *body)
 uint8_t
 papago_res_json(papago_response_t *res, const char *json)
 {
-	papago_res_header(res, "Content-Type", "application/json");
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
+		"application/json");
 	return papago_res_send(res, json);
 }
 
 uint8_t
-papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
-                         const char *mime_type)
+papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
+                         const char *filepath, const char *mime_type)
 {
-	if (res == NULL || filepath == NULL) {
+	if (server == NULL || res == NULL || filepath == NULL) {
 		return 1;
 	}
  
 	// check if file exists and get size
 	struct stat st;
 	if (stat(filepath, &st) != 0) {
-		if (g_server != NULL && g_server->config.enable_logging) {
+		if (server != NULL && server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "file not found"),
 				s_log_string("filepath", filepath));
@@ -516,7 +503,7 @@ papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
 
 	FILE *fp = fopen(filepath, "rb");
 	if (fp == NULL) {
-		if (g_server->config.enable_logging) {
+		if (server != NULL && server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
 				s_log_string("msg", "cannot open file"),
 				s_log_string("filepath", filepath));
@@ -552,7 +539,8 @@ papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
 }
 
 uint8_t
-papago_res_sendfile(papago_response_t *res, const char *filepath)
+papago_res_sendfile(papago_t *server, papago_response_t *res,
+                    const char *filepath)
 {
 	FILE *f = fopen(filepath, "rb");
 	if (f == NULL) {
@@ -593,7 +581,7 @@ papago_res_sendfile(papago_response_t *res, const char *filepath)
 	res->body_length = size;
 	res->sent = true;
 
-	return papago_res_sendfile_mime(res, filepath, NULL);
+	return papago_res_sendfile_mime(server, res, filepath, NULL);
 }
 
 // metrics
@@ -602,7 +590,7 @@ static void
 update_metrics(papago_t *server, const char *url, const char *method,
                papago_status_code_t status, uint64_t duration_ms)
 {
-	if (server == NULL) {
+	if (server == NULL || url == NULL || method == NULL) {
 		return;
 	}
  
@@ -698,12 +686,12 @@ void
 papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
 	PAPAGO_UNUSED(req);
-	PAPAGO_UNUSED(user_data);
 
-	papago_t *server = papago_get_current_server();
+
+	papago_t *server = (papago_t*)user_data; 
 	if (server == NULL) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-		papago_res_send(res, "# Metrics unavailable\n");
+		papago_res_send(res, "metrics unavailable\n");
 		return;
 	}
  
@@ -839,7 +827,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
  
 	pthread_mutex_unlock(&server->metrics->mutex);
  
-	papago_res_header(res, "Content-Type", 
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, 
 	    "text/plain; version=0.0.4; charset=utf-8");
 	papago_res_send(res, metrics);
 }
@@ -1414,7 +1402,6 @@ papago_start(papago_t *server)
 		return 1;
     }
 
-	g_server = server;
 	server->running = true;
 
 	char *cert_pem = NULL;
@@ -1434,7 +1421,6 @@ papago_start(papago_t *server)
 			server->error_message = "failed to initialize template engine";
 			server->template_ctx = NULL;
 			server->running = false;
-			g_server = NULL;
 
 			return 1;
 		}
@@ -1524,7 +1510,6 @@ papago_start(papago_t *server)
 				}
 				MHD_stop_daemon(server->mhd_daemon);
 				server->running = false;
-				g_server = NULL;
 
 				return 1;
 			}
@@ -1547,7 +1532,6 @@ papago_start(papago_t *server)
 			}
 			MHD_stop_daemon(server->mhd_daemon);
 			server->running = false;
-			g_server = NULL;
 
 			return 1;
 		}
@@ -1669,7 +1653,6 @@ papago_destroy(papago_t *server)
 	}
 
 	free(server);
-	g_server = NULL;
 }
 
 // routing 
@@ -1758,7 +1741,7 @@ papago_serve_embedded_handler(papago_request_t *req, papago_response_t *res,
 	for (size_t i = 0; g_embedded_files[i].path != NULL; i++) {
 		if (strcmp(g_embedded_files[i].path, path) == 0) {
 			// found file so serve it
-			papago_res_header(res, "Content-Type",
+			papago_res_header(res, PAPAGO_REQUEST_HEADER_CONTENT_TYPE,
 			    g_embedded_files[i].content_type);
 			
 			// copy data to send (papago_res_send expects null-terminated string)
@@ -1795,12 +1778,11 @@ void
 papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
                             void *user_data)	
 {
-	PAPAGO_UNUSED(user_data);
+	papago_t *server = (papago_t *)user_data;
 
 	char filepath[1024];
  
-	g_server = papago_get_current_server();
-	if (g_server == NULL || g_server->config.static_dir == NULL) {
+	if (server == NULL || server->config.static_dir == NULL) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "static directory not configured");
 		return;
@@ -1817,7 +1799,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
  
 	// build full file path
 	snprintf(filepath, sizeof(filepath), "%s%s", 
-	    g_server->config.static_dir, path);
+	    server->config.static_dir, path);
  
 	// check if file exists
 	struct stat st;
@@ -1832,7 +1814,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 		// default to index.html for directories
 		if (S_ISDIR(st.st_mode)) {
 			snprintf(filepath, sizeof(filepath), "%s%s/index.html",
-			    g_server->config.static_dir, path);
+			    server->config.static_dir, path);
 			
 			if (stat(filepath, &st) != 0 || !S_ISREG(st.st_mode)) {
 				papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
@@ -1846,7 +1828,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 		}
 	}
 
-	if (papago_res_sendfile(res, filepath) != 0) {
+	if (papago_res_sendfile(server, res, filepath) != 0) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "failed to serve file");
 	}
@@ -2313,9 +2295,9 @@ papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
 }
  
 bool
-papago_check_rate_limit(papago_request_t *req, papago_response_t *res)
+papago_check_rate_limit(papago_t *server, papago_request_t *req,
+                        papago_response_t *res)
 { 
-	papago_t *server = papago_get_current_server();
 	if (server == NULL || !server->config.enable_rate_limiting) {
 		return false;
 	}
@@ -2408,18 +2390,18 @@ papago_check_rate_limit(papago_request_t *req, papago_response_t *res)
 }
 
 uint8_t
-papago_render_file(const char *tmpl_path, char *output,
+papago_render_file(papago_t *server, const char *tmpl_path, char *output,
                    size_t output_size, ...)
 {
 	if (tmpl_path == NULL) {
 		return 1;
 	}
 
-	if (g_server == NULL) {
+	if (server == NULL) {
 		return 2;
 	}
  
-	if (g_server->template_ctx == NULL) {
+	if (server->template_ctx == NULL) {
 		return 3;
 	}
 
@@ -2430,12 +2412,12 @@ papago_render_file(const char *tmpl_path, char *output,
 	va_list args;
 	va_start(args, output_size);
 
-	pthread_mutex_lock(&g_server->template_mutex);
+	pthread_mutex_lock(&server->template_mutex);
 	const char *key;
 	while ((key = va_arg(args, const char *)) != NULL) {
 		const char *value = va_arg(args, const char *);
 		if (value != NULL) {
-			mp_set_var(g_server->template_ctx, key, value);
+			mp_set_var(server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
@@ -2443,15 +2425,15 @@ papago_render_file(const char *tmpl_path, char *output,
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
 	if (buf == NULL) {
-		pthread_mutex_unlock(&g_server->template_mutex);
+		pthread_mutex_unlock(&server->template_mutex);
 		return 5;
 	}
-	uint8_t ret = mp_render_file(g_server->template_ctx, buf, tmpl_path, ".");
+	uint8_t ret = mp_render_file(server->template_ctx, buf, tmpl_path, ".");
 	if (ret != 0) {
-		pthread_mutex_unlock(&g_server->template_mutex);
+		pthread_mutex_unlock(&server->template_mutex);
 		return 6;
 	}
-	pthread_mutex_unlock(&g_server->template_mutex);
+	pthread_mutex_unlock(&server->template_mutex);
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
@@ -2461,29 +2443,33 @@ papago_render_file(const char *tmpl_path, char *output,
 }
  
 uint8_t
-papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
+papago_render_template(papago_t *server, const char *tmpl, char *output,
+                       size_t output_size, ...)
 {
-	if (tmpl == NULL) {
+	if (server == NULL) {
 		return 1;
 	}
-
-	if (g_server->template_ctx == NULL) {
+	if (tmpl == NULL) {
 		return 2;
 	}
 
-	if (output == NULL || output_size == 0) {
+	if (server->template_ctx == NULL) {
 		return 3;
+	}
+
+	if (output == NULL || output_size == 0) {
+		return 4;
 	}
  
 	va_list args;
 	va_start(args, output_size);
 
-	pthread_mutex_lock(&g_server->template_mutex);
+	pthread_mutex_lock(&server->template_mutex);
 	const char *key;
 	while ((key = va_arg(args, const char*)) != NULL && strcmp(key, "") != 0) {
 		const char *value = va_arg(args, const char*);
 		if (value != NULL) {
-			mp_set_var(g_server->template_ctx, key, value);
+			mp_set_var(server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
@@ -2491,15 +2477,15 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
 	if (buf == NULL) {
-		pthread_mutex_unlock(&g_server->template_mutex);
+		pthread_mutex_unlock(&server->template_mutex);
 		return 4;
 	}
-	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
+	uint8_t ret = mp_render_segment(server->template_ctx, buf, tmpl, NULL, ".");
 	if (ret != 0) {
-		pthread_mutex_unlock(&g_server->template_mutex);
+		pthread_mutex_unlock(&server->template_mutex);
 		return 5;
 	}
-	pthread_mutex_unlock(&g_server->template_mutex);	
+	pthread_mutex_unlock(&server->template_mutex);	
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
@@ -2509,22 +2495,27 @@ papago_render_template(const char *tmpl, char *output, size_t output_size, ...)
 }
  
 int
-papago_res_render(papago_response_t *res, const char *tmpl, char *output,
-                  size_t output_size, ...)
+papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
+                  char *output, size_t output_size, ...)
 {
-	if (res == NULL || tmpl == NULL) {
+	if (server == NULL || res == NULL || tmpl == NULL || output == NULL
+		|| output_size == 0) {
+		return 1;
+	}
+
+	if (server->template_ctx == NULL) {
 		return 1;
 	}
 
 	va_list args;
 	va_start(args, output_size);
 
-	pthread_mutex_lock(&g_server->template_mutex);
+	pthread_mutex_lock(&server->template_mutex);
 	const char *key;
 	while ((key = va_arg(args, const char*)) != NULL) {
 		const char *value = va_arg(args, const char*);
 		if (value != NULL) {
-			mp_set_var(g_server->template_ctx, key, value);
+			mp_set_var(server->template_ctx, key, value);
 		}
 	}
 	va_end(args);
@@ -2532,22 +2523,23 @@ papago_res_render(papago_response_t *res, const char *tmpl, char *output,
 	memstream_t *mem;
     FILE *buf = _fmemopen(&mem);
 	if (buf == NULL) {
-		pthread_mutex_unlock(&g_server->template_mutex);
+		pthread_mutex_unlock(&server->template_mutex);
 		return 1;
 	}
-	uint8_t ret = mp_render_segment(g_server->template_ctx, buf, tmpl, NULL, ".");
+	uint8_t ret = mp_render_segment(server->template_ctx, buf, tmpl, NULL, ".");
 	if (ret != 0) {
-		pthread_mutex_unlock(&g_server->template_mutex);
+		pthread_mutex_unlock(&server->template_mutex);
 		return 1;
 	}
-	pthread_mutex_unlock(&g_server->template_mutex);
+	pthread_mutex_unlock(&server->template_mutex);
 
 	fseek(buf, 0, SEEK_SET);
 	memcpy(output, memstream_data(mem), memstream_size(mem));
 	fclose(buf);
  
 	// send as HTML response
-	papago_res_header(res, "Content-Type", "text/html; charset=utf-8");
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
+		"text/html; charset=utf-8");
  
 	return papago_res_send(res, output);
 }
