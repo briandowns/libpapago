@@ -486,11 +486,7 @@ uint8_t
 papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
                          const char *filepath, const char *mime_type)
 {
-	if (server == NULL) {
-		return 1;
-	}
-
-	if (res == NULL || filepath == NULL) {
+	if (server == NULL || res == NULL || filepath == NULL) {
 		return 1;
 	}
  
@@ -594,7 +590,7 @@ static void
 update_metrics(papago_t *server, const char *url, const char *method,
                papago_status_code_t status, uint64_t duration_ms)
 {
-	if (server == NULL) {
+	if (server == NULL || url == NULL || method == NULL) {
 		return;
 	}
  
