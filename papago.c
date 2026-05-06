@@ -477,7 +477,7 @@ papago_res_send(papago_response_t *res, const char *body)
 uint8_t
 papago_res_json(papago_response_t *res, const char *json)
 {
-	papago_res_header(res, PAPAGO_REQUEST_HEADER_CONTENT_TYPE,
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
 		"application/json");
 	return papago_res_send(res, json);
 }
@@ -486,6 +486,10 @@ uint8_t
 papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
                          const char *filepath, const char *mime_type)
 {
+	if (server == NULL) {
+		return 1;
+	}
+
 	if (res == NULL || filepath == NULL) {
 		return 1;
 	}
@@ -827,7 +831,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
  
 	pthread_mutex_unlock(&server->metrics->mutex);
  
-	papago_res_header(res, PAPAGO_REQUEST_HEADER_CONTENT_TYPE, 
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, 
 	    "text/plain; version=0.0.4; charset=utf-8");
 	papago_res_send(res, metrics);
 }
@@ -1775,10 +1779,10 @@ papago_set_static_dir(papago_t *server, const char *directory)
 }
  
 void
-papago_serve_static_handler(papago_t *server, papago_request_t *req, papago_response_t *res,
+papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
                             void *user_data)	
 {
-	PAPAGO_UNUSED(user_data);
+	papago_t *server = (papago_t *)user_data;
 
 	char filepath[1024];
  
@@ -2446,16 +2450,19 @@ uint8_t
 papago_render_template(papago_t *server, const char *tmpl, char *output,
                        size_t output_size, ...)
 {
-	if (tmpl == NULL) {
+	if (server == NULL) {
 		return 1;
 	}
-
-	if (server->template_ctx == NULL) {
+	if (tmpl == NULL) {
 		return 2;
 	}
 
-	if (output == NULL || output_size == 0) {
+	if (server->template_ctx == NULL) {
 		return 3;
+	}
+
+	if (output == NULL || output_size == 0) {
+		return 4;
 	}
  
 	va_list args;
@@ -2495,7 +2502,12 @@ int
 papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
                   char *output, size_t output_size, ...)
 {
-	if (res == NULL || tmpl == NULL || output == NULL || output_size == 0) {
+	if (server == NULL || res == NULL || tmpl == NULL || output == NULL
+		|| output_size == 0) {
+		return 1;
+	}
+
+	if (server->template_ctx == NULL) {
 		return 1;
 	}
 
@@ -2530,7 +2542,7 @@ papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
 	fclose(buf);
  
 	// send as HTML response
-	papago_res_header(res, PAPAGO_REQUEST_HEADER_CONTENT_TYPE,
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
 		"text/html; charset=utf-8");
  
 	return papago_res_send(res, output);

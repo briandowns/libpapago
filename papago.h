@@ -336,8 +336,8 @@ papago_set_static_dir(papago_t *server, const char *directory);
  * Static file handler serves files from static directory.
  */
 void
-papago_serve_static_handler(papago_t *server, papago_request_t *req,
-                            papago_response_t *res, void *user_data);
+papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
+                            void *user_data);
 
 // websocket
 
@@ -398,12 +398,6 @@ const char*
 papago_ws_get_client_ip(papago_ws_connection_t *conn);
 
 /**
- * Retrieve current server instance. Returns current server or NULL.
- */
-// papago_t*
-// papago_get_current_server(void);
-
-/**
  * URL encode a string. Returns encoded string. Caller is responsible to free
  * the returned memory.
  */
@@ -455,7 +449,7 @@ papago_render_template(papago_t *server, const char *tmpl, char *output,
                        size_t output_size, ...);
 
 /**
- * Send rendered template as response. Returns 0 on success or -1 on failure.
+ * Send rendered template as response. Returns 0 on success or 1 on failure.
  * Since this is a variadic function, make sure to include the NULL sentinel.
  */
 int
