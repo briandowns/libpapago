@@ -41,7 +41,7 @@ rate_limit_middleware(papago_request_t *req, papago_response_t *res, void *user_
 {
 	PAPAGO_UNUSED(user_data);
 
-	if (papago_check_rate_limit(req, res)) {
+	if (papago_check_rate_limit(server, req, res)) {
 		printf("rate limit exceeded for client\n");
 		return false;  
 	}

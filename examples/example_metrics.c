@@ -180,7 +180,7 @@ main(void)
 	papago_route(server, PAPAGO_GET, "/error", error_handler, NULL);
 
     // register observability endpoints
-	papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, NULL);
+	papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, server);
 	papago_route(server, PAPAGO_GET, "/health", health_handler, NULL);
 
 	// start server (blocking)

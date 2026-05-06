@@ -333,12 +333,11 @@ void
 papago_set_static_dir(papago_t *server, const char *directory);
  
 /**
- * Static file handler serves files from static directory. Use with
- * papago_get(server, "/static/*", papago_serve_static_handler, NULL);
+ * Static file handler serves files from static directory.
  */
 void
-papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
-                            void *user_data);
+papago_serve_static_handler(papago_t *server, papago_request_t *req,
+                            papago_response_t *res, void *user_data);
 
 // websocket
 
@@ -401,8 +400,8 @@ papago_ws_get_client_ip(papago_ws_connection_t *conn);
 /**
  * Retrieve current server instance. Returns current server or NULL.
  */
-papago_t*
-papago_get_current_server(void);
+// papago_t*
+// papago_get_current_server(void);
 
 /**
  * URL encode a string. Returns encoded string. Caller is responsible to free
@@ -435,7 +434,8 @@ papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
  * sent, otherwise returns false.
  */
 bool
-papago_check_rate_limit(papago_request_t *req, papago_response_t *res);
+papago_check_rate_limit(papago_t *server, papago_request_t *req,
+                        papago_response_t *res);
 
 // template rendering
 
@@ -444,14 +444,14 @@ papago_check_rate_limit(papago_request_t *req, papago_response_t *res);
  * failure.
  */
 uint8_t
-papago_render_file(const char *tmpl_path, char *output,
+papago_render_file(papago_t *server, const char *tmpl_path, char *output,
                    size_t output_size, ...);
 
 /**
  * Render template with variables. Returns 0 on success.
  */
 uint8_t
-papago_render_template(const char *tmpl, char *output,
+papago_render_template(papago_t *server, const char *tmpl, char *output,
                        size_t output_size, ...);
 
 /**
@@ -459,8 +459,8 @@ papago_render_template(const char *tmpl, char *output,
  * Since this is a variadic function, make sure to include the NULL sentinel.
  */
 int
-papago_res_render(papago_response_t *res, const char *tmpl, char *output,
-                  size_t output_size, ...);
+papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
+                  char *output, size_t output_size, ...);
 
 // metrics
  
@@ -479,14 +479,15 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res,
  * memory. Returns 0 on success or 1 on error.
  */
 uint8_t
-papago_res_sendfile(papago_response_t *res, const char *filepath);
+papago_res_sendfile(papago_t *server, papago_response_t *res,
+                    const char *filepath);
  
 /**
  * Stream a file with custom MIME type. Returns 0 on success or 1 on error.
  */
 uint8_t
-papago_res_sendfile_mime(papago_response_t *res, const char *filepath,
-                         const char *mime_type);
+papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
+                         const char *filepath, const char *mime_type);
  
 /**
  * Get MIME type from file extension. Returns MIME type (e.g., "text/html").

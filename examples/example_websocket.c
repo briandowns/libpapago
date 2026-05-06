@@ -402,7 +402,7 @@ api_users_get(papago_request_t *req, papago_response_t *res, void *user_data)
 	}
 
 	papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
-	papago_res_json(res, "{\"error\":\"User not found\"}");
+	papago_res_json(res, "{\"error\":\"User not found\"}"); 
 }
 
 /**
@@ -490,7 +490,7 @@ ws_on_connect(papago_ws_connection_t *conn)
 	// announce to others
 	snprintf(welcome, sizeof(welcome),
 	    "{\"type\":\"join\",\"username\":\"%s\"}", user->username);
-	papago_ws_broadcast(papago_get_current_server(), welcome);
+	papago_ws_broadcast(server, welcome);
 }
 
 void
@@ -561,7 +561,7 @@ ws_on_message(papago_ws_connection_t *conn, const char *message, size_t length,
 					    "\"time\":\"%s\"}",
 					    user->username, text, timestamp);
 
-					papago_ws_broadcast(papago_get_current_server(), response);
+					papago_ws_broadcast(server, response);
 				}
 			}
 		}
@@ -585,7 +585,7 @@ ws_on_close(papago_ws_connection_t *conn)
 	// announce departure
 	snprintf(leave, sizeof(leave), "{\"type\":\"leave\",\"username\":\"%s\"}",
 	    user->username);
-	papago_ws_broadcast(papago_get_current_server(), leave);
+	papago_ws_broadcast(server, leave);
 
 	free(user);
 }

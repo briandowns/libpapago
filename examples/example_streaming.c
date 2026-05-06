@@ -34,7 +34,7 @@
 #include "../papago.h"
 
 static papago_t *server = NULL;
-static const char *files_dir = "/tmp";
+static const char *files_dir = ".";
 
 /**
  * Signal handler for graceful shutdown.
@@ -87,7 +87,7 @@ serve_file_handler(papago_request_t *req, papago_response_t *res, void *user_dat
 	printf("streaming file: %s (%ld bytes)\n", filepath, st.st_size);
 
 	// stream the file - automatically detects MIME type
-	if (papago_res_sendfile(res, filepath) != 0) {
+	if (papago_res_sendfile(server, res, filepath) != 0) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "failed to stream file");
 	}
@@ -127,7 +127,7 @@ download_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	printf("forcing download: %s\n", filename);
 
-	if (papago_res_sendfile(res, filepath) != 0) {
+	if (papago_res_sendfile(server, res, filepath) != 0) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "failed to stream file");
 	}
@@ -163,7 +163,7 @@ video_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	printf("streaming video: %s\n", filename);
 
-	if (papago_res_sendfile(res, filepath) != 0) {
+	if (papago_res_sendfile(server, res, filepath) != 0) {
 		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "failed to stream file");
 	}
