@@ -467,6 +467,11 @@ papago_res_send(papago_response_t *res, const char *body)
 		free(res->body);
     }
 
+	if (res->is_stream_file) {
+		// if response is file-based, we should not have a body set
+		return 1;
+	}
+
 	res->body = _strdup(body);
 	res->body_length = (body != NULL) ? strlen(body) : 0;
 	res->sent = true;
@@ -502,9 +507,9 @@ set_file_headers(papago_response_t *res, const char *filepath,
  
 
 /**
- * Validate file for streaming. Returns file size on success or 1 on error.
+ * Validate file for streaming. Returns file size on success or -1 on error.
  */
-static long
+static int64_t
 validate_file(const char *filepath)
 {
 	struct stat st;
@@ -522,7 +527,7 @@ validate_file(const char *filepath)
 		return -1;
 	}
  
-	return st.st_size;
+	return (int64_t)st.st_size;
 }
 
 int
@@ -533,21 +538,29 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
 		return 1;
 	}
  
-	long file_size = validate_file(filepath);
-	if (file_size < 0) {
+	int64_t file_size = validate_file(filepath);
+	if (file_size == (int64_t)-1) {
 		return 1;
 	}
  
 	FILE *fp = fopen(filepath, "rb");
 	if (fp == NULL) {
-		fprintf(stderr, "cannot open file: %s\n", filepath);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "failed to open file for streaming"),
+				s_log_string("file", filepath));
+		}
 		return 1;
 	}
  
 	int fd = fileno(fp);
 	if (fd < 0) {
 		fclose(fp);
-		fprintf(stderr, "cannot get file descriptor: %s\n", filepath);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "failed to get file descriptor"),
+				s_log_string("file", filepath));
+		}
 		return 1;
 	}
  
@@ -557,6 +570,7 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
 		free(res->body);
 		res->body = NULL;
 		res->body_length = 0;
+		res->sent = true;
 	}
  
 	// mark response as file-based for special handling in send_response
