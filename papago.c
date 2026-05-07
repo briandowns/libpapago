@@ -131,7 +131,7 @@ typedef struct {
 		uint64_t count;
 		uint64_t total_ms;
 	} endpoints[64];
-	uint8_t endpoint_count;
+	uint16_t endpoint_count;
 	pthread_mutex_t	mutex;
 } papago_metrics_t;
 
@@ -460,12 +460,17 @@ papago_res_header(papago_response_t *res, const char *key, const char *value)
 	add_kv(&res->headers, &res->header_count, key, value);
 }
 
-uint8_t
+int
 papago_res_send(papago_response_t *res, const char *body)
 {
 	if (res->body != NULL) {
 		free(res->body);
     }
+
+	if (res->is_stream_file) {
+		// if response is file-based, we should not have a body set
+		return 1;
+	}
 
 	res->body = _strdup(body);
 	res->body_length = (body != NULL) ? strlen(body) : 0;
@@ -474,7 +479,7 @@ papago_res_send(papago_response_t *res, const char *body)
 	return 0;
 }
 
-uint8_t
+int
 papago_res_json(papago_response_t *res, const char *json)
 {
 	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
@@ -482,7 +487,50 @@ papago_res_json(papago_response_t *res, const char *json)
 	return papago_res_send(res, json);
 }
 
-uint8_t
+/**
+ * Set file streaming headers
+ */
+static void
+set_file_headers(papago_response_t *res, const char *filepath,
+                 const char *mime_type, long file_size)
+{
+	if (mime_type != NULL) {
+		papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, mime_type);
+	} else {
+		papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, papago_mime_type(filepath));
+	}
+
+	char size_str[64];
+	snprintf(size_str, sizeof(size_str), "%ld", file_size);
+	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_LENGTH, size_str);
+}
+ 
+
+/**
+ * Validate file for streaming. Returns file size on success or -1 on error.
+ */
+static int64_t
+validate_file(const char *filepath)
+{
+	struct stat st;
+ 
+	if (filepath == NULL)
+		return -1;
+ 
+	if (stat(filepath, &st) != 0) {
+		fprintf(stderr, "file not found: %s\n", filepath);
+		return -1;
+	}
+ 
+	if (!S_ISREG(st.st_mode)) {
+		fprintf(stderr, "not a regular file: %s\n", filepath);
+		return -1;
+	}
+ 
+	return (int64_t)st.st_size;
+}
+
+int
 papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
                          const char *filepath, const char *mime_type)
 {
@@ -490,23 +538,17 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
 		return 1;
 	}
  
-	// check if file exists and get size
-	struct stat st;
-	if (stat(filepath, &st) != 0) {
-		if (server != NULL && server->config.enable_logging) {
-			s_log(S_LOG_ERROR,
-				s_log_string("msg", "file not found"),
-				s_log_string("filepath", filepath));
-		}
+	int64_t file_size = validate_file(filepath);
+	if (file_size == (int64_t)-1) {
 		return 1;
 	}
-
+ 
 	FILE *fp = fopen(filepath, "rb");
 	if (fp == NULL) {
-		if (server != NULL && server->config.enable_logging) {
+		if (server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
-				s_log_string("msg", "cannot open file"),
-				s_log_string("filepath", filepath));
+				s_log_string("msg", "failed to open file for streaming"),
+				s_log_string("file", filepath));
 		}
 		return 1;
 	}
@@ -514,73 +556,35 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
 	int fd = fileno(fp);
 	if (fd < 0) {
 		fclose(fp);
+		if (server->config.enable_logging) {
+			s_log(S_LOG_ERROR,
+				s_log_string("msg", "failed to get file descriptor"),
+				s_log_string("file", filepath));
+		}
 		return 1;
 	}
  
-	// set content type
-	if (mime_type != NULL) {
-		papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, mime_type);
-	} else {
-		papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
-			papago_mime_type(filepath));
-	}
- 
-	// set content length
-	char size_str[64];
-	snprintf(size_str, sizeof(size_str), "%ld", (long)st.st_size);
-	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_LENGTH, size_str);
- 
-	// mark response as file-based for special handling
-	res->stream_file = fp;
-	res->stream_file_size = st.st_size;
-	res->is_stream_file = true;
- 
-	return 0;
-}
-
-uint8_t
-papago_res_sendfile(papago_t *server, papago_response_t *res,
-                    const char *filepath)
-{
-	FILE *f = fopen(filepath, "rb");
-	if (f == NULL) {
-		return 1;
-	}
-
-	if (fseek(f, 0, SEEK_END) != 0) {
-		fclose(f);
-		return 1;
-	}
-	long size = ftell(f);
-	if (fseek(f, 0, SEEK_SET) != 0) {
-		fclose(f);
-		return 1;
-	}
-
-	char *content = malloc(size + 1);
-	if (content == NULL) {
-		fclose(f);
-		return 1;
-	}
-
-	size_t ret = fread(content, 1, size, f);
-    if (ret != (size_t)size) {
-        free(content);
-        fclose(f);
-        return 1;
-    }
-
-	content[size] = '\0';
-	fclose(f);
+	set_file_headers(res, filepath, mime_type, file_size);
 
 	if (res->body != NULL) {
 		free(res->body);
-    }
+		res->body = NULL;
+		res->body_length = 0;
+		res->sent = true;
+	}
+ 
+	// mark response as file-based for special handling in send_response
+	res->is_stream_file = true;
+	res->stream_file = fp; // MHD will close fd
+	res->stream_file_size = file_size;
 
-	res->body = content;
-	res->body_length = size;
-	res->sent = true;
+	return 0;
+}
 
+int
+papago_res_sendfile(papago_t *server, papago_response_t *res,
+                    const char *filepath)
+{
 	return papago_res_sendfile_mime(server, res, filepath, NULL);
 }
 
@@ -1375,7 +1379,7 @@ papago_error(const papago_t *server)
 	return server->error_message;
 }
 
-uint8_t
+int
 papago_configure(papago_t *server, const papago_config_t *config)
 {
 	if (server == NULL || config == NULL) {
@@ -1395,7 +1399,7 @@ suppress_lws_output(int level, const char *line)
 }
 #endif
 
-uint8_t
+int
 papago_start(papago_t *server)
 {
 	if (server == NULL) {
@@ -1657,7 +1661,7 @@ papago_destroy(papago_t *server)
 
 // routing 
 
-uint8_t
+int
 papago_route(papago_t *server, papago_method_t method,
              const char *path, papago_handler_t handler, void *user_data)
 {
@@ -1681,13 +1685,13 @@ papago_route(papago_t *server, papago_method_t method,
 
 // middleware
 
-uint8_t
+int
 papago_middleware_add(papago_t *server, papago_middleware_fn_t middleware)
 {
 	return papago_middleware_path_add(server, NULL, middleware);
 }
 
-uint8_t
+int
 papago_middleware_path_add(papago_t *server, const char *path,
                            papago_middleware_fn_t middleware)
 {
@@ -1836,7 +1840,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 
 // websocket Functions
 
-uint8_t
+int
 papago_ws_endpoint(papago_t *server, const char *path,
                    papago_ws_on_connect_t on_connect,
                    papago_ws_on_message_t on_message,
@@ -1862,7 +1866,7 @@ papago_ws_endpoint(papago_t *server, const char *path,
 	return 0;
 }
 
-uint8_t
+int
 papago_ws_send(papago_ws_connection_t *conn, const char *message)
 {
 	if (conn == NULL || conn->wsi == NULL || message == NULL) {
@@ -1883,7 +1887,7 @@ papago_ws_send(papago_ws_connection_t *conn, const char *message)
 	return 0;
 }
 
-uint8_t
+int
 papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
                       size_t length)
 {
@@ -2389,7 +2393,7 @@ papago_check_rate_limit(papago_t *server, papago_request_t *req,
 	return false;
 }
 
-uint8_t
+int
 papago_render_file(papago_t *server, const char *tmpl_path, char *output,
                    size_t output_size, ...)
 {
@@ -2442,7 +2446,7 @@ papago_render_file(papago_t *server, const char *tmpl_path, char *output,
 	return 0;
 }
  
-uint8_t
+int
 papago_render_template(papago_t *server, const char *tmpl, char *output,
                        size_t output_size, ...)
 {
