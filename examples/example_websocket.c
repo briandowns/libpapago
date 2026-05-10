@@ -670,7 +670,7 @@ main(void)
 	// start server (blocking)
 	if (papago_start(server) != 0) {
 		s_log(S_LOG_ERROR, "failed to start server",
-			s_log_string("error", papago_error(server)));
+			s_log_string("error", papago_error()));
         papago_destroy(server);
 
         return 1;

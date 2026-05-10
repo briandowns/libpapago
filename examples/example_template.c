@@ -103,7 +103,7 @@ main(void)
 
 	// start server (blocking)
 	if (papago_start(server) != 0) {
-        fprintf(stderr, "%s\n", papago_error(server));
+        fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 
         return 1;
