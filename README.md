@@ -31,7 +31,7 @@ WOFF, WOFF2, TTF
 
 ## Dependencies
 
-* libnmicrohttpd
+* libmicrohttpd
 * libwebsockets
 * jansson
 * openssl
@@ -46,11 +46,15 @@ make
 
 ## Quick Start
 
-Below is a very simple demonstration of how to create a handler for `GET` request. More examples can be found in the [examples](/examples) directory. Each example has a `Makefile` target or you can make every example with `make examples_all`.
+Below is a very simple demonstration of how to create a handler for a `GET` request. More examples can be found in the [examples](/examples) directory. Each example has a `Makefile` target.
+
+You can make all examples with `make examples_all`.
 
 ```sh
 make example
 ```
+
+A convenience script is included to generate certificates to be able to run the example below. `generate_certs.sh`
 
 ```sh
 make example_ssl
@@ -98,7 +102,7 @@ main(void)
 Build and run:
 
 ```sh
-cc -o hello hello.c logger.c maple.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm
+cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lmaple -llogger
 ./hello
 ```
 
