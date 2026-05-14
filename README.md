@@ -57,6 +57,8 @@ Below is a very simple demonstration of how to create a handler for a `GET` requ
 
 You can make all examples with `make examples_all`.
 
+*NOTE*: some examples require `PAPAGO_USE_LOGGER=1` or `PAPAGO_USE_MAPLE=1` to be set.
+
 ```sh
 make example
 ```

@@ -443,6 +443,7 @@ bool
 papago_check_rate_limit(papago_t *server, papago_request_t *req,
                         papago_response_t *res);
 
+#ifdef PAPAGO_USE_MAPLE						
 // template rendering
 
 /**
@@ -468,6 +469,7 @@ papago_render_template(papago_t *server, const char *tmpl, char *output,
 int
 papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
                   char *output, size_t output_size, ...);
+#endif
 
 // metrics
  

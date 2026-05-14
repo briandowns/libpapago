@@ -18,7 +18,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 TEST_CFLAGS = -g -fPIC -Wall -Wextra
-LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread -llogger -lmaple
+LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread
 
 ifeq ($(UNAME_S),FreeBSD)
 	CFLAGS += -I$(INCDIR)
