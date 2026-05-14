@@ -21,9 +21,22 @@ TEST_CFLAGS = -g -fPIC -Wall -Wextra
 LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread -llogger -lmaple
 
 ifeq ($(UNAME_S),FreeBSD)
-CFLAGS += -I$(INCDIR)
-TEST_CFLAGS += -I$(INCDIR)
-LDFLAGS += -L$(LIBDIR)
+	CFLAGS += -I$(INCDIR)
+	TEST_CFLAGS += -I$(INCDIR)
+	LDFLAGS += -L$(LIBDIR)
+endif
+
+PAPAGO_USE_MAPLE ?= 0
+PAPAGO_USE_LOGGER ?= 0
+
+ifeq ($(PAPAGO_USE_LOGGER),1)
+	CFLAGS += -DPAPAGO_USE_LOGGER
+	LDFLAGS += -llogger
+endif
+
+ifeq ($(PAPAGO_USE_MAPLE),1)
+	CFLAGS += -DPAPAGO_USE_MAPLE
+	LDFLAGS += -lmaple
 endif
 
 EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded
@@ -84,7 +97,7 @@ example_websocket: clean
 
 .PHONY: example_template
 example_template: clean
-	$(CC) -o $@ examples/example_template.c papago.c $(TEST_CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ examples/example_template.c papago.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_rate_limit
 example_rate_limit: clean

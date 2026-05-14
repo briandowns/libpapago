@@ -35,13 +35,20 @@ WOFF, WOFF2, TTF
 * libwebsockets
 * jansson
 * openssl
-* libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 * liblogger - [Structured(json) Logger](https://github.com/briandowns/liblogger)
+* libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 
 ### Build
 
+Papago has the logger and template engine disabled by default. If those components are desired, add `PAPAGO_USE_LOGGER=1` or `PAPAGO_USE_MAPLE=1` to the `make` command when building. 
+
 ```sh 
 make
+```
+
+### Install
+```sh
+sudo make install
 ```
 
 ## Quick Start
