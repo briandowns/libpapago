@@ -174,6 +174,34 @@ typedef struct {
 	time_t window_start;
 } papago_rate_limit_entry_t;
 
+static _Thread_local papago_error_t papago_error_state;
+
+void
+papago_set_error(const int code, const char *fmt, ...)
+{
+    papago_error_state.code = code;
+
+    va_list args;
+    va_start(args, fmt);
+
+    vsnprintf(papago_error_state.message, sizeof(papago_error_state.message),
+        fmt, args);
+
+    va_end(args);
+}
+
+const char*
+papago_error(void)
+{
+    return papago_error_state.message;
+}
+
+int
+papago_error_code(void)
+{
+    return papago_error_state.code;
+}
+
 // utility Functions
 
 static char*
@@ -545,22 +573,29 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
  
 	FILE *fp = fopen(filepath, "rb");
 	if (fp == NULL) {
+		const char *err_msg = "failed to open file for streaming";
+
 		if (server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
-				s_log_string("msg", "failed to open file for streaming"),
+				s_log_string("msg", err_msg),
 				s_log_string("file", filepath));
 		}
+		papago_set_error(PAPAGO_ERR, err_msg);
+
 		return 1;
 	}
  
 	int fd = fileno(fp);
 	if (fd < 0) {
 		fclose(fp);
+		const char *err_msg = "failed to get file descriptor";
 		if (server->config.enable_logging) {
 			s_log(S_LOG_ERROR,
-				s_log_string("msg", "failed to get file descriptor"),
+				s_log_string("msg", err_msg),
 				s_log_string("file", filepath));
 		}
+		papago_set_error(PAPAGO_ERR, err_msg);
+
 		return 1;
 	}
  
@@ -1373,12 +1408,6 @@ papago_new(void)
 	return server;
 }
 
-const char*
-papago_error(const papago_t *server)
-{
-	return server->error_message;
-}
-
 int
 papago_configure(papago_t *server, const papago_config_t *config)
 {
@@ -1422,10 +1451,9 @@ papago_start(papago_t *server)
 	if (server->config.enable_template_rendering) {
 		server->template_ctx = mp_init();
 		if (server->template_ctx == NULL) {
-			server->error_message = "failed to initialize template engine";
 			server->template_ctx = NULL;
 			server->running = false;
-
+			papago_set_error(PAPAGO_ERR, "failed to initialize template engine");
 			return 1;
 		}
 	}
@@ -1434,8 +1462,7 @@ papago_start(papago_t *server)
 	if (server->config.enable_ssl) {
 		if (server->config.cert_file == NULL ||
 		    server->config.key_file == NULL) {
-            server->error_message = "SSL enabled but cert_file or key_file not set";
-
+            papago_set_error(PAPAGO_ERR, "SSL enabled but cert_file or key_file not set");
 			return 1;
 		}
 
@@ -1444,15 +1471,19 @@ papago_start(papago_t *server)
 		key_pem = load_file(server->config.key_file);
 
 		if (cert_pem == NULL || key_pem == NULL) {
+			const char *err_msg = "failed to load SSL certificate or key";
+
 			if (server->config.enable_logging) {
 				s_log(S_LOG_ERROR, 
-					s_log_string("msg", "failed to load SSL certificate or key"),
+					s_log_string("msg", err_msg),
 					s_log_string("cert", server->config.cert_file),
 					s_log_string("key", server->config.key_file));
 			}
 			
 			free(cert_pem);
 			free(key_pem);
+
+			papago_set_error(PAPAGO_ERR, err_msg);
 
 			return 1;
 		}
@@ -1482,9 +1513,9 @@ papago_start(papago_t *server)
 
 	if (server->mhd_daemon == NULL) {
 		if (errno == EADDRINUSE) {
-			server->error_message = "port already in use";
+			papago_set_error(PAPAGO_ERR, "port already in use");
 		} else if (errno == EACCES) {
-			server->error_message = "insufficient permissions to start HTTP server";
+			papago_set_error(PAPAGO_ERR, "insufficient permissions to start HTTP server");
 		} else {
 			perror("Failed to start HTTP server");
 		}
@@ -1506,14 +1537,17 @@ papago_start(papago_t *server)
 		if (server->config.enable_ssl) {
 			if (server->config.cert_file == NULL ||
 			    server->config.key_file == NULL) {
+				const char *err_msg = "SSL enabled but cert_file or key_file not set for WebSocket";
+
 				if (server->config.enable_logging) {
 					s_log(S_LOG_ERROR, 
-						s_log_string("msg", "SSL enabled but cert_file or key_file not set for WebSocket"),
+						s_log_string("msg", err_msg),
 						s_log_string("cert", server->config.cert_file ? server->config.cert_file : "NULL"),
 						s_log_string("key", server->config.key_file ? server->config.key_file : "NULL"));
 				}
 				MHD_stop_daemon(server->mhd_daemon);
 				server->running = false;
+				papago_set_error(PAPAGO_ERR, err_msg);
 
 				return 1;
 			}
@@ -1528,14 +1562,17 @@ papago_start(papago_t *server)
 		#endif
 		server->lws_context = lws_create_context(&info);
 		if (server->lws_context == NULL) {
+			const char *err_msg = "failed to create libwebsockets context";
+
 			if (server->config.enable_logging) {
 				s_log(S_LOG_ERROR, 
-					s_log_string("msg", "failed to create libwebsockets context"),
+					s_log_string("msg", err_msg),
 					s_log_int("port", info.port),
 					s_log_string("ssl", server->config.enable_ssl ? "enabled" : "disabled"));
 			}
 			MHD_stop_daemon(server->mhd_daemon);
 			server->running = false;
+			papago_set_error(PAPAGO_ERR, err_msg);
 
 			return 1;
 		}

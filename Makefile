@@ -38,7 +38,7 @@ endif
 
 .PHONY: tests
 tests: clean
-	$(CC) -o tests/tests tests/crosscheck.c tests/papago_test.c papago.c $(TEST_CFLAGS) $(LDFLAGS)
+	$(CC) -o tests/tests tests/papago_test.c papago.c $(TEST_CFLAGS) $(LDFLAGS) -lcrosscheck
 	tests/tests
 	rm -f tests/tests
 

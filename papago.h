@@ -28,6 +28,7 @@
 #ifndef __PAPAGO_H
 #define __PAPAGO_H
 
+#include <openssl/asn1.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -152,6 +153,16 @@ typedef struct {
 	bool enable_compression;
 } papago_config_t;
 
+typedef enum {
+    PAPAGO_OK = 0,
+    PAPAGO_ERR
+} papago_error_code_t; 
+
+typedef struct {
+    papago_error_code_t code;
+    char message[512];
+} papago_error_t;
+
 // server management
 
 /**
@@ -162,11 +173,12 @@ papago_t*
 papago_new(void);
 
 /**
- * Retrieve current error message. Returns error message string or NULL if no
- * error.
+ * Retrieve current error message. Returns error message string or empty string
+ * if no error. The returned string is thread-local and should not be freed by
+ * the caller.
  */
 const char*
-papago_error(const papago_t *server);
+papago_error(void);
 
 /**
  * Configure the server. This must be called before papago_start. Returns 0 on
