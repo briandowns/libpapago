@@ -35,13 +35,20 @@ WOFF, WOFF2, TTF
 * libwebsockets
 * jansson
 * openssl
-* libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 * liblogger - [Structured(json) Logger](https://github.com/briandowns/liblogger)
+* libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 
 ### Build
 
+Papago has the logger and template engine disabled by default. If those components are desired, add `PAPAGO_USE_LOGGER=1` or `PAPAGO_USE_MAPLE=1` to the `make` command when building. 
+
 ```sh 
 make
+```
+
+### Install
+```sh
+sudo make install
 ```
 
 ## Quick Start
@@ -49,6 +56,8 @@ make
 Below is a very simple demonstration of how to create a handler for a `GET` request. More examples can be found in the [examples](/examples) directory. Each example has a `Makefile` target.
 
 You can make all examples with `make examples_all`.
+
+*NOTE*: some examples require `PAPAGO_USE_LOGGER=1` or `PAPAGO_USE_MAPLE=1` to be set.
 
 ```sh
 make example
