@@ -39,9 +39,6 @@ jobs:
             git clone https://github.com/briandowns/libmaple.git && \
             cd libmaple && make && sudo make install && \
             cd .. && rm -rf libmaple && \
-            git clone https://github.com/briandowns/liblogger.git && \
-            cd liblogger && make && sudo make install && \
-            cd .. && rm -rf liblogger && \
             sudo ldconfig && \
             sudo apt autoremove -y && \
             sudo apt clean -y && \
