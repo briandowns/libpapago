@@ -35,7 +35,6 @@ WOFF, WOFF2, TTF
 * libwebsockets
 * jansson
 * openssl
-* liblogger - [Structured(json) Logger](https://github.com/briandowns/liblogger)
 * libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 
 ### Build
@@ -111,7 +110,7 @@ main(void)
 Build and run:
 
 ```sh
-cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lmaple -llogger
+cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lmaple
 ./hello
 ```
 
@@ -155,7 +154,7 @@ papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
 
 ### Middleware
 
-Papago middleware consists of defining 2 functions, `before` and `after` and assigning them to the `papago_middleware_t` struct. The `before` function is ran on every request and is required to be present. The `after` function is optional. A full example of 
+Papago middleware consists of defining 2 functions, `before` and `after` and assigning them to the `papago_middleware_t` struct. The `before` function is ran on every request and is required to be present. The `after` function is optional.
 
 ```c
 static bool

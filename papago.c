@@ -1025,6 +1025,18 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         req->version[0] = '\0';
     }
 
+    // run all before() functions
+    for (int i = 0; i < server->middleware_count; i++) {
+        papago_middleware_slot_t *slot = &server->middleware[i];
+        if (slot->path != NULL &&
+            strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
+            continue;
+        }
+        if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
+            goto send_response;
+        }
+    }
+
     // find matching route
     route_found = false;
     for (size_t i = 0; i < server->route_count; i++) {
@@ -1038,17 +1050,6 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
                 &req->param_count)) {
             clock_gettime(CLOCK_MONOTONIC, &req->start_time);
 
-            // run all before() functions
-            for (int i = 0; i < server->middleware_count; i++) {
-                papago_middleware_slot_t *slot = &server->middleware[i];
-                if (slot->path != NULL &&
-                    strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
-                    continue;
-                }
-                if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
-                    goto send_response;
-                }
-            }
             route->handler(req, res, route->user_data);
             route_found = true;
             break;
@@ -1074,9 +1075,14 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         slot->middleware->after(req, res, slot->middleware->user_data);
     }
 
+    struct timespec now;
+
 send_response:
-    update_metrics(server, req->path, papago_req_method(req), res->status,
-        (uint64_t)((clock_gettime(CLOCK_MONOTONIC, &req->start_time), 0)));
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    double duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec)
+        * 1000.0
+        + (now.tv_nsec - papago_req_start_time(req).tv_nsec) / 1.0e6;
+    update_metrics(server, req->path, papago_req_method(req), res->status, duration_ms);
 
     if (res->is_stream_file && res->stream_file != NULL) {
         int fd = fileno(res->stream_file);
@@ -1669,7 +1675,7 @@ int
 papago_middleware_path_add(papago_t *server, const char *path,
                            papago_middleware_t *middleware)
 {
-    if (server == NULL || middleware == NULL ||
+    if (server == NULL || middleware == NULL || middleware->before == NULL ||
         server->middleware_count >= PAPAGO_MAX_MIDDLEWARE) {
         return 1;
     }
@@ -1678,7 +1684,11 @@ papago_middleware_path_add(papago_t *server, const char *path,
         &server->middleware[server->middleware_count++];
     slot->middleware = middleware;
     if (path != NULL) {
-        slot->path = strdup(path);
+        slot->path = _strdup(path);
+        if (slot->path == NULL) {
+             server->middleware_count--;
+             return 1;
+         }
     } else {
         slot->path = NULL;
     }
@@ -1686,7 +1696,7 @@ papago_middleware_path_add(papago_t *server, const char *path,
     return 0;
 }
 
-/*
+/**
  * Embedded Static Files
  */
 static const papago_embedded_file_t *g_embedded_files = NULL;

@@ -115,12 +115,12 @@ logger_after(papago_request_t *req, papago_response_t *res, void *user_data)
         "{\"remote\":\"%s\",\"method\":\"%s\",\"path\":\"%s\","
         "\"version\":\"%s\",\"host\":\"%s\",\"user_agent\":\"%s\","
         "\"status\":%d,\"duration_ms\":%.3f}\n",
-        papago_req_client_ip(req),
-        papago_req_method(req),
-        papago_req_path(req),
-        papago_req_version(req),
-        papago_req_host(req),
-        papago_req_user_agent(req),
+        papago_req_client_ip(req) != NULL ? papago_req_client_ip(req) : "-",
+        papago_req_method(req) != NULL ? papago_req_method(req) : "-",
+        papago_req_path(req) != NULL ? papago_req_path(req) : "-",
+        papago_req_version(req) != NULL ? papago_req_version(req) : "-",
+        papago_req_host(req) != NULL ? papago_req_host(req) : "-",
+        papago_req_user_agent(req) != NULL ? papago_req_user_agent(req) : "-",
         papago_res_status(res),
         duration_ms);
 }

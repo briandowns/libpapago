@@ -37,6 +37,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 #define PAPAGO_UNUSED(x) (void)x;
 
@@ -152,10 +153,11 @@ typedef struct {
 } papago_config_t;
 
 /**
- * papago_middleware_t is provided to papago_use(). Only the before function
- * is required. If the after function is non-NULL, it will be called
+ * papago_middleware_t is provided to papago_middleware_add(). Only the before
+ * function is required. If the after function is non-NULL, it will be called
  * automatically after the route handler completes. user_data is passed to both
- * before and after.
+ * before and after. Since the server holds a pointer to papago_middleware_t,
+ * the caller must ensure that the memory remains valid for the lifetime of the server.
  */
 typedef struct {
     bool (*before)(papago_request_t *req, papago_response_t *res,
