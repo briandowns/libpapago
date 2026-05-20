@@ -43,12 +43,12 @@ static papago_t *server = NULL;
 static void
 signal_handler(int sig)
 {
-	PAPAGO_UNUSED(sig);
+    PAPAGO_UNUSED(sig);
 
-	printf("\nShutting down...\n");
-	if (server != NULL) {
-		papago_stop(server);
-	}
+    printf("\nShutting down...\n");
+    if (server != NULL) {
+        papago_stop(server);
+    }
 }
 
 // HTTP route handlers
@@ -56,22 +56,22 @@ signal_handler(int sig)
 void
 index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
     papago_res_set_status(res, PAPAGO_STATUS_OK);
-	papago_res_send(res,
-	    "<h1>Welcome to Papago!</h1>"
-	    "<p>Built on libmicrohttpd + libwebsockets</p>");
+    papago_res_send(res,
+        "<h1>Welcome to Papago!</h1>"
+        "<p>Built on libmicrohttpd + libwebsockets</p>");
 }
 
 void
 api_hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
     papago_res_set_status(res, PAPAGO_STATUS_OK);
-	papago_res_json(res, "{\"message\":\"Hello from Papago!\"}");
+    papago_res_json(res, "{\"message\":\"Hello from Papago!\"}");
 }
 
 void
@@ -79,15 +79,15 @@ user_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     PAPAGO_UNUSED(user_data);
 
-	const char *username;
-	char json[256];
+    const char *username;
+    char json[256];
 
-	username = papago_req_param(req, "username");
+    username = papago_req_param(req, "username");
 
-	snprintf(json, sizeof(json), "{\"username\":\"%s\",\"id\":123}",
-	    (username != NULL) ? username : "unknown");
+    snprintf(json, sizeof(json), "{\"username\":\"%s\",\"id\":123}",
+        (username != NULL) ? username : "unknown");
     papago_res_set_status(res, PAPAGO_STATUS_OK);
-	papago_res_json(res, json);
+    papago_res_json(res, json);
 }
 
 static bool
@@ -128,20 +128,20 @@ logger_after(papago_request_t *req, papago_response_t *res, void *user_data)
 int
 main(void)
 {
-	// setup signal handling
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+    // setup signal handling
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
 
-	// create server
-	server = papago_new();
-	if (server == NULL) {
-		fprintf(stderr, "failed to create server\n");
-		return 1;
-	}
+    // create server
+    server = papago_new();
+    if (server == NULL) {
+        fprintf(stderr, "failed to create server\n");
+        return 1;
+    }
 
-	papago_config_t config = papago_default_config();
-	config.port = 8282;
-	papago_configure(server, &config);
+    papago_config_t config = papago_default_config();
+    config.port = 8282;
+    papago_configure(server, &config);
 
     papago_middleware_t structured_logger = {
         .before    = logger_before,
@@ -150,21 +150,21 @@ main(void)
     };
     papago_middleware_add(server, &structured_logger);
 
-	// register HTTP routes
-	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
-	papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
-	papago_route(server, PAPAGO_GET, "/user/:username", user_handler, NULL);
+    // register HTTP routes
+    papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/user/:username", user_handler, NULL);
 
-	// start server (blocking)
-	if (papago_start(server) != 0) {
+    // start server (blocking)
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 
         return 1;
     }
 
-	// cleanup
-	papago_destroy(server);
+    // cleanup
+    papago_destroy(server);
 
-	return 0;
+    return 0;
 }

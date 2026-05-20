@@ -40,14 +40,14 @@ static bool
 rate_limit_middleware(papago_request_t *req, papago_response_t *res,
                       void *user_data)
 {
-	PAPAGO_UNUSED(user_data);
+    PAPAGO_UNUSED(user_data);
 
-	if (papago_check_rate_limit(server, req, res)) {
-		printf("rate limit exceeded for client\n");
-		return false;  
-	}
+    if (papago_check_rate_limit(server, req, res)) {
+        printf("rate limit exceeded for client\n");
+        return false;  
+    }
  
-	return true;
+    return true;
 }
 
 /**
@@ -56,12 +56,12 @@ rate_limit_middleware(papago_request_t *req, papago_response_t *res,
 static void
 signal_handler(int sig)
 {
-	PAPAGO_UNUSED(sig);
+    PAPAGO_UNUSED(sig);
 
-	printf("\nShutting down...\n");
-	if (server != NULL) {
-		papago_stop(server);
-	}
+    printf("\nShutting down...\n");
+    if (server != NULL) {
+        papago_stop(server);
+    }
 }
 
 // HTTP route handlers
@@ -69,55 +69,55 @@ signal_handler(int sig)
 void
 index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-	papago_res_send(res,
-	    "<h1>Welcome to Papago!</h1>"
-	    "<p>Rate Limiting Example</p>");
+    papago_res_send(res,
+        "<h1>Welcome to Papago!</h1>"
+        "<p>Rate Limiting Example</p>");
 }
 
 int
 main(void)
 {
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
 
-	server = papago_new();
-	if (server == NULL) {
-		fprintf(stderr, "failed to create server\n");
-		return 1;
-	}
+    server = papago_new();
+    if (server == NULL) {
+        fprintf(stderr, "failed to create server\n");
+        return 1;
+    }
 
-	papago_config_t config = papago_default_config();
-	config.port = 8282;
+    papago_config_t config = papago_default_config();
+    config.port = 8282;
     config.enable_compression = true;
-	papago_configure(server, &config);
+    papago_configure(server, &config);
 
-	papago_middleware_t rate_limit_mw = {
-		.before    = rate_limit_middleware,
-		.after     = NULL,
-		.user_data = NULL,
-	};
+    papago_middleware_t rate_limit_mw = {
+        .before    = rate_limit_middleware,
+        .after     = NULL,
+        .user_data = NULL,
+    };
     papago_enable_rate_limit(server, 5, 30);
     papago_middleware_path_add(server, "/", &rate_limit_mw);
 
-	// register HTTP routes
-	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+    // register HTTP routes
+    papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 
-	printf("Server starting on:\n");
-	printf("  HTTP:      http://%s:%d\n", config.host, config.port);
+    printf("Server starting on:\n");
+    printf("  HTTP:      http://%s:%d\n", config.host, config.port);
 
-	// start server (blocking)
-	if (papago_start(server) != 0) {
+    // start server (blocking)
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 
         return 1;
     }
 
-	// cleanup
-	papago_destroy(server);
+    // cleanup
+    papago_destroy(server);
 
-	return 0;
+    return 0;
 }

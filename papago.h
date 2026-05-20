@@ -41,77 +41,77 @@ extern "C" {
 #define PAPAGO_UNUSED(x) (void)x;
 
 typedef enum {
-	PAPAGO_GET,
-	PAPAGO_POST,
-	PAPAGO_PUT,
-	PAPAGO_DELETE,
-	PAPAGO_PATCH,
-	PAPAGO_HEAD,
-	PAPAGO_CONNECT,
-	PAPAGO_OPTIONS,
-	PAPAGO_TRACE
+    PAPAGO_GET,
+    PAPAGO_POST,
+    PAPAGO_PUT,
+    PAPAGO_DELETE,
+    PAPAGO_PATCH,
+    PAPAGO_HEAD,
+    PAPAGO_CONNECT,
+    PAPAGO_OPTIONS,
+    PAPAGO_TRACE
 } papago_method_t;
 
 typedef enum {
-	PAPAGO_STATUS_CONTINUE = 100, // RFC 7231, 6.2.1
-	PAPAGO_STATUS_SWITCHING_PROTOCOLS = 101, // RFC 7231, 6.2.2
-	PAPAGO_STATUS_PROCESSING = 102, // RFC 2518, 10.1
-	PAPAGO_STATUS_EARLY_HINTS = 103, // RFC 8297
-	PAPAGO_STATUS_OK = 200,
-	PAPAGO_STATUS_CREATED = 201,
-	PAPAGO_STATUS_NO_CONTENT = 204,
-	PAPAGO_STATUS_RESET_CONTENT = 205, // RFC 7231, 6.3.6
-	PAPAGO_STATUS_PARTIAL_CONTENT = 206, // RFC 7233, 4.1
-	PAPAGO_STATUS_MULTI_STATUS = 207, // RFC 4918, 11.1
-	PAPAGO_STATUS_ALREADY_REPORTED = 208, // RFC 5842, 7.1
-	PAPAGO_STATUS_IM_USED = 226, // RFC 3229, 10.4.1
-	PAPAGO_STATUS_MULTIPLE_CHOICES = 300, // RFC 7231, 6.4.1
-	PAPAGO_STATUS_MOVED_PERMANENTLY = 301, // RFC 7231, 6.4.2
-	PAPAGO_STATUS_FOUND = 302, // RFC 7231, 6.4.3
-	PAPAGO_STATUS_SEE_OTHER = 303, // RFC 7231, 6.4.4
-	PAPAGO_STATUS_NOT_MODIFIED = 304, // RFC 7232, 4.1
-	PAPAGO_STATUS_USE_PROXY = 305, // RFC 7231, 6.4.5
-	PAPAGO_STATUS_TEMPORARY_REDIRECT = 307, // RFC 7231, 6.4.7
-	PAPAGO_STATUS_PERMANENT_REDIRECT = 308, // RFC 7538, 3.1
-	PAPAGO_STATUS_BAD_REQUEST = 400,
-	PAPAGO_STATUS_UNAUTHORIZED = 401,
-	PAPAGO_STATUS_FORBIDDEN = 403,
-	PAPAGO_STATUS_NOT_FOUND = 404,
-	PAPAGO_STATUS_METHOD_NOT_ALLOWED = 405,
-	PAPAGO_STATUS_NOT_ACCEPTABLE = 406, // RFC 7231, 6.5.6
-	PAPAGO_STATUS_PROXY_AUTH_REQUIRED = 407, // RFC 7235, 3.2
-	PAPAGO_STATUS_REQUEST_TIMEOUT = 408, // RFC 7231, 6.5.7
-	PAPAGO_STATUS_CONFLICT = 409, // RFC 7231, 6.5.8
-	PAPAGO_STATUS_GONE = 410, // RFC 7231, 6.5.9
-	PAPAGO_STATUS_LENGTH_REQUIRED = 411, // RFC 7231, 6.5.10
-	PAPAGO_STATUS_PRECONDITION_FAILED = 412, // RFC 7232, 4.2
-	PAPAGO_STATUS_REQUEST_ENTITY_TOO_LARGE = 413, // RFC 7231, 6.5.11
-	PAPAGO_STATUS_REQUEST_URI_TOO_LONG = 414, // RFC 7231, 6.5.12
-	PAPAGO_STATUS_UNSUPPORTED_MEDIA_TYPE = 415, // RFC 7231, 6.5.13
-	PAPAGO_STATUS_REQUESTED_RANGE_NOT_SATISFIABLE = 416, // RFC 7233, 4.4
-	PAPAGO_STATUS_EXPECTATION_FAILED = 417, // RFC 7231, 6.5.14
-	PAPAGO_STATUS_TEAPOT = 418, // RFC 7168, 2.3.3
-	PAPAGO_STATUS_MISDIRECTED_REQUEST = 421, // RFC 7540, 9.1.2
-	PAPAGO_STATUS_UNPROCESSABLE_ENTITY = 422, // RFC 4918, 11.2
-	PAPAGO_STATUS_LOCKED = 423, // RFC 4918, 11.3
-	PAPAGO_STATUS_FAILED_DEPENDENCY = 424, // RFC 4918, 11.4
-	PAPAGO_STATUS_TOO_EARLY = 425, // RFC 8470, 5.2.
-	PAPAGO_STATUS_UPGRADE_REQUIRED = 426, // RFC 7231, 6.5.15
-	PAPAGO_STATUS_PRECONDITION_REQUIRED = 428, // RFC 6585, 3
-	PAPAGO_STATUS_TOO_MANY_REQUESTS = 429, // RFC 6585, 4
-	PAPAGO_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE = 431, // RFC 6585, 5
-	PAPAGO_STATUS_UNAVAILABLE_FOR_LEGAL_REASONS = 451, // RFC 7725, 3
-	PAPAGO_STATUS_INTERNAL_ERROR = 500,
-	PAPAGO_STATUS_NOT_IMPLEMENTED = 501,
-	PAPAGO_STATUS_BAD_GATEWAY = 502, // RFC 7231, 6.6.3
-	PAPAGO_STATUS_SERVICE_UNAVAILABLE = 503, // RFC 7231, 6.6.4
-	PAPAGO_STATUS_GATEWAY_TIMEOUT = 504, // RFC 7231, 6.6.5
-	PAPAGO_STATUS_HTTP_VERSION_NOT_SUPPORTED = 505, // RFC 7231, 6.6.6
-	PAPAGO_STATUS_VARIANT_ALSO_NEGOTIATES = 506, // RFC 2295, 8.1
-	PAPAGO_STATUS_INSUFFICIENT_STORAGE = 507, // RFC 4918, 11.5
-	PAPAGO_STATUS_LOOP_DETECTED = 508, // RFC 5842, 7.2
-	PAPAGO_STATUS_NOT_EXTENDED = 510, // RFC 2774, 7
-	PAPAGO_STATUS_NETWORK_AUTHENTICATION_REQUIRED = 511 // RFC 6585, 6
+    PAPAGO_STATUS_CONTINUE = 100, // RFC 7231, 6.2.1
+    PAPAGO_STATUS_SWITCHING_PROTOCOLS = 101, // RFC 7231, 6.2.2
+    PAPAGO_STATUS_PROCESSING = 102, // RFC 2518, 10.1
+    PAPAGO_STATUS_EARLY_HINTS = 103, // RFC 8297
+    PAPAGO_STATUS_OK = 200,
+    PAPAGO_STATUS_CREATED = 201,
+    PAPAGO_STATUS_NO_CONTENT = 204,
+    PAPAGO_STATUS_RESET_CONTENT = 205, // RFC 7231, 6.3.6
+    PAPAGO_STATUS_PARTIAL_CONTENT = 206, // RFC 7233, 4.1
+    PAPAGO_STATUS_MULTI_STATUS = 207, // RFC 4918, 11.1
+    PAPAGO_STATUS_ALREADY_REPORTED = 208, // RFC 5842, 7.1
+    PAPAGO_STATUS_IM_USED = 226, // RFC 3229, 10.4.1
+    PAPAGO_STATUS_MULTIPLE_CHOICES = 300, // RFC 7231, 6.4.1
+    PAPAGO_STATUS_MOVED_PERMANENTLY = 301, // RFC 7231, 6.4.2
+    PAPAGO_STATUS_FOUND = 302, // RFC 7231, 6.4.3
+    PAPAGO_STATUS_SEE_OTHER = 303, // RFC 7231, 6.4.4
+    PAPAGO_STATUS_NOT_MODIFIED = 304, // RFC 7232, 4.1
+    PAPAGO_STATUS_USE_PROXY = 305, // RFC 7231, 6.4.5
+    PAPAGO_STATUS_TEMPORARY_REDIRECT = 307, // RFC 7231, 6.4.7
+    PAPAGO_STATUS_PERMANENT_REDIRECT = 308, // RFC 7538, 3.1
+    PAPAGO_STATUS_BAD_REQUEST = 400,
+    PAPAGO_STATUS_UNAUTHORIZED = 401,
+    PAPAGO_STATUS_FORBIDDEN = 403,
+    PAPAGO_STATUS_NOT_FOUND = 404,
+    PAPAGO_STATUS_METHOD_NOT_ALLOWED = 405,
+    PAPAGO_STATUS_NOT_ACCEPTABLE = 406, // RFC 7231, 6.5.6
+    PAPAGO_STATUS_PROXY_AUTH_REQUIRED = 407, // RFC 7235, 3.2
+    PAPAGO_STATUS_REQUEST_TIMEOUT = 408, // RFC 7231, 6.5.7
+    PAPAGO_STATUS_CONFLICT = 409, // RFC 7231, 6.5.8
+    PAPAGO_STATUS_GONE = 410, // RFC 7231, 6.5.9
+    PAPAGO_STATUS_LENGTH_REQUIRED = 411, // RFC 7231, 6.5.10
+    PAPAGO_STATUS_PRECONDITION_FAILED = 412, // RFC 7232, 4.2
+    PAPAGO_STATUS_REQUEST_ENTITY_TOO_LARGE = 413, // RFC 7231, 6.5.11
+    PAPAGO_STATUS_REQUEST_URI_TOO_LONG = 414, // RFC 7231, 6.5.12
+    PAPAGO_STATUS_UNSUPPORTED_MEDIA_TYPE = 415, // RFC 7231, 6.5.13
+    PAPAGO_STATUS_REQUESTED_RANGE_NOT_SATISFIABLE = 416, // RFC 7233, 4.4
+    PAPAGO_STATUS_EXPECTATION_FAILED = 417, // RFC 7231, 6.5.14
+    PAPAGO_STATUS_TEAPOT = 418, // RFC 7168, 2.3.3
+    PAPAGO_STATUS_MISDIRECTED_REQUEST = 421, // RFC 7540, 9.1.2
+    PAPAGO_STATUS_UNPROCESSABLE_ENTITY = 422, // RFC 4918, 11.2
+    PAPAGO_STATUS_LOCKED = 423, // RFC 4918, 11.3
+    PAPAGO_STATUS_FAILED_DEPENDENCY = 424, // RFC 4918, 11.4
+    PAPAGO_STATUS_TOO_EARLY = 425, // RFC 8470, 5.2.
+    PAPAGO_STATUS_UPGRADE_REQUIRED = 426, // RFC 7231, 6.5.15
+    PAPAGO_STATUS_PRECONDITION_REQUIRED = 428, // RFC 6585, 3
+    PAPAGO_STATUS_TOO_MANY_REQUESTS = 429, // RFC 6585, 4
+    PAPAGO_STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE = 431, // RFC 6585, 5
+    PAPAGO_STATUS_UNAVAILABLE_FOR_LEGAL_REASONS = 451, // RFC 7725, 3
+    PAPAGO_STATUS_INTERNAL_ERROR = 500,
+    PAPAGO_STATUS_NOT_IMPLEMENTED = 501,
+    PAPAGO_STATUS_BAD_GATEWAY = 502, // RFC 7231, 6.6.3
+    PAPAGO_STATUS_SERVICE_UNAVAILABLE = 503, // RFC 7231, 6.6.4
+    PAPAGO_STATUS_GATEWAY_TIMEOUT = 504, // RFC 7231, 6.6.5
+    PAPAGO_STATUS_HTTP_VERSION_NOT_SUPPORTED = 505, // RFC 7231, 6.6.6
+    PAPAGO_STATUS_VARIANT_ALSO_NEGOTIATES = 506, // RFC 2295, 8.1
+    PAPAGO_STATUS_INSUFFICIENT_STORAGE = 507, // RFC 4918, 11.5
+    PAPAGO_STATUS_LOOP_DETECTED = 508, // RFC 5842, 7.2
+    PAPAGO_STATUS_NOT_EXTENDED = 510, // RFC 2774, 7
+    PAPAGO_STATUS_NETWORK_AUTHENTICATION_REQUIRED = 511 // RFC 6585, 6
 } papago_status_code_t;
 
 typedef struct papago_server papago_t;
@@ -135,20 +135,20 @@ typedef void (*papago_ws_on_error_t)(papago_ws_connection_t *conn,
                                      const char *error);
 
 typedef struct {
-	int port;
-	char *host;
-	uint16_t rate_limit_requests;
-	uint16_t rate_limit_window;
-	char *cert_file;
-	char *key_file;
-	char *static_dir;
-	int thread_pool_size;
-	size_t max_body_size;
-	bool enable_cors;
-	bool enable_ssl;
-	bool enable_template_rendering;
-	bool enable_rate_limiting;
-	bool enable_compression;
+    int port;
+    char *host;
+    uint16_t rate_limit_requests;
+    uint16_t rate_limit_window;
+    char *cert_file;
+    char *key_file;
+    char *static_dir;
+    int thread_pool_size;
+    size_t max_body_size;
+    bool enable_cors;
+    bool enable_ssl;
+    bool enable_template_rendering;
+    bool enable_rate_limiting;
+    bool enable_compression;
 } papago_config_t;
 
 /**
@@ -159,9 +159,9 @@ typedef struct {
  */
 typedef struct {
     bool (*before)(papago_request_t *req, papago_response_t *res,
-		           void *user_data);
+                   void *user_data);
     void (*after)(papago_request_t *req, papago_response_t *res,
-	              void *user_data);
+                  void *user_data);
     void *user_data;
 } papago_middleware_t;
 
@@ -358,10 +358,10 @@ papago_res_json(papago_response_t *res, const char *json);
  
 // embedded file entry
 typedef struct {
-	const char	*path;         // virtual path (e.g., "/index.html")
-	const char	*content_type; // MIME type
-	const unsigned char *data; // file data
-	size_t		size;
+    const char *path;          // virtual path (e.g., "/index.html")
+    const char *content_type;  // MIME type
+    const unsigned char *data; // file data
+    size_t size;
 } papago_embedded_file_t;
  
 /**
@@ -486,7 +486,7 @@ bool
 papago_check_rate_limit(papago_t *server, papago_request_t *req,
                         papago_response_t *res);
 
-#ifdef PAPAGO_USE_MAPLE						
+#ifdef PAPAGO_USE_MAPLE
 // template rendering
 
 /**
@@ -634,7 +634,7 @@ papago_mime_type(const char *filename);
 #define PAPAGO_REQUEST_HEADER_EXPECT                         "Expect"
 #define PAPAGO_REQUEST_HEADER_FORWARDED                      "Forwarded"
 #define PAPAGO_REQUEST_HEADER_FROM                           "From"
-#define PAPAGO_REQUEST_HEADER_HOST                           "Host"	
+#define PAPAGO_REQUEST_HEADER_HOST                           "Host"
 #define PAPAGO_REQUEST_HEADER_HTTP2_SETTINGS                 "HTTP2-Settings"
 #define PAPAGO_REQUEST_HEADER_IF_MATCH                       "If-Match"
 #define PAPAGO_REQUEST_HEADER_IF_MODIFIED_SINCE              "If-Modified-Since"
@@ -647,7 +647,7 @@ papago_mime_type(const char *filename);
 #define PAPAGO_REQUEST_HEADER_RANGE                          "Range"
 #define PAPAGO_REQUEST_HEADER_REFERRER                       "Referer"
 #define PAPAGO_REQUEST_HEADER_TE                             "TE"
-#define PAPAGO_REQUEST_HEADER_TRAILER                        "Trailer"	
+#define PAPAGO_REQUEST_HEADER_TRAILER                        "Trailer"
 #define PAPAGO_REQUEST_HEADER_TRANSFER_ENCODING              "Transfer-Encoding"
 #define PAPAGO_REQUEST_HEADER_USER_AGENT                     "User-Agent"
 #define PAPAGO_REQUEST_HEADER_UPGRADE                        "Upgrade"
@@ -662,7 +662,7 @@ papago_mime_type(const char *filename);
 #define PAPAGO_RESPONSE_HEADER_ACCEPT_PATCH                     "Accept-Patch"
 #define PAPAGO_RESPONSE_HEADER_ACCEPT_RANGES                    "Accept-Ranges"
 #define PAPAGO_RESPONSE_HEADER_AGE                              "Age"
-#define PAPAGO_RESPONSE_HEADER_ALLOW                            "Allow"	
+#define PAPAGO_RESPONSE_HEADER_ALLOW                            "Allow"
 #define PAPAGO_RESPONSE_HEADER_ALT_SVC                          "Alt-Svc"
 #define PAPAGO_RESPONSE_HEADER_CACHE_CONTROL                    "Cache-Control"
 #define PAPAGO_RESPONSE_HEADER_CONNECTION                       "Connection"

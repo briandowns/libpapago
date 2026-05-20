@@ -43,12 +43,12 @@ static papago_t *server = NULL;
 static void
 signal_handler(int sig)
 {
-	PAPAGO_UNUSED(sig);
+    PAPAGO_UNUSED(sig);
 
-	printf("\nShutting down...\n");
-	if (server != NULL) {
-		papago_stop(server);
-	}
+    printf("\nShutting down...\n");
+    if (server != NULL) {
+        papago_stop(server);
+    }
 }
 
 // HTTP route handlers
@@ -57,37 +57,37 @@ void
 index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
  
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
-	
-	const char *html = 
-	    "<html><body>"
-	    "<h1>Prometheus Metrics Example</h1>"
-	    "<h2>Test Endpoints:</h2>"
-	    "<ul>"
-	    "<li><a href='/slow'>/slow</a> (1 second delay)</li>"
-	    "<li><a href='/error'>/error</a> (500 error)</li>"
-	    "</ul>"
-	    "<h2>Metrics:</h2>"
-	    "<ul>"
-	    "<li><a href='/metrics'>/metrics</a> (Prometheus format)</li>"
-	    "<li><a href='/health'>/health</a> (Health check)</li>"
-	    "</ul>"
-	    "</body></html>";
-	
-	papago_res_send(res, html);
+    
+    const char *html = 
+        "<html><body>"
+        "<h1>Prometheus Metrics Example</h1>"
+        "<h2>Test Endpoints:</h2>"
+        "<ul>"
+        "<li><a href='/slow'>/slow</a> (1 second delay)</li>"
+        "<li><a href='/error'>/error</a> (500 error)</li>"
+        "</ul>"
+        "<h2>Metrics:</h2>"
+        "<ul>"
+        "<li><a href='/metrics'>/metrics</a> (Prometheus format)</li>"
+        "<li><a href='/health'>/health</a> (Health check)</li>"
+        "</ul>"
+        "</body></html>";
+    
+    papago_res_send(res, html);
 }
 
 void
 health_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
     json_t *root = json_pack("{s:s, s:o}",
         "status", "UP",
         "timestamp", json_integer((json_int_t)time(NULL)));
-	if (root == NULL) {
+    if (root == NULL) {
         fprintf(stderr, "failed to create JSON\n");
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         return;
@@ -102,17 +102,17 @@ health_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     }
     json_decref(root);
 
-	papago_res_json(res, result);
-	free(result);
+    papago_res_json(res, result);
+    free(result);
 }
 
 void
 api_hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-	papago_res_json(res, "{\"message\":\"Hello from Papago!\"}");
+    papago_res_json(res, "{\"message\":\"Hello from Papago!\"}");
 }
 
 void
@@ -120,79 +120,79 @@ user_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     PAPAGO_UNUSED(user_data);
 
-	const char *username;
-	char json[256];
+    const char *username;
+    char json[256];
 
-	username = papago_req_param(req, "username");
+    username = papago_req_param(req, "username");
 
-	snprintf(json, sizeof(json), "{\"username\":\"%s\",\"id\":123}",
-	    (username != NULL) ? username : "unknown");
+    snprintf(json, sizeof(json), "{\"username\":\"%s\",\"id\":123}",
+        (username != NULL) ? username : "unknown");
 
-	papago_res_json(res, json);
+    papago_res_json(res, json);
 }
 
 void
 slow_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
-	
-	// simulate slow endpoint
-	sleep(1);
-	
-	papago_res_set_status(res, PAPAGO_STATUS_OK);
-	papago_res_send(res, "slow response completed");
+    
+    // simulate slow endpoint
+    sleep(1);
+    
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
+    papago_res_send(res, "slow response completed");
 }
  
 void
 error_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
     papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-	papago_res_send(res, "simulated server error");
+    papago_res_send(res, "simulated server error");
 }
 
 
 int
 main(void)
 {
-	// setup signal handling
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+    // setup signal handling
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
 
-	// create server
-	server = papago_new();
-	if (server == NULL) {
-		fprintf(stderr, "failed to create server\n");
-		return 1;
-	}
+    // create server
+    server = papago_new();
+    if (server == NULL) {
+        fprintf(stderr, "failed to create server\n");
+        return 1;
+    }
 
-	papago_config_t config = papago_default_config();
-	config.port = 8282;
-	papago_configure(server, &config);
+    papago_config_t config = papago_default_config();
+    config.port = 8282;
+    papago_configure(server, &config);
 
-	// register HTTP routes
-	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
-	papago_route(server, PAPAGO_GET, "/slow", slow_handler, NULL);
-	papago_route(server, PAPAGO_GET, "/error", error_handler, NULL);
+    // register HTTP routes
+    papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/slow", slow_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/error", error_handler, NULL);
 
     // register observability endpoints
-	papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, server);
-	papago_route(server, PAPAGO_GET, "/health", health_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, server);
+    papago_route(server, PAPAGO_GET, "/health", health_handler, NULL);
 
-	// start server (blocking)
-	if (papago_start(server) != 0) {
+    // start server (blocking)
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 
         return 1;
     }
 
-	// cleanup
-	papago_destroy(server);
+    // cleanup
+    papago_destroy(server);
 
-	return 0;
+    return 0;
 }
 

@@ -40,10 +40,10 @@ static papago_t *server = NULL;
 void
 signal_handler(int sig)
 {
-	PAPAGO_UNUSED(sig);
+    PAPAGO_UNUSED(sig);
 
-	printf("\nShutting down...\n");
-	if (server != NULL) {
+    printf("\nShutting down...\n");
+    if (server != NULL) {
         papago_stop(server);
     }
 }
@@ -55,26 +55,26 @@ signal_handler(int sig)
 void
 large_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
-	PAPAGO_UNUSED(user_data);
+    PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(user_data);
 
-	char *large_text = malloc(10000);
-	if (large_text != NULL) {
-		strcpy(large_text, "{\"data\":[");
+    char *large_text = malloc(10000);
+    if (large_text != NULL) {
+        strcpy(large_text, "{\"data\":[");
 
-		for (int i = 0; i < 100; i++) {
-			char item[100];
-			snprintf(item, sizeof(item), 
-			    "{\"id\":%d,\"name\":\"Item %d\",\"value\":\"data\"}%s",
-			    i, i, i < 99 ? "," : "");
-			strcat(large_text, item);
-		}
-		strcat(large_text, "]}");
-		
-		printf("sending large text: %zu bytes\n", strlen(large_text));
-		papago_res_send(res, large_text);
-		free(large_text);
-	} else {
+        for (int i = 0; i < 100; i++) {
+            char item[100];
+            snprintf(item, sizeof(item), 
+                "{\"id\":%d,\"name\":\"Item %d\",\"value\":\"data\"}%s",
+                i, i, i < 99 ? "," : "");
+            strcat(large_text, item);
+        }
+        strcat(large_text, "]}");
+        
+        printf("sending large text: %zu bytes\n", strlen(large_text));
+        papago_res_send(res, large_text);
+        free(large_text);
+    } else {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         papago_res_json(res, "{\"error\":\"Failed to generate response\"}");
     }
@@ -86,10 +86,10 @@ large_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 void
 small_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
-	PAPAGO_UNUSED(user_data);
+    PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(user_data);
 
-	papago_res_send(res, "Small response");
+    papago_res_send(res, "Small response");
 }
 
 /**
@@ -98,51 +98,51 @@ small_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 void
 info_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
-	PAPAGO_UNUSED(user_data);
+    PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(user_data);
 
     char info[512];
-	snprintf(info, sizeof(info),
-	    "Compression Test Server\n"
-	    "======================\n\n"
-	    "Compression:\n"
-	    "Endpoints:\n"
-	    "  /large - Large JSON response (~10KB)\n"
-	    "  /small - Small response\n"
-	    "  /info  - This page\n\n"
-	    "Test compression:\n"
-	    "  curl -i -H \"Accept-Encoding: gzip\" http://localhost:8080/large\n"
-	);
+    snprintf(info, sizeof(info),
+        "Compression Test Server\n"
+        "======================\n\n"
+        "Compression:\n"
+        "Endpoints:\n"
+        "  /large - Large JSON response (~10KB)\n"
+        "  /small - Small response\n"
+        "  /info  - This page\n\n"
+        "Test compression:\n"
+        "  curl -i -H \"Accept-Encoding: gzip\" http://localhost:8080/large\n"
+    );
 
-	papago_res_send(res, info);
+    papago_res_send(res, info);
 }
 
 int
 main(void)
 {
-	papago_config_t config;
+    papago_config_t config;
 
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
 
-	server = papago_new();
-	if (server == NULL) {
-		fprintf(stderr, "Failed to create server\n");
-		return 1;
-	}
+    server = papago_new();
+    if (server == NULL) {
+        fprintf(stderr, "Failed to create server\n");
+        return 1;
+    }
 
-	config = papago_default_config();
-	config.port = 8282;
+    config = papago_default_config();
+    config.port = 8282;
     config.enable_compression = true;
-	papago_configure(server, &config);
+    papago_configure(server, &config);
 
-	papago_route(server, PAPAGO_GET, "/large", large_handler, NULL);
-	papago_route(server, PAPAGO_GET, "/small", small_handler, NULL);
-	papago_route(server, PAPAGO_GET, "/info", info_handler, NULL);
-	papago_route(server, PAPAGO_GET, "/", info_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/large", large_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/small", small_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/info", info_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/", info_handler, NULL);
 
-	papago_start(server);
-	papago_destroy(server);
+    papago_start(server);
+    papago_destroy(server);
 
-	return 0;
+    return 0;
 }

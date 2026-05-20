@@ -39,78 +39,78 @@ static papago_t *server = NULL;
 static void
 signal_handler(int sig)
 {
-	PAPAGO_UNUSED(sig);
+    PAPAGO_UNUSED(sig);
 
-	printf("\nShutting down...\n");
-	if (server != NULL) {
-		papago_stop(server);
-	}
+    printf("\nShutting down...\n");
+    if (server != NULL) {
+        papago_stop(server);
+    }
 }
 
 void
 index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-	const char *html =
-	    "<!DOCTYPE html>\n"
-	    "<html>\n"
-	    "<head><title>{{ name }} Template Example</title></head>\n"
-	    "<body>\n"
-	    "<h1>Welcome to the {{ name }} Template Example!</h1>\n"
-	    "<p>This is a simple template example for the {{ name }} framework.</p>\n"
-	    "</body>\n"
-	    "</html>";
+    const char *html =
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head><title>{{ name }} Template Example</title></head>\n"
+        "<body>\n"
+        "<h1>Welcome to the {{ name }} Template Example!</h1>\n"
+        "<p>This is a simple template example for the {{ name }} framework.</p>\n"
+        "</body>\n"
+        "</html>";
 
-	char rendered[1024];
-	int result = papago_res_render(server, res, html, rendered,
-		sizeof(rendered), "name", "Papago", NULL);
-	if (result != 0) {
-		fprintf(stderr, "failed to render template\n");
-		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR); 
-		return;
-	}
+    char rendered[1024];
+    int result = papago_res_render(server, res, html, rendered,
+        sizeof(rendered), "name", "Papago", NULL);
+    if (result != 0) {
+        fprintf(stderr, "failed to render template\n");
+        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR); 
+        return;
+    }
 }
 
 int
 main(void)
 {
-	printf("papago template exampleds\n");
+    printf("papago template exampleds\n");
 
-	// setup signal handling
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+    // setup signal handling
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
 
-	// create server
-	server = papago_new();
-	if (server == NULL) {
-		fprintf(stderr, "failed to create server\n");
-		return 1;
-	}
+    // create server
+    server = papago_new();
+    if (server == NULL) {
+        fprintf(stderr, "failed to create server\n");
+        return 1;
+    }
 
-	papago_config_t config = papago_default_config();
-	config.port = 8282;
-	config.enable_template_rendering = true;
-	papago_configure(server, &config);
+    papago_config_t config = papago_default_config();
+    config.port = 8282;
+    config.enable_template_rendering = true;
+    papago_configure(server, &config);
 
-	// register HTTP routes
-	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+    // register HTTP routes
+    papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 
-	printf("Server starting on:\n");
-	printf("  HTTP:      http://%s:%d\n", config.host, config.port);
+    printf("Server starting on:\n");
+    printf("  HTTP:      http://%s:%d\n", config.host, config.port);
 
-	// start server (blocking)
-	if (papago_start(server) != 0) {
+    // start server (blocking)
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 
         return 1;
     }
 
-	// cleanup
-	papago_destroy(server);
+    // cleanup
+    papago_destroy(server);
 
-	return 0;
+    return 0;
 }
 
