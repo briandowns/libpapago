@@ -17,9 +17,6 @@
 #include <unistd.h>
 
 #include <libwebsockets.h>
-#ifdef PAPAGO_USE_LOGGER
-#include <logger.h>
-#endif
 #ifdef PAPAGO_USE_MAPLE
 #include <maple.h>
 #endif
@@ -30,7 +27,7 @@
 #include "papago.h"
 
 #define	PAPAGO_MAX_ROUTES 512
-#define	PAPAGO_MAX_MIDDLEWARE 64
+#define	PAPAGO_MAX_MIDDLEWARE 256
 #define	PAPAGO_MAX_WS_ENDPOINTS	32
 #define MAX_WS_CONNECTIONS 256
 #define	PAPAGO_MAX_HEADERS 64
@@ -52,12 +49,6 @@ typedef struct {
 
 typedef struct {
 	char *path;
-	papago_middleware_fn_t	fn;
-    void *user_data;
-} papago_middleware_t;
-
-typedef struct {
-	char *path;
 	papago_ws_on_connect_t on_connect;
 	papago_ws_on_message_t on_message;
 	papago_ws_on_close_t on_close;
@@ -71,8 +62,11 @@ struct papago_request {
 	char client_ip[64];
 	papago_method_t method;
 	char *path;
+    char version[12];
 	char *query_string;
 	char *body;
+    char host[256];
+    char user_agent[256];
 	size_t body_length;
 	papago_kv_t *headers;
 	size_t header_count;
@@ -80,8 +74,7 @@ struct papago_request {
 	size_t param_count;
 	papago_kv_t *query;
 	size_t query_count;
-	int status;
-	struct timeval start_time;
+	struct timespec start_time;
 	struct MHD_Connection *connection;
 	void *user_data;
 };
@@ -140,6 +133,14 @@ typedef struct {
 } papago_metrics_t;
 
 /**
+ * Middleware slot structure for global and path-specific middleware
+ */
+typedef struct {
+    papago_middleware_t *middleware;
+    char *path;
+} papago_middleware_slot_t;
+
+/**
  * Server structure
  */
 struct papago_server {
@@ -149,8 +150,8 @@ struct papago_server {
 	FILE *log_output_dst;
 	papago_route_t routes[PAPAGO_MAX_ROUTES];
 	size_t route_count;
-	papago_middleware_t	middleware[PAPAGO_MAX_MIDDLEWARE];
-	size_t middleware_count;
+	papago_middleware_slot_t middleware[PAPAGO_MAX_MIDDLEWARE];
+	int middleware_count;
 	papago_ws_endpoint_t ws_endpoints[PAPAGO_MAX_WS_ENDPOINTS];
 	size_t ws_endpoint_count;
 	pthread_t lws_thread;
@@ -299,7 +300,6 @@ papago_default_config(void)
 	config.port = DEFAULT_PORT;
 	config.host = DEFAULT_HOST;
 	config.enable_ssl = false;
-	config.enable_logging = false;
 	config.enable_template_rendering = false;
 	config.enable_rate_limiting = false;
 	config.enable_compression = false;
@@ -309,7 +309,6 @@ papago_default_config(void)
 	config.thread_pool_size = 4;
 	config.max_body_size = DEFAULT_BODY_SIZE;
 	config.enable_cors = false;
-	config.log_output_dst = stdout;
 
 	return config;
 }
@@ -433,6 +432,12 @@ papago_req_body_len(const papago_request_t *req)
 	return req->body_length;
 }
 
+struct timespec
+papago_req_start_time(const papago_request_t *req)
+{
+	return req->start_time;
+}
+
 const char*
 papago_req_method(const papago_request_t *req)
 {
@@ -482,8 +487,32 @@ papago_req_client_ip(const papago_request_t *req)
 	return NULL;
 }
 
+const char*
+papago_req_host(const papago_request_t *req)
+{
+    return req->host;
+}
+
+const char*
+papago_req_user_agent(const papago_request_t *req)
+{   
+    return req->user_agent;
+}
+
+const char*
+papago_req_version(const papago_request_t *req)
+{
+    return req->version;
+}
+
+int
+papago_res_status(papago_response_t *res)
+{
+	return res->status;
+}
+
 void
-papago_res_status(papago_response_t *res, papago_status_code_t status)
+papago_res_set_status(papago_response_t *res, papago_status_code_t status)
 {
 	res->status = status;
 }
@@ -580,14 +609,6 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
 	FILE *fp = fopen(filepath, "rb");
 	if (fp == NULL) {
 		const char *err_msg = "failed to open file for streaming";
-
-#ifdef PAPAGO_USE_LOGGER
-		if (server->config.enable_logging) {
-			s_log(S_LOG_ERROR,
-				s_log_string("msg", err_msg),
-				s_log_string("file", filepath));
-		}
-#endif
 		papago_set_error(PAPAGO_ERR, err_msg);
 
 		return 1;
@@ -596,15 +617,7 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
 	int fd = fileno(fp);
 	if (fd < 0) {
 		fclose(fp);
-		const char *err_msg = "failed to get file descriptor";
-#ifdef PAPAGO_USE_LOGGER
-		if (server->config.enable_logging) {
-			s_log(S_LOG_ERROR,
-				s_log_string("msg", err_msg),
-				s_log_string("file", filepath));
-		}
-#endif
-		papago_set_error(PAPAGO_ERR, err_msg);
+		papago_set_error(PAPAGO_ERR, "failed to get file descriptor");
 
 		return 1;
 	}
@@ -739,7 +752,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 
 	papago_t *server = (papago_t*)user_data; 
 	if (server == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "metrics unavailable\n");
 		return;
 	}
@@ -762,68 +775,50 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	    "# TYPE http_requests_total counter\n"
 	    "http_requests_total %lu\n\n",
 	    server->metrics->total_requests);
-	if (len >= (int)sizeof(metrics)) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-#ifdef PAPAGO_USE_LOGGER
-		if (server->config.enable_logging) {
-			s_log(S_LOG_ERROR,
-				s_log_string("msg", "metrics response truncated due to size limit"));
-		}
-#endif
-		return;
-	}
+    if (len >= (int)sizeof(metrics)) {
+        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        return;
+    }
+ 
+    len += snprintf(metrics + len, sizeof(metrics) - len,
+        "# HELP http_request_duration_milliseconds HTTP request latencies\n"
+        "# TYPE http_request_duration_milliseconds summary\n"
+        "http_request_duration_milliseconds_min %" PRIu64 "\n"
+        "http_request_duration_milliseconds_max %" PRIu64 "\n"
+        "http_request_duration_milliseconds_avg %.2f\n"
+        "http_request_duration_milliseconds_sum %" PRIu64 "\n\n",
+        server->metrics->min_duration_ms == UINT_MAX ? 0 : server->metrics->min_duration_ms,
+        server->metrics->max_duration_ms,
+        avg_duration,
+        server->metrics->total_duration_ms);
+    if (len >= (int)sizeof(metrics)) {
+        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        return;
+    }
  
 	len += snprintf(metrics + len, sizeof(metrics) - len,
-	    "# HELP http_request_duration_milliseconds HTTP request latencies\n"
-	    "# TYPE http_request_duration_milliseconds summary\n"
-	    "http_request_duration_milliseconds_min %" PRIu64 "\n"
-	    "http_request_duration_milliseconds_max %" PRIu64 "\n"
-	    "http_request_duration_milliseconds_avg %.2f\n"
-	    "http_request_duration_milliseconds_sum %" PRIu64 "\n\n",
-	    server->metrics->min_duration_ms == UINT_MAX ? 0 : server->metrics->min_duration_ms,
-	    server->metrics->max_duration_ms,
-	    avg_duration,
-	    server->metrics->total_duration_ms);
-	if (len >= (int)sizeof(metrics)) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-#ifdef PAPAGO_USE_LOGGER
-		if (server->config.enable_logging) {
-			s_log(S_LOG_ERROR,
-				s_log_string("msg", "metrics response truncated due to size limit"));
-		}
-#endif
-		return;
-	}
- 
-	len += snprintf(metrics + len, sizeof(metrics) - len,
-	    "# HELP http_requests_by_method Requests by HTTP method\n"
-	    "# TYPE http_requests_by_method counter\n"
-	    "http_requests_by_method{method=\"GET\"} %lu\n"
-	    "http_requests_by_method{method=\"POST\"} %lu\n"
-	    "http_requests_by_method{method=\"PUT\"} %lu\n"
-	    "http_requests_by_method{method=\"DELETE\"} %lu\n"
-	    "http_requests_by_method{method=\"PATCH\"} %lu\n"
+		"# HELP http_requests_by_method Requests by HTTP method\n"
+		"# TYPE http_requests_by_method counter\n"
+		"http_requests_by_method{method=\"GET\"} %lu\n"
+		"http_requests_by_method{method=\"POST\"} %lu\n"
+		"http_requests_by_method{method=\"PUT\"} %lu\n"
+		"http_requests_by_method{method=\"DELETE\"} %lu\n"
+		"http_requests_by_method{method=\"PATCH\"} %lu\n"
 		"http_requests_by_method{method=\"HEAD\"} %lu\n"
 		"http_requests_by_method{method=\"OPTIONS\"} %lu\n"
 		"http_requests_by_method{method=\"CONNECT\"} %lu\n"
 		"http_requests_by_method{method=\"TRACE\"} %lu\n\n",
-	    server->metrics->requests_by_method[0],
-	    server->metrics->requests_by_method[1],
-	    server->metrics->requests_by_method[2],
-	    server->metrics->requests_by_method[3],
-	    server->metrics->requests_by_method[4],
+		server->metrics->requests_by_method[0],
+		server->metrics->requests_by_method[1],
+		server->metrics->requests_by_method[2],
+		server->metrics->requests_by_method[3],
+		server->metrics->requests_by_method[4],
 		server->metrics->requests_by_method[5],
 		server->metrics->requests_by_method[6],
 		server->metrics->requests_by_method[7],
 		server->metrics->requests_by_method[8]);
 	if (len >= (int)sizeof(metrics)) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-#ifdef PAPAGO_USE_LOGGER
-		if (server->config.enable_logging) {
-			s_log(S_LOG_ERROR,
-				s_log_string("msg", "metrics response truncated due to size limit"));
-		}
-#endif
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		return;
 	}
  
@@ -843,13 +838,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 		server->metrics->requests_by_status[4],
 		server->metrics->requests_by_status[5]);
 	if (len >= (int)sizeof(metrics)) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-#ifdef PAPAGO_USE_LOGGER
-		if (server->config.enable_logging) {
-			s_log(S_LOG_ERROR,
-				s_log_string("msg", "metrics response truncated due to size limit"));
-		}
-#endif
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		return;
 	}
  
@@ -859,13 +848,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	    "process_uptime_seconds %ld\n\n",
 	    (long)uptime);
 	if (len >= (int)sizeof(metrics)) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-#ifdef PAPAGO_USE_LOGGER
-		if (server->config.enable_logging) {
-			s_log(S_LOG_ERROR,
-				s_log_string("msg", "metrics response truncated due to size limit"));
-		}
-#endif
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		return;
 	}
  
@@ -889,68 +872,6 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
 	papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, 
 	    "text/plain; version=0.0.4; charset=utf-8");
 	papago_res_send(res, metrics);
-}
-
-static void
-log_request(papago_t *server, struct MHD_Connection *connection,
-            const char *url, const char *method, papago_status_code_t status,
-            const struct timeval *start_time, const char *version)
-{
-	PAPAGO_UNUSED(server);
-	
-	const union MHD_ConnectionInfo *conn_info = MHD_get_connection_info(
-		connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
-	
-	char client_ip[INET6_ADDRSTRLEN] = "unknown";
-	if (conn_info != NULL) {
-		const struct sockaddr *addr = conn_info->client_addr;
-		if (addr->sa_family == AF_INET) {
-			struct sockaddr_in *addr_in = (struct sockaddr_in *)addr;
-			inet_ntop(AF_INET, &addr_in->sin_addr, client_ip,
-				sizeof(client_ip));
-		} else if (addr->sa_family == AF_INET6) {
-			struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)addr;
-			inet_ntop(AF_INET6, &addr_in6->sin6_addr, client_ip,
-			    sizeof(client_ip));
-		}
-	}
- 
-	const char *user_agent = MHD_lookup_connection_value(connection,
-		MHD_HEADER_KIND, "User-Agent");
-	const char *host = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
-		"Host");
-
-	struct timeval end;
-	gettimeofday(&end, NULL);
-	// long duration_ms = (end.tv_sec - start_time->tv_sec) * 1000L +
-	// 	(end.tv_usec - start_time->tv_usec) / 1000L;
- 
-	int64_t start_us = ((int64_t)start_time->tv_sec * 1000000LL) + (int64_t)start_time->tv_usec;
-	int64_t end_us = ((int64_t)end.tv_sec * 1000000LL) + (int64_t)end.tv_usec;
-	int64_t duration_us = (end_us - start_us) / 1000LL;
-	if (duration_us < 0) {
-		duration_us = 0;
-	}
-	uint64_t duration_ms = (uint64_t)duration_us;
-
-#ifdef PAPAGO_USE_LOGGER
-	if (server->config.enable_logging) {
-		s_log(S_LOG_INFO,
-			s_log_string("remote", client_ip),
-			s_log_string("method", method),
-			s_log_string("path", url),
-			s_log_string("version", version ? version : "-"),
-			s_log_string("host", host ? host : "-"),
-			s_log_string("user_agent", user_agent ? user_agent : "-"),
-			s_log_int("status", (int)status),
-			s_log_int64("duration_ms", (int64_t)duration_ms));
-	}
-#else
-	PAPAGO_UNUSED(user_agent);
-	PAPAGO_UNUSED(host);
-	PAPAGO_UNUSED(version);
-#endif
-	update_metrics(server, url, method, status, (uint64_t)duration_ms);
 }
 
 // compression 
@@ -1006,6 +927,8 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             const char *method, const char *version, const char *upload_data,
             size_t *upload_data_size, void **con_cls)
 {
+    PAPAGO_UNUSED(version);
+
 	papago_t *server = (papago_t *)cls;
 	struct MHD_Response *mhd_response = NULL;
 	papago_request_t *req;
@@ -1019,7 +942,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 			return MHD_NO;
         }
 
-		gettimeofday(&req->start_time, NULL);
+		clock_gettime(CLOCK_MONOTONIC, &req->start_time);
 
 		req->path = _strdup(url);
 		req->connection = connection;
@@ -1078,25 +1001,29 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
 		return MHD_NO;
 	}
-	res->status = PAPAGO_STATUS_OK; 
+	// res->status = PAPAGO_STATUS_OK;
 
-	// run middleware
-	for (size_t i = 0; i < server->middleware_count; i++) {
-		papago_middleware_t *mw = &server->middleware[i];
+    const char *user_agent = MHD_lookup_connection_value(connection,
+		MHD_HEADER_KIND, "User-Agent");
+    if (user_agent == NULL) {
+        req->user_agent[0] = '\0';
+    } else {
+        snprintf(req->user_agent, sizeof(req->user_agent), "%s", user_agent);
+    }
 
-		if (mw->path != NULL) {
-			if (strncmp(req->path, mw->path, strlen(mw->path)) != 0) 
-				continue;
-		}
+	const char *host = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
+		"Host");
+    if (host == NULL) {
+        req->host[0] = '\0';
+    } else {
+        snprintf(req->host, sizeof(req->host), "%s", host);
+    }
 
-		if (!mw->fn(req, res, mw->user_data)) {
-			if (!res->sent) {
-				papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
-				papago_res_json(res, "{\"error\":\"Forbidden\"}");
-			}
-			goto send_response;
-		}
-	}
+    if (version != NULL) {
+        snprintf(req->version, sizeof(req->version), "%s", version);
+    } else {
+        req->version[0] = '\0';
+    }
 
 	// find matching route
 	route_found = false;
@@ -1108,7 +1035,20 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 		}
 
 		if (match_route(route->path, req->path, &req->params,
-		    &req->param_count)) {
+		    	&req->param_count)) {
+            clock_gettime(CLOCK_MONOTONIC, &req->start_time);
+
+            // run all before() functions
+            for (int i = 0; i < server->middleware_count; i++) {
+                papago_middleware_slot_t *slot = &server->middleware[i];
+                if (slot->path != NULL &&
+                    strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
+                    continue;
+                }
+                if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
+                    goto send_response;
+                }
+            }
 			route->handler(req, res, route->user_data);
 			route_found = true;
 			break;
@@ -1116,13 +1056,27 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 	}
 
 	if (!route_found) {
-		papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
-		papago_res_json(res, "{\"error\":\"Not Found\"}");
+		papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
+		papago_res_json(res, "{\"error\":\"not found\"}");
+	}
+
+	// run all after() functions (reverse order)
+	for (int i = server->middleware_count-1; i >= 0; i--) {
+		papago_middleware_slot_t *slot = &server->middleware[i];
+		if (slot->middleware->after == NULL) {
+			continue;
+		}
+
+		if (slot->path != NULL &&
+			strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
+			continue;
+		}
+		slot->middleware->after(req, res, slot->middleware->user_data);
 	}
 
 send_response:
-	log_request(server, connection, req->path, method, res->status,
-		&req->start_time, version);
+    update_metrics(server, req->path, papago_req_method(req), res->status,
+        (uint64_t)((clock_gettime(CLOCK_MONOTONIC, &req->start_time), 0)));
 
 	if (res->is_stream_file && res->stream_file != NULL) {
 		int fd = fileno(res->stream_file);
@@ -1465,12 +1419,6 @@ papago_start(papago_t *server)
 	char *cert_pem = NULL;
 	char *key_pem = NULL;
 
-#ifdef PAPAGO_USE_LOGGER
-	if (server->config.enable_logging) {
-		s_log_init(stdout);
-	}
-#endif
-
 	// determine libmicrohttpd flags
 	unsigned int mhd_flags = MHD_USE_THREAD_PER_CONNECTION
 		| MHD_USE_INTERNAL_POLLING_THREAD;
@@ -1500,21 +1448,10 @@ papago_start(papago_t *server)
 		key_pem = load_file(server->config.key_file);
 
 		if (cert_pem == NULL || key_pem == NULL) {
-			const char *err_msg = "failed to load SSL certificate or key";
-
-#ifdef PAPAGO_USE_LOGGER
-			if (server->config.enable_logging) {
-				s_log(S_LOG_ERROR, 
-					s_log_string("msg", err_msg),
-					s_log_string("cert", server->config.cert_file),
-					s_log_string("key", server->config.key_file));
-			}
-#endif
-
 			free(cert_pem);
 			free(key_pem);
 
-			papago_set_error(PAPAGO_ERR, err_msg);
+			papago_set_error(PAPAGO_ERR, "failed to load SSL certificate or key");
 
 			return 1;
 		}
@@ -1568,19 +1505,9 @@ papago_start(papago_t *server)
 		if (server->config.enable_ssl) {
 			if (server->config.cert_file == NULL ||
 			    server->config.key_file == NULL) {
-				const char *err_msg = "SSL enabled but cert_file or key_file not set for WebSocket";
-
-#ifdef PAPAGO_USE_LOGGER				
-				if (server->config.enable_logging) {
-					s_log(S_LOG_ERROR, 
-						s_log_string("msg", err_msg),
-						s_log_string("cert", server->config.cert_file ? server->config.cert_file : "NULL"),
-						s_log_string("key", server->config.key_file ? server->config.key_file : "NULL"));
-				}
-#endif
 				MHD_stop_daemon(server->mhd_daemon);
 				server->running = false;
-				papago_set_error(PAPAGO_ERR, err_msg);
+				papago_set_error(PAPAGO_ERR, "SSL enabled but cert_file or key_file not set for WebSocket");
 
 				return 1;
 			}
@@ -1595,20 +1522,9 @@ papago_start(papago_t *server)
 		#endif
 		server->lws_context = lws_create_context(&info);
 		if (server->lws_context == NULL) {
-			const char *err_msg = "failed to create libwebsockets context";
-
-#ifdef PAPAGO_USE_LOGGER
-			if (server->config.enable_logging) {
-				s_log(S_LOG_ERROR, 
-					s_log_string("msg", err_msg),
-					s_log_int("port", info.port),
-					s_log_string("ssl", server->config.enable_ssl ? "enabled" : "disabled"));
-			}
-#endif
-
 			MHD_stop_daemon(server->mhd_daemon);
 			server->running = false;
-			papago_set_error(PAPAGO_ERR, err_msg);
+			papago_set_error(PAPAGO_ERR, "failed to create libwebsockets context");
 
 			return 1;
 		}
@@ -1617,24 +1533,6 @@ papago_start(papago_t *server)
 		pthread_create(&server->lws_thread, NULL,
 		lws_thread_func, server);
 	}
-
-#ifdef PAPAGO_USE_LOGGER
-	if (server->config.enable_logging) {
-		s_log(S_LOG_INFO, 
-			s_log_string("msg", "server started"),
-			s_log_int("port", server->config.port),
-			s_log_string("type", server->config.enable_ssl ? "HTTPS" : "HTTP"));
-	}
-
-	if (server->ws_endpoint_count > 0) {
-		if (server->config.enable_logging) {
-			s_log(S_LOG_INFO, 
-				s_log_string("msg", "websocket server started"),
-				s_log_int("port", server->config.port+1),
-				s_log_string("type", server->config.enable_ssl ? "WSS" : "WS"));
-		}
-	}
-#endif
 
 	// wait for shutdown signal using condition variable for instant response
 	pthread_mutex_lock(&server->shutdown_mutex);
@@ -1704,7 +1602,7 @@ papago_destroy(papago_t *server)
 	}
 
 	// free middleware data
-	for (size_t i = 0; i < server->middleware_count; i++) {
+	for (int i = 0; i < server->middleware_count; i++) {
 		free(server->middleware[i].path);
     }
 
@@ -1762,25 +1660,28 @@ papago_route(papago_t *server, papago_method_t method,
 // middleware
 
 int
-papago_middleware_add(papago_t *server, papago_middleware_fn_t middleware)
+papago_middleware_add(papago_t *server, papago_middleware_t *middleware)
 {
 	return papago_middleware_path_add(server, NULL, middleware);
 }
 
 int
 papago_middleware_path_add(papago_t *server, const char *path,
-                           papago_middleware_fn_t middleware)
+                           papago_middleware_t *middleware)
 {
 	if (server == NULL || middleware == NULL ||
 	    server->middleware_count >= PAPAGO_MAX_MIDDLEWARE) {
 		return 1;
     }
 
-	papago_middleware_t *mw = &server->middleware[server->middleware_count];
-	mw->path = (path != NULL) ? _strdup(path) : NULL;
-	mw->fn = middleware;
-
-	server->middleware_count++;
+    papago_middleware_slot_t *slot =
+        &server->middleware[server->middleware_count++];
+    slot->middleware = middleware;
+	if (path != NULL) {
+    	slot->path = strdup(path);
+    } else {
+        slot->path = NULL;
+    }
 
 	return 0;
 }
@@ -1804,7 +1705,7 @@ papago_serve_embedded_handler(papago_request_t *req, papago_response_t *res,
 	PAPAGO_UNUSED(user_data);
  
 	if (g_embedded_files == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+		papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
 		papago_res_send(res, "No embedded files registered");
 		return;
 	}
@@ -1840,7 +1741,7 @@ papago_serve_embedded_handler(papago_request_t *req, papago_response_t *res,
 	}
  
 	// not found
-	papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+	papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
 	papago_res_send(res, "file not found");
 }
 
@@ -1863,7 +1764,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 	char filepath[1024];
  
 	if (server == NULL || server->config.static_dir == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "static directory not configured");
 		return;
 	}
@@ -1872,7 +1773,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
  
 	// prevent directory traversal
 	if (strstr(path, "..") != NULL) {
-		papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
+		papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
 		papago_res_send(res, "invalid path");
 		return;
 	}
@@ -1884,7 +1785,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 	// check if file exists
 	struct stat st;
 	if (stat(filepath, &st) != 0) {
-		papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+		papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
 		papago_res_send(res, "file not found");
 		return;
 	}
@@ -1897,19 +1798,19 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 			    server->config.static_dir, path);
 			
 			if (stat(filepath, &st) != 0 || !S_ISREG(st.st_mode)) {
-				papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
+				papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
 				papago_res_send(res, "directory listing not allowed");
 				return;
 			}
 		} else {
-			papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
+			papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
 			papago_res_send(res, "not a regular file");
 			return;
 		}
 	}
 
 	if (papago_res_sendfile(server, res, filepath) != 0) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "failed to serve file");
 	}
 }
@@ -2442,7 +2343,7 @@ papago_check_rate_limit(papago_t *server, papago_request_t *req,
 				pthread_mutex_unlock(&server->rate_limit_mutex);
  
 				// send rate limit response
-				papago_res_status(res, PAPAGO_STATUS_TOO_MANY_REQUESTS);
+				papago_res_set_status(res, PAPAGO_STATUS_TOO_MANY_REQUESTS);
 
 				char buf[32];
 				snprintf(buf, sizeof(buf), "%d", server->config.rate_limit_window);

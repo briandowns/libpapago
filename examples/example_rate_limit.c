@@ -36,8 +36,9 @@ static papago_t *server = NULL;
 /**
  * Rate limit middleware
  */
-bool
-rate_limit_middleware(papago_request_t *req, papago_response_t *res, void *user_data)
+static bool
+rate_limit_middleware(papago_request_t *req, papago_response_t *res,
+                      void *user_data)
 {
 	PAPAGO_UNUSED(user_data);
 
@@ -90,12 +91,16 @@ main(void)
 
 	papago_config_t config = papago_default_config();
 	config.port = 8282;
-	config.enable_logging = true;
     config.enable_compression = true;
 	papago_configure(server, &config);
 
+	papago_middleware_t rate_limit_mw = {
+		.before    = rate_limit_middleware,
+		.after     = NULL,
+		.user_data = NULL,
+	};
     papago_enable_rate_limit(server, 5, 30);
-    papago_middleware_path_add(server, "/", rate_limit_middleware);
+    papago_middleware_path_add(server, "/", &rate_limit_mw);
 
 	// register HTTP routes
 	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
@@ -116,4 +121,3 @@ main(void)
 
 	return 0;
 }
-

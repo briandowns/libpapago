@@ -61,7 +61,7 @@ serve_file_handler(papago_request_t *req, papago_response_t *res, void *user_dat
 	// get filename from path parameter
 	const char *filename = papago_req_param(req, "filename");
 	if (filename == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_BAD_REQUEST);
+		papago_res_set_status(res, PAPAGO_STATUS_BAD_REQUEST);
 		papago_res_send(res, "no filename specified");
 		return;
 	}
@@ -72,14 +72,14 @@ serve_file_handler(papago_request_t *req, papago_response_t *res, void *user_dat
 	// check if file exists
 	struct stat st;
 	if (stat(filepath, &st) != 0) {
-		papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+		papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
 		papago_res_send(res, "file not found");
 		return;
 	}
 
 	// check if it's a regular file
 	if (!S_ISREG(st.st_mode)) {
-		papago_res_status(res, PAPAGO_STATUS_FORBIDDEN);
+		papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
 		papago_res_send(res, "not a regular file");
 		return;
 	}
@@ -88,7 +88,7 @@ serve_file_handler(papago_request_t *req, papago_response_t *res, void *user_dat
 
 	// stream the file - automatically detects MIME type
 	if (papago_res_sendfile(server, res, filepath) != 0) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "failed to stream file");
 	}
 }
@@ -103,7 +103,7 @@ download_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	const char *filename = papago_req_param(req, "filename");
 	if (filename == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_BAD_REQUEST);
+		papago_res_set_status(res, PAPAGO_STATUS_BAD_REQUEST);
 		papago_res_send(res, "no filename specified");
 		return;
 	}
@@ -113,7 +113,7 @@ download_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	struct stat st;
 	if (stat(filepath, &st) != 0) {
-		papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+		papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
 		papago_res_send(res, "file not found");
 		return;
 	}
@@ -128,7 +128,7 @@ download_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 	printf("forcing download: %s\n", filename);
 
 	if (papago_res_sendfile(server, res, filepath) != 0) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "failed to stream file");
 	}
 }
@@ -143,7 +143,7 @@ video_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	const char *filename = papago_req_param(req, "filename");
 	if (filename == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_BAD_REQUEST);
+		papago_res_set_status(res, PAPAGO_STATUS_BAD_REQUEST);
 		papago_res_send(res, "no filename specified");
 		return;
 	}
@@ -153,7 +153,7 @@ video_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	struct stat st;
 	if (stat(filepath, &st) != 0) {
-		papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+		papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
 		papago_res_send(res, "file not found");
 		return;
 	}
@@ -164,7 +164,7 @@ video_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 	printf("streaming video: %s\n", filename);
 
 	if (papago_res_sendfile(server, res, filepath) != 0) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "failed to stream file");
 	}
 }
@@ -180,7 +180,7 @@ list_files_handler(papago_request_t *req, papago_response_t *res, void *user_dat
 
 	DIR *dir = opendir(files_dir);
 	if (dir == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 		papago_res_send(res, "cannot open directory");
 		return;
 	}

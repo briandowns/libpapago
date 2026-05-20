@@ -27,19 +27,13 @@ ifeq ($(UNAME_S),FreeBSD)
 endif
 
 PAPAGO_USE_MAPLE ?= 0
-PAPAGO_USE_LOGGER ?= 0
-
-ifeq ($(PAPAGO_USE_LOGGER),1)
-	CFLAGS += -DPAPAGO_USE_LOGGER
-	LDFLAGS += -llogger
-endif
 
 ifeq ($(PAPAGO_USE_MAPLE),1)
 	CFLAGS += -DPAPAGO_USE_MAPLE
 	LDFLAGS += -lmaple
 endif
 
-EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded
+EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded example_logger_middleware
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
@@ -118,6 +112,10 @@ example_streaming: clean
 .PHONY: example_embedded
 example_embedded: clean
 	$(CC) -o $@ papago.c examples/example_embedded.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_logger_middleware
+example_logger_middleware: clean
+	$(CC) -o $@ papago.c examples/example_logger_middleware.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)

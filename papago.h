@@ -141,17 +141,29 @@ typedef struct {
 	uint16_t rate_limit_window;
 	char *cert_file;
 	char *key_file;
-	FILE *log_output_dst;
 	char *static_dir;
 	int thread_pool_size;
 	size_t max_body_size;
 	bool enable_cors;
 	bool enable_ssl;
-	bool enable_logging;
 	bool enable_template_rendering;
 	bool enable_rate_limiting;
 	bool enable_compression;
 } papago_config_t;
+
+/**
+ * papago_middleware_t is provided to papago_use(). Only the before function
+ * is required. If the after function is non-NULL, it will be called
+ * automatically after the route handler completes. user_data is passed to both
+ * before and after.
+ */
+typedef struct {
+    bool (*before)(papago_request_t *req, papago_response_t *res,
+		           void *user_data);
+    void (*after)(papago_request_t *req, papago_response_t *res,
+	              void *user_data);
+    void *user_data;
+} papago_middleware_t;
 
 typedef enum {
     PAPAGO_OK = 0,
@@ -226,14 +238,14 @@ papago_route(papago_t *server, papago_method_t method, const char *path,
  * Register global middleware. Returns 0 on success or 1 on failure.
  */
 int
-papago_middleware_add(papago_t *server, papago_middleware_fn_t middleware);
+papago_middleware_add(papago_t *server, papago_middleware_t *middleware);
 
 /**
  * Register path-specific middleware. Returns 0 on success or 1 on failure.
  */
 int
 papago_middleware_path_add(papago_t *server, const char *path,
-                           papago_middleware_fn_t middleware);
+                           papago_middleware_t *middleware);
 
 // request helpers
 
@@ -268,6 +280,13 @@ uint64_t
 papago_req_body_len(const papago_request_t *req);
 
 /**
+ * Retrieve request start time. Returns timespec struct with request start
+ * time.
+ */
+struct timespec
+papago_req_start_time(const papago_request_t *req);
+
+/**
  * Retrieve request method. Returns HTTP method.
  */
 const char*
@@ -285,13 +304,37 @@ papago_req_path(const papago_request_t *req);
 const char*
 papago_req_client_ip(const papago_request_t *req);
 
+/**
+ * Retrieve host value from the request or empty string if not present.
+ */
+const char*
+papago_req_host(const papago_request_t *req);
+
+/**
+ * Retrieve user agent value from the request or empty string if not present.
+ */
+const char*
+papago_req_user_agent(const papago_request_t *req);
+
+/**
+ * Retrieve HTTP version from the request or empty string if not present.
+ */
+const char*
+papago_req_version(const papago_request_t *req);
+
 // response helpers
+
+/**
+ * Retrieve response status code.
+ */
+int
+papago_res_status(papago_response_t *res);
 
 /**
  * Set response status code.
  */
 void
-papago_res_status(papago_response_t *res, papago_status_code_t status);
+papago_res_set_status(papago_response_t *res, papago_status_code_t status);
 
 /**
  * Set response header.

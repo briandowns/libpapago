@@ -59,6 +59,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build All Examples
-        run: make examples_all PAPAGO_USE_LOGGER=1 PAPAGO_USE_MAPLE=1
+        run: make examples_all PAPAGO_USE_MAPLE=1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

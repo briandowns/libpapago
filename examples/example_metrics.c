@@ -89,14 +89,14 @@ health_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "timestamp", json_integer((json_int_t)time(NULL)));
 	if (root == NULL) {
         fprintf(stderr, "failed to create JSON\n");
-        papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         return;
 
     }
     char *result = json_dumps(root, 0);
     if (result == NULL) {
         fprintf(stderr, "failed to serialize JSON\n");
-        papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         json_decref(root);
         return;
     }
@@ -140,7 +140,7 @@ slow_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 	// simulate slow endpoint
 	sleep(1);
 	
-	papago_res_status(res, PAPAGO_STATUS_OK);
+	papago_res_set_status(res, PAPAGO_STATUS_OK);
 	papago_res_send(res, "slow response completed");
 }
  
@@ -150,7 +150,7 @@ error_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 	PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-    papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+    papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
 	papago_res_send(res, "simulated server error");
 }
 
@@ -171,7 +171,6 @@ main(void)
 
 	papago_config_t config = papago_default_config();
 	config.port = 8282;
-	config.enable_logging = false;
 	papago_configure(server, &config);
 
 	// register HTTP routes

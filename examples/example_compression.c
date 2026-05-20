@@ -75,7 +75,7 @@ large_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 		papago_res_send(res, large_text);
 		free(large_text);
 	} else {
-        papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         papago_res_json(res, "{\"error\":\"Failed to generate response\"}");
     }
 }

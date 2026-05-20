@@ -25,10 +25,12 @@
  * SUCH DAMAGE.
  */
 
+#define _POSIX_C_SOURCE 199309L
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "../papago.h"
@@ -57,6 +59,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 	PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
 	papago_res_send(res,
 	    "<h1>Welcome to Papago!</h1>"
 	    "<p>Built on libmicrohttpd + libwebsockets</p>");
@@ -67,7 +70,7 @@ api_hello_handler(papago_request_t *req, papago_response_t *res, void *user_data
 {
 	PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
-
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
 	papago_res_json(res, "{\"message\":\"Hello from Papago!\"}");
 }
 
@@ -83,46 +86,43 @@ user_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	snprintf(json, sizeof(json), "{\"username\":\"%s\",\"id\":123}",
 	    (username != NULL) ? username : "unknown");
-
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
 	papago_res_json(res, json);
 }
 
-// websocket handlers
-
-void
-ws_on_connect(papago_ws_connection_t *conn)
+static bool
+logger_before(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	printf("[WS] client connected from %s\n", papago_ws_get_client_ip(conn));
-	papago_ws_send(conn, "{\"type\":\"welcome\",\"message\":\"Connected!\"}");
+    PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(res);
+    PAPAGO_UNUSED(user_data);
+
+    return true;
 }
 
-void
-ws_on_message(papago_ws_connection_t *conn, const char *message, size_t length,
-	          bool is_binary)
+static void
+logger_after(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	printf("[WS] received %s message (%zu bytes): %s\n",
-	    is_binary ? "binary" : "text", length, message);
+    PAPAGO_UNUSED(user_data);
 
-	// echo message back
-	if (is_binary) {
-		papago_ws_send_binary(conn, message, length);
-	} else {
-		papago_ws_send(conn, message);
-	}
-}
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    double duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec) 
+        * 1000.0
+        + (now.tv_nsec - papago_req_start_time(req).tv_nsec) / 1.0e6;
 
-void
-ws_on_close(papago_ws_connection_t *conn)
-{
-	printf("[WS] client disconnected from %s\n",
-	    papago_ws_get_client_ip(conn));
-}
-
-void
-ws_on_error(papago_ws_connection_t *conn, const char *error)
-{
-	PAPAGO_UNUSED(conn);
-	printf("[WS] error: %s\n", error);
+    fprintf(stdout,
+        "{\"remote\":\"%s\",\"method\":\"%s\",\"path\":\"%s\","
+        "\"version\":\"%s\",\"host\":\"%s\",\"user_agent\":\"%s\","
+        "\"status\":%d,\"duration_ms\":%.3f}\n",
+        papago_req_client_ip(req),
+        papago_req_method(req),
+        papago_req_path(req),
+        papago_req_version(req),
+        papago_req_host(req),
+        papago_req_user_agent(req),
+        papago_res_status(res),
+        duration_ms);
 }
 
 int
@@ -143,22 +143,17 @@ main(void)
 	config.port = 8282;
 	papago_configure(server, &config);
 
+    papago_middleware_t structured_logger = {
+        .before    = logger_before,
+        .after     = logger_after,
+        .user_data = NULL,
+    };
+    papago_middleware_add(server, &structured_logger);
+
 	// register HTTP routes
 	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 	papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
 	papago_route(server, PAPAGO_GET, "/user/:username", user_handler, NULL);
-
-	// register websocket endpoint
-	papago_ws_endpoint(server, "/ws",
-	    ws_on_connect, ws_on_message, ws_on_close, ws_on_error);
-
-	printf("Server starting on:\n");
-	printf("  HTTP:      http://%s:%d\n", config.host, config.port);
-	printf("  WebSocket: ws://%s:%d/ws\n\n", config.host, config.port + 1);
-
-	printf("Run\n\ncurl http://%s:%d/\n", config.host, config.port);
-	printf("curl http://%s:%d/api/hello\n", config.host, config.port);
-	printf("curl http://%s:%d/user/alice\n\n", config.host, config.port);
 
 	// start server (blocking)
 	if (papago_start(server) != 0) {

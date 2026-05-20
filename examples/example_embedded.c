@@ -140,7 +140,6 @@ main(void)
 
 	papago_config_t config = papago_default_config();
 	config.port = 8282;
-	config.enable_logging = true;
 	papago_configure(server, &config);
 
     papago_register_embedded_files(server, embedded_files);

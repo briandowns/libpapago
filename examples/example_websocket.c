@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  */
 
-/*
+/**
  * Papago Feature Demo - Real-time Chat Application
  * - HTTP routing (GET, POST, PUT, DELETE)
  * - Path parameters (/user/:id)
@@ -44,8 +44,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#include <logger.h>
 
 #include "../papago.h"
 
@@ -75,7 +73,7 @@ signal_handler(int sig)
 {
 	PAPAGO_UNUSED(sig);
 
-	s_log(S_LOG_INFO, "shutting down gracefully...");
+	printf("Shutting down gracefully...\n");
 	if (server != NULL) {
 		papago_stop(server);
 	}
@@ -92,7 +90,7 @@ auth_middleware(papago_request_t *req, papago_response_t *res, void *user_data)
 	const char *api_key = papago_req_header(req, "X-API-Key");
 
 	if (api_key == NULL || strcmp(api_key, "secret123") != 0) {
-		papago_res_status(res, PAPAGO_STATUS_UNAUTHORIZED);
+		papago_res_set_status(res, PAPAGO_STATUS_UNAUTHORIZED);
 		papago_res_json(res, "{\"error\":\"Unauthorized\","
 		    "\"message\":\"Valid X-API-Key header required\"}");
 
@@ -304,7 +302,7 @@ api_users_create(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(user_data);
 
 	if (user_count >= 100) {
-		papago_res_status(res, PAPAGO_STATUS_BAD_REQUEST);
+		papago_res_set_status(res, PAPAGO_STATUS_BAD_REQUEST);
 		papago_res_json(res, "{\"error\":\"User limit reached\"}");
 
 		return;
@@ -312,7 +310,7 @@ api_users_create(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	const char *body = papago_req_body(req);
 	if (body == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_BAD_REQUEST);
+		papago_res_set_status(res, PAPAGO_STATUS_BAD_REQUEST);
 		papago_res_json(res, "{\"error\":\"Missing request body\"}");
 
 		return;
@@ -369,7 +367,7 @@ api_users_create(papago_request_t *req, papago_response_t *res, void *user_data)
 	    "{\"id\":%d,\"username\":\"%s\",\"email\":\"%s\"}",
 	    user->id, user->username, user->email);
 
-	papago_res_status(res, PAPAGO_STATUS_CREATED);
+	papago_res_set_status(res, PAPAGO_STATUS_CREATED);
 	papago_res_json(res, response);
 }
 
@@ -383,7 +381,7 @@ api_users_get(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	const char *id_str = papago_req_param(req, "id");
 	if (id_str == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_BAD_REQUEST);
+		papago_res_set_status(res, PAPAGO_STATUS_BAD_REQUEST);
 		papago_res_json(res, "{\"error\":\"Missing user ID\"}");
 		return;
 	}
@@ -401,7 +399,7 @@ api_users_get(papago_request_t *req, papago_response_t *res, void *user_data)
 		}
 	}
 
-	papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+	papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
 	papago_res_json(res, "{\"error\":\"User not found\"}"); 
 }
 
@@ -415,7 +413,7 @@ api_users_delete(papago_request_t *req, papago_response_t *res, void *user_data)
 
 	const char *id_str = papago_req_param(req, "id");
 	if (id_str == NULL) {
-		papago_res_status(res, PAPAGO_STATUS_BAD_REQUEST);
+		papago_res_set_status(res, PAPAGO_STATUS_BAD_REQUEST);
 		papago_res_json(res, "{\"error\":\"Missing user ID\"}");
 
 		return;
@@ -431,14 +429,14 @@ api_users_delete(papago_request_t *req, papago_response_t *res, void *user_data)
             }
 			user_count--;
 
-			papago_res_status(res, PAPAGO_STATUS_NO_CONTENT);
+			papago_res_set_status(res, PAPAGO_STATUS_NO_CONTENT);
 			papago_res_send(res, "");
 
 			return;
 		}
 	}
 
-	papago_res_status(res, PAPAGO_STATUS_NOT_FOUND);
+	papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
 	papago_res_json(res, "{\"error\":\"User not found\"}");
 }
 
@@ -477,9 +475,8 @@ ws_on_connect(papago_ws_connection_t *conn)
 
 	papago_ws_set_userdata(conn, user);
 
-	s_log(S_LOG_INFO, "client connected",
-		s_log_string("username", user->username),
-		s_log_string("ip", papago_ws_get_client_ip(conn)));
+	printf("[WS] client connected from %s for %s\n",
+		papago_ws_get_client_ip(conn), user->username);
 
 	// send welcome
     char welcome[256];
@@ -511,9 +508,7 @@ ws_on_message(papago_ws_connection_t *conn, const char *message, size_t length,
 		return;
 	}
 
-	s_log(S_LOG_INFO, "received message",
-		s_log_string("username", user->username),
-		s_log_string("message", message));
+	printf("[WS] received message from %s: %s\n", user->username, message);
 
 	// parse message type
 	const char *type_start = strstr(message, "\"type\":");
@@ -578,9 +573,8 @@ ws_on_close(papago_ws_connection_t *conn)
 		return;
     }
 
-	s_log(S_LOG_INFO, "client disconnected",
-		s_log_string("username", user->username),
-		s_log_int("messages_sent", user->message_count));
+	printf("[WS] client disconnected from %s for %s\n",
+		papago_ws_get_client_ip(conn), user->username);
 
 	// announce departure
 	snprintf(leave, sizeof(leave), "{\"type\":\"leave\",\"username\":\"%s\"}",
@@ -594,9 +588,8 @@ void
 ws_on_error(papago_ws_connection_t *conn, const char *error)
 {
 	chat_user_t *user = papago_ws_get_userdata(conn);
-	s_log(S_LOG_ERROR, "websocket error",
-		s_log_string("username", user != NULL ? user->username : "unknown"),
-		s_log_string("error", error));
+	printf("[WS] error for %s: %s\n", user != NULL ? 
+		user->username : "unknown", error);
 }
 
 int
@@ -615,7 +608,6 @@ main(void)
 
 	papago_config_t config = papago_default_config();
 	config.port = 8484;
-	config.enable_logging = true;
 	papago_configure(server, &config);
 
 	// add some demo users
@@ -631,12 +623,18 @@ main(void)
 
 	user_count = 2;
 
+	papago_middleware_t auth_mw = {
+		.before    = auth_middleware,
+		.after     = NULL,
+		.user_data = NULL,
+	};
+
 	// register HTTP routes
 	papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 	papago_route(server, PAPAGO_GET, "/api/stats", api_stats, NULL);
 
 	// protected API routes (require X-API-Key header)
-	papago_middleware_path_add(server, "/api/users", auth_middleware);
+	papago_middleware_path_add(server, "/api/users", &auth_mw);
 	papago_route(server, PAPAGO_GET, "/api/users", api_users_list, NULL);
 	papago_route(server, PAPAGO_POST, "/api/users", api_users_create, NULL);
 	papago_route(server, PAPAGO_GET, "/api/users/:id", api_users_get, NULL);
@@ -669,8 +667,7 @@ main(void)
 
 	// start server (blocking)
 	if (papago_start(server) != 0) {
-		s_log(S_LOG_ERROR, "failed to start server",
-			s_log_string("error", papago_error()));
+		printf("failed to start server: %s\n", papago_error());
         papago_destroy(server);
 
         return 1;
@@ -679,7 +676,7 @@ main(void)
 	// cleanup
 	papago_destroy(server);
 
-	s_log(S_LOG_INFO, "server stopped");
+	printf("server stopped\n");
 
 	return 0;
 }

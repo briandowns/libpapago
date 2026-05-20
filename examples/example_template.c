@@ -68,7 +68,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 		sizeof(rendered), "name", "Papago", NULL);
 	if (result != 0) {
 		fprintf(stderr, "failed to render template\n");
-		papago_res_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+		papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR); 
 		return;
 	}
 }
@@ -91,7 +91,6 @@ main(void)
 
 	papago_config_t config = papago_default_config();
 	config.port = 8282;
-	config.enable_logging = true;
 	config.enable_template_rendering = true;
 	papago_configure(server, &config);
 
