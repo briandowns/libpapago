@@ -105,6 +105,17 @@ struct papago_ws_connection {
     struct papago_server *server;
 };
 
+typedef struct route {
+	char *segment;      /* Path segment */
+	papago_handler_t handlers[6];   /* Handlers by method (GET=0, POST=1, etc) */
+	struct route **children;    /* Child nodes */
+	size_t child_count;   /* Number of children */
+	size_t child_capacity;/* Allocated space for children */
+	bool is_param;      /* Is this a :param segment? */
+	bool is_wildcard;   /* Is this a * wildcard? */
+	char *param_name;   /* Parameter name if is_param */
+} route_t;
+
 /**
  * Metrics structure
  */
@@ -144,30 +155,32 @@ typedef struct {
  * Server structure
  */
 struct papago_server {
-    struct MHD_Daemon *mhd_daemon;
-    struct lws_context *lws_context;
-    papago_config_t config;
-    FILE *log_output_dst;
-    papago_route_t routes[PAPAGO_MAX_ROUTES];
-    size_t route_count;
-    papago_middleware_slot_t middleware[PAPAGO_MAX_MIDDLEWARE];
-    int middleware_count;
-    papago_ws_endpoint_t ws_endpoints[PAPAGO_MAX_WS_ENDPOINTS];
-    size_t ws_endpoint_count;
-    pthread_t lws_thread;
+	struct MHD_Daemon *mhd_daemon;
+	route_t	*routes;
+	struct lws_context *lws_context;
+	papago_config_t config;
+	FILE *log_output_dst;
+	papago_route_t _routes[PAPAGO_MAX_ROUTES];
+	size_t route_count;
+	papago_middleware_t	middleware[PAPAGO_MAX_MIDDLEWARE];
+	size_t middleware_count;
+	papago_ws_endpoint_t ws_endpoints[PAPAGO_MAX_WS_ENDPOINTS];
+	size_t ws_endpoint_count;
+	pthread_t lws_thread;
 #ifdef PAPAGO_USE_MAPLE
     mp_context_t *template_ctx;
 #endif
-    papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
-    size_t ws_connection_count;
-    pthread_mutex_t ws_mutex;
-    pthread_mutex_t template_mutex; // mutex for per request template rendering
-    pthread_mutex_t shutdown_mutex; // shutdown synchronization
-    pthread_mutex_t rate_limit_mutex;
-    pthread_cond_t shutdown_cond;
-    papago_metrics_t *metrics;
-    const papago_embedded_file_t *embedded_files;
-    void *rate_limit_map;
+	papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
+	size_t ws_connection_count;
+	pthread_mutex_t ws_mutex;
+	pthread_mutex_t template_mutex; // mutex for per request template rendering
+	pthread_mutex_t shutdown_mutex; // shutdown synchronization
+	pthread_mutex_t rate_limit_mutex;
+	pthread_mutex_t route_mutex;
+	pthread_cond_t shutdown_cond;
+	papago_metrics_t *metrics;
+	const papago_embedded_file_t *embedded_files;
+	void *rate_limit_map;
     char *error_message;
     volatile bool running;
 };
@@ -314,6 +327,361 @@ papago_default_config(void)
 }
 
 // path parameter matching
+
+/**
+ * Create a new route
+ */
+static route_t*
+route_create(const char *segment)
+{
+	route_t *route = calloc(1, sizeof(route_t));
+	if (route == NULL) {
+		return NULL;
+	}
+ 
+	if (segment != NULL) {
+		route->segment = _strdup(segment);
+		if (route->segment == NULL) {
+			free(route);
+			return NULL;
+		}
+ 
+		// check if this is a parameter or wildcard
+		if (segment[0] == ':') {
+			route->is_param = true;
+			route->param_name = _strdup(segment + 1);  // skip ':'
+		} else if (strcmp(segment, "*") == 0) {
+			route->is_wildcard = true;
+		}
+	}
+ 
+	/* Initialize handlers array */
+	for (size_t i = 0; i < 6; i++) {
+		route->handlers[i] = NULL;
+	}
+ 
+	/* Allocate initial children array */
+	route->child_capacity = 4;
+	route->children = calloc(route->child_capacity, sizeof(route_t *));
+	route->child_count = 0;
+ 
+	return route;
+}
+ 
+/**
+ * Destroy a route node and all its children recursively
+ */
+static void
+route_destroy(route_t *node)
+{
+	if (node == NULL) {
+		return;
+    }
+ 
+	free(node->segment);
+	free(node->param_name);
+ 
+	for (size_t i = 0; i < node->child_count; i++) {
+		route_destroy(node->children[i]);
+	}
+ 
+	free(node->children);
+	free(node);
+}
+ 
+/*
+ * Add a child node to a parent
+ */
+static int
+route_add_child(route_t *parent, route_t *child)
+{
+	if (parent == NULL || child == NULL) {
+		return 1;
+	}
+ 
+	/* Check if we need to expand the children array */
+	if (parent->child_count >= parent->child_capacity) {
+		size_t new_capacity = parent->child_capacity * 2;
+		route_t **new_children = realloc(parent->children,
+		    new_capacity * sizeof(route_t *));
+		if (new_children == NULL) {
+			return 1;
+		}
+ 
+		parent->children = new_children;
+		parent->child_capacity = new_capacity;
+	}
+ 
+	parent->children[parent->child_count++] = child;
+	return 0;
+}
+ 
+/*
+ * Find a child node by segment name
+ * Returns: child node, or NULL if not found
+ * Sets: is_param and is_wildcard flags for fallback matching
+ */
+static route_t*
+route_find_child(route_t *node, const char *segment, route_t **param_child,
+                 route_t **wildcard_child)
+{
+	if (node == NULL || segment == NULL) {
+		return NULL;
+    }
+ 
+	*param_child = NULL;
+	*wildcard_child = NULL;
+ 
+	route_t *child = NULL;
+
+	/* Search for exact match, and track param/wildcard nodes */
+	for (size_t i = 0; i < node->child_count; i++) {
+		child = node->children[i];
+ 
+		if (child->is_wildcard) {
+			*wildcard_child = child;
+		} else if (child->is_param) {
+			*param_child = child;
+		} else if (strcmp(child->segment, segment) == 0) {
+			/* Exact match - return immediately */
+			return child;
+		}
+	}
+ 
+	return NULL;
+}
+
+/**
+ * Split path into segments
+ * Returns: array of strings (caller must free each string and array)
+ * count: number of segments
+ */
+static char **
+split_path(const char *path, size_t *count)
+{
+	*count = 0;
+ 
+	if (path == NULL || path[0] != '/') {
+		return NULL;
+	}
+
+	char **segments;
+ 
+	// skip leading slash
+	if (path[0] == '/' && path[1] == '\0') {
+		segments = malloc(sizeof(char *));
+		if (segments != NULL) {
+			segments[0] = NULL;
+			*count = 0;
+		}
+		return segments;
+	}
+ 
+	char *path_copy = _strdup(path + 1);
+	if (path_copy == NULL) {
+		return NULL;
+	}
+ 
+	// allocate initial segments array
+	size_t capacity = 8;
+	segments = malloc(capacity * sizeof(char *));
+	if (segments == NULL) {
+		free(path_copy);
+		return NULL;
+	}
+ 
+	size_t n = 0;
+	char *saveptr;
+	char *token = strtok_r(path_copy, "/", &saveptr);
+	while (token != NULL) {
+		if (n >= capacity) {
+			char **new_segments;
+			capacity *= 2;
+			new_segments = realloc(segments, capacity * sizeof(char *));
+			if (new_segments == NULL) {
+				// cleanup on error 
+				for (size_t i = 0; i < n; i++) {
+					free(segments[i]);
+				}
+				free(segments);
+				free(path_copy);
+
+				return NULL;
+			}
+			segments = new_segments;
+		}
+ 
+		segments[n++] = _strdup(token);
+		token = strtok_r(NULL, "/", &saveptr);
+	}
+ 
+	free(path_copy);
+	*count = n;
+
+	return segments;
+}
+
+/**
+ * Free segments array
+ */
+static void
+free_segments(char **segments, size_t count)
+{
+	if (segments == NULL) {
+		return;
+	}
+ 
+	for (size_t i = 0; i < count; i++) {
+		free(segments[i]);
+	}
+	free(segments);
+}
+
+/**
+ * Insert a new route
+ */
+static int
+route_insert(route_t *root, const char *path, papago_method_t method,
+             papago_handler_t handler)
+{
+	size_t count, i;
+	route_t *current, *child, *param_child, *wildcard_child;
+ 
+	if (root == NULL || path == NULL || handler == NULL) {
+		return 1;
+	}
+ 
+	// split path into segments
+	char **segments = split_path(path, &count);
+	if (segments == NULL) {
+		return 1;
+	}
+ 
+	current = root;
+ 
+	for (i = 0; i < count; i++) {
+		child = route_find_child(current, segments[i], &param_child,
+			&wildcard_child);
+ 
+		if (child == NULL) {
+			/* Need to create new node */
+			child = route_create(segments[i]);
+			if (child == NULL) {
+				free_segments(segments, count);
+				return 1;
+			}
+ 
+			if (route_add_child(current, child) != 0) {
+				route_destroy(child);
+				free_segments(segments, count);
+				return 1;
+			}
+		}
+ 
+		current = child;
+	}
+ 
+	// set handler at leaf node
+	current->handlers[method] = handler;
+ 
+	free_segments(segments, count);
+	return 0;
+}
+
+/**
+ * Lookup a route in the trie
+ * Returns: handler if found, NULL otherwise
+ * Extracts path parameters into params array
+ */
+static papago_handler_t
+route_lookup(route_t *root, const char *path,
+    papago_method_t method, papago_kv_t **params_out, size_t *param_count_out)
+{
+	char **segments;
+	size_t count, i;
+	route_t *current, *exact_child, *param_child, *wildcard_child;
+	papago_kv_t *params;
+	size_t param_count, param_capacity;
+	papago_handler_t handler;
+ 
+	if (root == NULL || path == NULL)
+		return (NULL);
+ 
+	/* Split path into segments */
+	segments = split_path(path, &count);
+	if (segments == NULL)
+		return (NULL);
+ 
+	/* Allocate params array */
+	param_capacity = 8;
+	params = malloc(param_capacity * sizeof(papago_kv_t));
+	if (params == NULL) {
+		free_segments(segments, count);
+		return (NULL);
+	}
+	param_count = 0;
+ 
+	current = root;
+ 
+	/* Traverse trie */
+	for (i = 0; i < count; i++) {
+		exact_child = route_find_child(current, segments[i],
+		    &param_child, &wildcard_child);
+ 
+		if (exact_child != NULL) {
+			/* Exact match - prefer this */
+			current = exact_child;
+		} else if (param_child != NULL) {
+			/* Parameter match */
+			current = param_child;
+ 
+			/* Expand params array if needed */
+			if (param_count >= param_capacity) {
+				papago_kv_t *new_params;
+				param_capacity *= 2;
+				new_params = realloc(params,
+				    param_capacity * sizeof(papago_kv_t));
+				if (new_params == NULL) {
+					free(params);
+					free_segments(segments, count);
+					return (NULL);
+				}
+				params = new_params;
+			}
+ 
+			/* Store parameter */
+			params[param_count].key = _strdup(param_child->param_name);
+			params[param_count].value = _strdup(segments[i]);
+			param_count++;
+		} else if (wildcard_child != NULL) {
+			/* Wildcard match - matches rest of path */
+			current = wildcard_child;
+			break;  /* Wildcard consumes rest of path */
+		} else {
+			/* No match found */
+			free(params);
+			free_segments(segments, count);
+			return (NULL);
+		}
+	}
+ 
+	/* Get handler for method */
+	handler = current->handlers[method];
+ 
+	free_segments(segments, count);
+ 
+	if (handler != NULL) {
+		*params_out = params;
+		*param_count_out = param_count;
+	} else {
+		/* No handler - cleanup params */
+		free_kv_array(params, param_count);
+		*params_out = NULL;
+		*param_count_out = 0;
+	}
+ 
+	return (handler);
+}
 
 static bool
 match_route(const char *pattern, const char *path, papago_kv_t **params,
@@ -1042,6 +1410,11 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     for (size_t i = 0; i < server->route_count; i++) {
         papago_route_t *route = &server->routes[i];
 
+	pthread_mutex_lock(&server->route_mutex);
+	handler = route_lookup(server->routes, req->path, req->method,
+	    &req->params, &req->param_count);
+	pthread_mutex_unlock(&server->route_mutex);
+
         if (route->method != req->method) {
             continue;
         }
@@ -1390,7 +1763,10 @@ papago_new(void)
     server->metrics->min_duration_ms = ULONG_MAX;
     pthread_mutex_init(&server->metrics->mutex, NULL);
 
-    return server;
+	server->routes = route_create("");
+	pthread_mutex_init(&server->route_mutex, NULL);
+
+	return server;
 }
 
 int
@@ -1584,9 +1960,15 @@ papago_destroy(papago_t *server)
     // signal shutdown
     server->running = false;
 
-    // stop HTTP daemon first
-    if (server->mhd_daemon != NULL) {
-        MHD_stop_daemon(server->mhd_daemon);
+	// free route data
+	for (size_t i = 0; i < server->route_count; i++) {
+		free(server->_routes[i].path);
+		free(server->_routes[i].path_pattern);
+	}
+
+	// free middleware data
+	for (size_t i = 0; i < server->middleware_count; i++) {
+		free(server->middleware[i].path);
     }
 
     // cancel websocket service and wait for thread
@@ -1601,31 +1983,20 @@ papago_destroy(papago_t *server)
         lws_context_destroy(server->lws_context);
     }
 
-    // free route data
-    for (size_t i = 0; i < server->route_count; i++) {
-        free(server->routes[i].path);
-        free(server->routes[i].path_pattern);
-    }
+	// destroy synchronization primitives
+	pthread_mutex_destroy(&server->ws_mutex);
+	pthread_mutex_destroy(&server->template_mutex);
+	pthread_mutex_destroy(&server->shutdown_mutex);
+	pthread_mutex_destroy(&server->rate_limit_mutex);
+	pthread_mutex_destroy(&server->metrics->mutex);
+	pthread_mutex_destroy(&server->route_mutex);
+	pthread_cond_destroy(&server->shutdown_cond);
 
-    // free middleware data
-    for (int i = 0; i < server->middleware_count; i++) {
-        free(server->middleware[i].path);
-    }
+	if (server->routes != NULL) {
+		route_destroy(server->routes);
+	}
 
-    // free websocket endpoint data
-    for (size_t i = 0; i < server->ws_endpoint_count; i++) {
-        free(server->ws_endpoints[i].path);
-    }
-
-    // destroy synchronization primitives
-    pthread_mutex_destroy(&server->ws_mutex);
-    pthread_mutex_destroy(&server->template_mutex);
-    pthread_mutex_destroy(&server->shutdown_mutex);
-    pthread_mutex_destroy(&server->rate_limit_mutex);
-    pthread_mutex_destroy(&server->metrics->mutex);
-    pthread_cond_destroy(&server->shutdown_cond);
-
-    // free template engine memory
+	// free template engine memory
 #ifdef PAPAGO_USE_MAPLE
     if (server->template_ctx != NULL) {
         mp_free(server->template_ctx);
@@ -1650,12 +2021,20 @@ papago_route(papago_t *server, papago_method_t method,
         return 1;
     }
 
-    papago_route_t *route = &server->routes[server->route_count];
-    route->method = method;
-    route->path = _strdup(path);
-    route->path_pattern = _strdup(path);
-    route->handler = handler;
-    route->has_params = (strchr(path, ':') != NULL);
+	pthread_mutex_lock(&server->route_mutex);
+	int result = route_insert(server->routes, path, method, handler);
+	pthread_mutex_unlock(&server->route_mutex);
+
+	if (result != 0) {
+		return 1;
+	}
+
+	papago_route_t *route = &server->_routes[server->route_count];
+	route->method = method;
+	route->path = _strdup(path);
+	route->path_pattern = _strdup(path);
+	route->handler = handler;
+	route->has_params = (strchr(path, ':') != NULL);
     route->user_data = user_data;
 
     server->route_count++;
