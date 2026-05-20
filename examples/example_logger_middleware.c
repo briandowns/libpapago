@@ -25,13 +25,13 @@
  * SUCH DAMAGE.
  */
 
+#define _POSIX_C_SOURCE 199309L
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
-
-#include <jansson.h>
 
 #include "../papago.h"
 
@@ -56,54 +56,13 @@ signal_handler(int sig)
 void
 index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
- 
-    PAPAGO_UNUSED(req);
-    PAPAGO_UNUSED(user_data);
-    
-    const char *html = 
-        "<html><body>"
-        "<h1>Prometheus Metrics Example</h1>"
-        "<h2>Test Endpoints:</h2>"
-        "<ul>"
-        "<li><a href='/slow'>/slow</a> (1 second delay)</li>"
-        "<li><a href='/error'>/error</a> (500 error)</li>"
-        "</ul>"
-        "<h2>Metrics:</h2>"
-        "<ul>"
-        "<li><a href='/metrics'>/metrics</a> (Prometheus format)</li>"
-        "<li><a href='/health'>/health</a> (Health check)</li>"
-        "</ul>"
-        "</body></html>";
-    
-    papago_res_send(res, html);
-}
-
-void
-health_handler(papago_request_t *req, papago_response_t *res, void *user_data)
-{
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-    json_t *root = json_pack("{s:s, s:o}",
-        "status", "UP",
-        "timestamp", json_integer((json_int_t)time(NULL)));
-    if (root == NULL) {
-        fprintf(stderr, "failed to create JSON\n");
-        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-        return;
-
-    }
-    char *result = json_dumps(root, 0);
-    if (result == NULL) {
-        fprintf(stderr, "failed to serialize JSON\n");
-        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-        json_decref(root);
-        return;
-    }
-    json_decref(root);
-
-    papago_res_json(res, result);
-    free(result);
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
+    papago_res_send(res,
+        "<h1>Welcome to Papago!</h1>"
+        "<p>Built on libmicrohttpd + libwebsockets</p>");
 }
 
 void
@@ -111,7 +70,7 @@ api_hello_handler(papago_request_t *req, papago_response_t *res, void *user_data
 {
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
-
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
     papago_res_json(res, "{\"message\":\"Hello from Papago!\"}");
 }
 
@@ -127,33 +86,44 @@ user_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
     snprintf(json, sizeof(json), "{\"username\":\"%s\",\"id\":123}",
         (username != NULL) ? username : "unknown");
-
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
     papago_res_json(res, json);
 }
 
-void
-slow_handler(papago_request_t *req, papago_response_t *res, void *user_data)
+static bool
+logger_before(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(res);
     PAPAGO_UNUSED(user_data);
-    
-    // simulate slow endpoint
-    sleep(1);
-    
-    papago_res_set_status(res, PAPAGO_STATUS_OK);
-    papago_res_send(res, "slow response completed");
+
+    return true;
 }
- 
-void
-error_handler(papago_request_t *req, papago_response_t *res, void *user_data)
+
+static void
+logger_after(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-    papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-    papago_res_send(res, "simulated server error");
-}
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    double duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec) 
+        * 1000.0
+        + (now.tv_nsec - papago_req_start_time(req).tv_nsec) / 1.0e6;
 
+    fprintf(stdout,
+        "{\"remote\":\"%s\",\"method\":\"%s\",\"path\":\"%s\","
+        "\"version\":\"%s\",\"host\":\"%s\",\"user_agent\":\"%s\","
+        "\"status\":%d,\"duration_ms\":%.3f}\n",
+        papago_req_client_ip(req) != NULL ? papago_req_client_ip(req) : "-",
+        papago_req_method(req) != NULL ? papago_req_method(req) : "-",
+        papago_req_path(req) != NULL ? papago_req_path(req) : "-",
+        papago_req_version(req) != NULL ? papago_req_version(req) : "-",
+        papago_req_host(req) != NULL ? papago_req_host(req) : "-",
+        papago_req_user_agent(req) != NULL ? papago_req_user_agent(req) : "-",
+        papago_res_status(res),
+        duration_ms);
+}
 
 int
 main(void)
@@ -173,14 +143,17 @@ main(void)
     config.port = 8282;
     papago_configure(server, &config);
 
+    papago_middleware_t structured_logger = {
+        .before    = logger_before,
+        .after     = logger_after,
+        .user_data = NULL,
+    };
+    papago_middleware_add(server, &structured_logger);
+
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
-    papago_route(server, PAPAGO_GET, "/slow", slow_handler, NULL);
-    papago_route(server, PAPAGO_GET, "/error", error_handler, NULL);
-
-    // register observability endpoints
-    papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, server);
-    papago_route(server, PAPAGO_GET, "/health", health_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/user/:username", user_handler, NULL);
 
     // start server (blocking)
     if (papago_start(server) != 0) {
@@ -195,4 +168,3 @@ main(void)
 
     return 0;
 }
-

@@ -39,9 +39,6 @@ jobs:
             git clone https://github.com/briandowns/libmaple.git && \
             cd libmaple && make && sudo make install && \
             cd .. && rm -rf libmaple && \
-            git clone https://github.com/briandowns/liblogger.git && \
-            cd liblogger && make && sudo make install && \
-            cd .. && rm -rf liblogger && \
             sudo ldconfig && \
             sudo apt autoremove -y && \
             sudo apt clean -y && \
@@ -59,6 +56,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build All Examples
-        run: make examples_all PAPAGO_USE_LOGGER=1 PAPAGO_USE_MAPLE=1
+        run: make examples_all PAPAGO_USE_MAPLE=1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

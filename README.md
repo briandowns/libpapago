@@ -35,12 +35,11 @@ WOFF, WOFF2, TTF
 * libwebsockets
 * jansson
 * openssl
-* liblogger - [Structured(json) Logger](https://github.com/briandowns/liblogger)
 * libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 
 ### Build
 
-Papago has the logger and template engine disabled by default. If those components are desired, add `PAPAGO_USE_LOGGER=1` or `PAPAGO_USE_MAPLE=1` to the `make` command when building. 
+Papago has the template engine disabled by default. If those components are desired, add `PAPAGO_USE_MAPLE=1` to the `make` command when building. 
 
 ```sh 
 make
@@ -57,7 +56,7 @@ Below is a very simple demonstration of how to create a handler for a `GET` requ
 
 You can make all examples with `make examples_all`.
 
-*NOTE*: some examples require `PAPAGO_USE_LOGGER=1` or `PAPAGO_USE_MAPLE=1` to be set.
+*NOTE*: some examples require `PAPAGO_USE_MAPLE=1` to be set.
 
 ```sh
 make example
@@ -111,7 +110,7 @@ main(void)
 Build and run:
 
 ```sh
-cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lmaple -llogger
+cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lmaple
 ./hello
 ```
 
@@ -155,28 +154,35 @@ papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
 
 ### Middleware
 
+Papago middleware consists of defining 2 functions, `before` and `after` and assigning them to the `papago_middleware_t` struct. The `before` function is ran on every request and is required to be present. The `after` function is optional.
+
 ```c
-// auth middleware
-bool
-auth(papago_request_t *req, papago_response_t *res, void *user_data)
-{
-    const char *token = papago_req_header(req, "Authorization");
+static bool
+mw_before(papago_request_t *req, papago_response_t *res, void *user_data);
 
-    if (token == NULL) {
-        papago_res_status(res, PAPAGO_STATUS_UNAUTHORIZED);
-        papago_res_json(res, "{\"error\":\"unauthorized\"}");
-        return false;  // stop processing
-    }
+static void
+mw_after(papago_request_t *req, papago_response_t *res, void *user_data);
+```
 
-    return true;
-}
+```c
+papago_middleware_t middleware = {
+    .before    = mw_before,
+    .after     = mw_after,
+    .user_data = NULL,
+};
+```
 
+After defining the middleware and assigning the functions to the struct, Papago supports setting the middleware to run globally or on specific routes. This is especially helpful when writing loggers or authentication middleware.
+
+```c
 // global middleware - runs on ALL routes
-papago_middleware_add(server, logger);
+papago_middleware_add(server, middleware);
 
 // path-specific - runs only on /api/* routes
-papago_middleware_path_add(server, "/api", auth);
+papago_middleware_path_add(server, "/api", middleware);
 ```
+
+Examples of some common middlewares (logger, rate-limiting) can be found in the [examples](examples/) directory.
 
 ### Websocket
 
