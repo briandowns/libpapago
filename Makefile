@@ -27,20 +27,27 @@ ifeq ($(UNAME_S),FreeBSD)
 endif
 
 PAPAGO_USE_MAPLE ?= 0
+PAPAGO_WITH_WSC ?= 0
 
 ifeq ($(PAPAGO_USE_MAPLE),1)
 	CFLAGS += -DPAPAGO_USE_MAPLE
 	LDFLAGS += -lmaple
 endif
 
-EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded example_logger_middleware
+EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded example_logger_middleware example_wsclient
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
 	$(CC) -dynamiclib -o $@ papago.c $(CFLAGS) $(LDFLAGS)
+ifeq ($(PAPAGO_WITH_WSC),1)
+	$(CC) -dynamiclib -o libpapago_wsc.dylib papago_wsc.c $(CFLAGS) $(LDFLAGS)
+endif
 else
 $(NAME).so: clean
-	$(CC) -shared -o $@ papago.c $(LDFLAGS) $(CFLAGS) 
+	$(CC) -shared -o $@ papago.c $(LDFLAGS) $(CFLAGS)
+ifeq ($(PAPAGO_WITH_WSC),1)
+	$(CC) -shared -o libpapago_wsc.so papago_wsc.c $(CFLAGS) $(LDFLAGS)
+endif
 endif
 
 .PHONY: tests
@@ -116,6 +123,10 @@ example_embedded: clean
 .PHONY: example_logger_middleware
 example_logger_middleware: clean
 	$(CC) -o $@ papago.c examples/example_logger_middleware.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_wsclient
+example_wsclient: clean
+	$(CC) -o $@ papago_wsc.c examples/example_wsclient.c $(CFLAGS) -lwebsockets -lssl -lcrypto -lz -lm -lpthread
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)

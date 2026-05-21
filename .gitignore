@@ -18,10 +18,13 @@ example_metrics
 example_streaming
 example_embedded
 example_logger_middleware
+example_wsclient
 debug_build
 
 libpapago.dylib
+libpapago_wsc.dylib
 libpapago.so
+libpapago_wsc.so
 libpapago.a
 
 server.crt
