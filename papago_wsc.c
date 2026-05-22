@@ -227,6 +227,7 @@ papago_wsc_default_config(void)
     config.port    = 8485;
     config.path    = "/ws";
     config.use_ssl = false;
+
     return config;
 }
 
@@ -300,15 +301,14 @@ papago_wsc_run(papago_wsc_t *client)
     }
 
     client->running = true;
-
     while (client->running) {
         if (lws_service(client->lws_ctx, 50) < 0) {
             wsc_set_error(client, "lws_service failed");
             return 1;
         }
     }
-
     client->running = false;
+
     return 0;
 }
 
@@ -416,6 +416,7 @@ papago_wsc_send(papago_wsc_t *client, const char *message)
     if (client == NULL || message == NULL) {
         return 1;
     }
+
     return wsc_enqueue(client, message, strlen(message), false);
 }
 
@@ -425,6 +426,7 @@ papago_wsc_send_binary(papago_wsc_t *client, const void *data, size_t length)
     if (client == NULL || data == NULL) {
         return 1;
     }
+
     return wsc_enqueue(client, data, length, true);
 }
 
@@ -448,5 +450,6 @@ papago_wsc_error(papago_wsc_t *client)
     if (client == NULL) {
         return "";
     }
+
     return client->errmsg;
 }
