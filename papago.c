@@ -1037,21 +1037,21 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             continue;
         }
 
+        // run all before() functions
+        for (int j = 0; j < server->middleware_count; j++) {
+            papago_middleware_slot_t *slot = &server->middleware[j];
+            if (slot->path != NULL &&
+                strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
+                continue;
+            }
+            if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
+                goto send_response;
+            }
+        }
+
         if (match_route(route->path, req->path, &req->params,
                 &req->param_count)) {
             clock_gettime(CLOCK_MONOTONIC, &req->start_time);
-
-            // run all before() functions
-            for (int j = 0; j < server->middleware_count; j++) {
-                papago_middleware_slot_t *slot = &server->middleware[j];
-                if (slot->path != NULL &&
-                    strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
-                    continue;
-                }
-                if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
-                    goto send_response;
-                }
-            }
 
             route->handler(req, res, route->user_data);
             route_found = true;

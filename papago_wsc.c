@@ -109,7 +109,13 @@ wsc_flush_one(papago_wsc_t *client)
 
     enum lws_write_protocol wp =
         msg->is_binary ? LWS_WRITE_BINARY : LWS_WRITE_TEXT;
-    lws_write(client->wsi, msg->buf + LWS_PRE, msg->len, wp);
+    int ret = lws_write(client->wsi, msg->buf + LWS_PRE, msg->len, wp);
+    if (ret < 0) {
+        wsc_set_error(client, "lws_write failed: %d", ret);
+        free(msg->buf);
+        free(msg);
+        return;
+    }
 
     free(msg->buf);
     free(msg);
@@ -297,7 +303,8 @@ papago_wsc_run(papago_wsc_t *client)
 
     while (client->running) {
         if (lws_service(client->lws_ctx, 50) < 0) {
-            break;
+            wsc_set_error(client, "lws_service failed");
+            return 1;
         }
     }
 

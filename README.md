@@ -254,7 +254,7 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
 }
 ```
 
-To build the client along with the Papago framework, use: `make PAPAGO_WITH_WSC` and `sudo make install PAPAGO_WITH_WSC`.
+To build the client along with the Papago framework, use: `make PAPAGO_WITH_WSC` and `sudo make install PAPAGO_WITH_WSC=1`.
 
 ## Metrics
 
