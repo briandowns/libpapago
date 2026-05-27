@@ -121,7 +121,7 @@ example_compression: clean
 
 .PHONY: example_metrics
 example_metrics: clean
-	$(CC) -o $@ papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS) -ljansson
 
 .PHONY: example_streaming
 example_streaming: clean

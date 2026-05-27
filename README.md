@@ -109,7 +109,7 @@ main(void)
 Build and run:
 
 ```sh
-cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -lz -lm
+cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -lz -lm -lpthread
 ./hello
 ```
 
