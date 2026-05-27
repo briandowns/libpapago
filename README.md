@@ -33,7 +33,6 @@ WOFF, WOFF2, TTF
 
 * libmicrohttpd
 * libwebsockets
-* jansson
 * openssl
 * libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 
@@ -110,7 +109,7 @@ main(void)
 Build and run:
 
 ```sh
-cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lmaple
+cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -lz -lm
 ./hello
 ```
 

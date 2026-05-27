@@ -30,7 +30,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <jansson.h>
 #include <zlib.h>
 
 #include "../papago.h"
