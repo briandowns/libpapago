@@ -65,16 +65,28 @@ install:
 	cp papago.h $(INCDIR)
 ifeq ($(UNAME_S),Darwin)
 	cp $(NAME).dylib $(LIBDIR)
+ifneq (,$(wildcard libpapago_wsc.dylib))
+	cp libpapago_wsc.dylib $(LIBDIR)
+endif
 else
 	cp $(NAME).so $(LIBDIR)
+ifneq (,$(wildcard libpapago_wsc.so))
+	cp libpapago_wsc.so $(LIBDIR)
+endif
 endif
 
 uninstall:
 	rm -f $(INCDIR)/papago.h
 ifeq ($(UNAME_S),Darwin)
 	rm -f $(INCDIR)/$(NAME).dylib
+ifneq (,$(wildcard $(INCDIR)/libpapago_wsc.dylib))
+	rm -f $(INCDIR)/libpapago_wsc.dylib
+endif
 else
 	rm -f $(INCDIR)/$(NAME).so
+ifneq (,$(wildcard $(INCDIR)/libpapago_wsc.so))
+	rm -f $(INCDIR)/libpapago_wsc.so
+endif
 endif
 
 .PHONY: clean
