@@ -1001,7 +1001,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
         return MHD_NO;
     }
-    // res->status = PAPAGO_STATUS_OK;
+    res->status = PAPAGO_STATUS_OK;
 
     const char *user_agent = MHD_lookup_connection_value(connection,
         MHD_HEADER_KIND, "User-Agent");
@@ -1025,17 +1025,8 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         req->version[0] = '\0';
     }
 
-    // run all before() functions
-    for (int i = 0; i < server->middleware_count; i++) {
-        papago_middleware_slot_t *slot = &server->middleware[i];
-        if (slot->path != NULL &&
-            strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
-            continue;
-        }
-        if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
-            goto send_response;
-        }
-    }
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
 
     // find matching route
     route_found = false;
@@ -1044,6 +1035,18 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
         if (route->method != req->method) {
             continue;
+        }
+
+        // run all before() functions
+        for (int j = 0; j < server->middleware_count; j++) {
+            papago_middleware_slot_t *slot = &server->middleware[j];
+            if (slot->path != NULL &&
+                strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
+                continue;
+            }
+            if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
+                goto send_response;
+            }
         }
 
         if (match_route(route->path, req->path, &req->params,
@@ -1075,11 +1078,10 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         slot->middleware->after(req, res, slot->middleware->user_data);
     }
 
-    struct timespec now;
+    double duration_ms = 0;
 
 send_response:
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    double duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec)
+    duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec)
         * 1000.0
         + (now.tv_nsec - papago_req_start_time(req).tv_nsec) / 1.0e6;
     update_metrics(server, req->path, papago_req_method(req), res->status, duration_ms);
@@ -1294,10 +1296,10 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 
 static struct lws_protocols papago_lws_protocols[] = {
     {
-        .name = "papgo-ws",
+        .name = "papago-ws",
         .callback = lws_callback,
         .per_session_data_size = sizeof(papago_ws_connection_t),
-        .rx_buffer_size = 4096,
+        .rx_buffer_size = 65536,
     },
     { 
         .name = NULL, 

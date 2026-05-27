@@ -186,6 +186,8 @@ Examples of some common middlewares (logger, rate-limiting) can be found in the 
 
 ### Websocket
 
+Below is example code of how to use the websocket functionality. For the available websocket client API, reference the [Papago Websocket Client Header](papago_wsc.h) file.
+
 ```c
 void
 ws_on_connect(papago_ws_connection_t *conn)
@@ -251,6 +253,8 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
     papago_res_json(res, "{\"status\":\"ok\"}");
 }
 ```
+
+To build the client along with the Papago framework, use: `make PAPAGO_WITH_WSC` and `sudo make install PAPAGO_WITH_WSC=1`.
 
 ## Metrics
 

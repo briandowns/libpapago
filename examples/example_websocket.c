@@ -39,6 +39,7 @@
  *   Open http://localhost:8484 in browser
  */
 
+#define _POSIX_C_SOURCE 199309L
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -592,6 +593,41 @@ ws_on_error(papago_ws_connection_t *conn, const char *error)
         user->username : "unknown", error);
 }
 
+static bool
+logger_before(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+    PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(res);
+    PAPAGO_UNUSED(user_data);
+
+    return true;
+}
+
+static void
+logger_after(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+    PAPAGO_UNUSED(user_data);
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    double duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec) 
+        * 1000.0
+        + (now.tv_nsec - papago_req_start_time(req).tv_nsec) / 1.0e6;
+
+    fprintf(stdout,
+        "{\"remote\":\"%s\",\"method\":\"%s\",\"path\":\"%s\","
+        "\"version\":\"%s\",\"host\":\"%s\",\"user_agent\":\"%s\","
+        "\"status\":%d,\"duration_ms\":%.3f}\n",
+        papago_req_client_ip(req) != NULL ? papago_req_client_ip(req) : "-",
+        papago_req_method(req) != NULL ? papago_req_method(req) : "-",
+        papago_req_path(req) != NULL ? papago_req_path(req) : "-",
+        papago_req_version(req) != NULL ? papago_req_version(req) : "-",
+        papago_req_host(req) != NULL ? papago_req_host(req) : "-",
+        papago_req_user_agent(req) != NULL ? papago_req_user_agent(req) : "-",
+        papago_res_status(res),
+        duration_ms);
+}
+
 int
 main(void)
 {
@@ -628,6 +664,13 @@ main(void)
         .after     = NULL,
         .user_data = NULL,
     };
+
+    papago_middleware_t structured_logger = {
+        .before    = logger_before,
+        .after     = logger_after,
+        .user_data = NULL,
+    };
+    papago_middleware_add(server, &structured_logger);
 
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);

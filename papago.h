@@ -28,7 +28,6 @@
 #ifndef __PAPAGO_H
 #define __PAPAGO_H
 
-#include <openssl/asn1.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
