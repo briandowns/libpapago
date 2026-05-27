@@ -12,13 +12,12 @@ CFLAGS  = -O3 -fPIC -Wall -Wextra
 ifeq ($(UNAME_S),Darwin)
 	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
               $(shell pkg-config --cflags --libs libmicrohttpd) \
-			  $(shell pkg-config --cflags --libs jansson) \
               $(shell pkg-config --cflags --libs openssl) \
 			  -lssl -lcrypto -lz
 endif
 
 TEST_CFLAGS = -g -fPIC -Wall -Wextra
-LDFLAGS = -lwebsockets -lmicrohttpd -ljansson -lssl -lcrypto -lz -lm -lpthread
+LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread
 
 ifeq ($(UNAME_S),FreeBSD)
 	CFLAGS += -I$(INCDIR)
@@ -122,7 +121,7 @@ example_compression: clean
 
 .PHONY: example_metrics
 example_metrics: clean
-	$(CC) -o $@ papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS) -ljansson
 
 .PHONY: example_streaming
 example_streaming: clean
