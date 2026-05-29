@@ -12,6 +12,7 @@ Modern web framework designed to be full featured and powerful all while being e
 - Middleware System - Global and path-specific middleware
 - File stream - video / audio / large files, zero-copy, automatic MIME type detection
 - WebSocket Support - Real-time bidirectional communication
+- WebSocket Client - included
 - Embedded File Support - Embed HTML, JS, CSS, etc into the application
 - JSON Responses - Built-in JSON helpers
 - Static Files - Serve files from directories
