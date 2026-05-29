@@ -27,6 +27,7 @@
 
 #include <ctype.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -255,7 +256,8 @@ papago_http_send(papago_http_client_t *client,
         break;
     case PAPAGO_PUT:
     case PAPAGO_PATCH:
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, _method_str(req->method));
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, curl_easy_setopt(curl,
+            CURLOPT_CUSTOMREQUEST, papago_req_method(req->method)));
         if (req->body) {
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, req->body);
             curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)blen);
@@ -264,7 +266,8 @@ papago_http_send(papago_http_client_t *client,
     case PAPAGO_DELETE:
     case PAPAGO_HEAD:
     case PAPAGO_OPTIONS:
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, _method_str(req->method));
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST,
+            papago_req_method(req->method));
         break;
     default:
         curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
@@ -343,6 +346,10 @@ papago_http_response_free(papago_http_response_t *res)
 papago_http_header_t*
 papago_header_new(const char *key, const char *value)
 {
+    if (key == NULL || value == NULL) {
+        return NULL;
+    }
+
     papago_http_header_t *h = malloc(sizeof(*h));
     if (h == NULL) {
         return NULL;
@@ -363,16 +370,16 @@ papago_header_new(const char *key, const char *value)
 }
 
 papago_http_header_t*
-papago_header_append(papago_http_header_t *list,
-                          const char *key, const char *value)
+papago_header_append(papago_http_header_t *list, const char *key,
+                     const char *value)
 {
-    papago_http_header_t *node = papago_http_header_new(key, value);
+    papago_http_header_t *node = papago_header_new(key, value);
     if (node == NULL) {
-        return list;
+        return NULL;
     }
 
     if (list == NULL) {
-        return node;
+        return NULL;
     }
 
     papago_http_header_t *tail = list;
