@@ -20,6 +20,7 @@ Modern web framework designed to be full featured and powerful all while being e
 - Rate limiting by IP
 - Compression with Gzip
 - Metrics collection and exposure via Prometheus endpoint
+- Simple HTTP Client
 
 ### MIME Types Supported
 HTML, CSS, JS, JSON, XML, TXT
@@ -53,7 +54,7 @@ sudo make install
 
 Below is a very simple demonstration of how to create a handler for a `GET` request. More examples can be found in the [examples](/examples) directory. Each example has a `Makefile` target.
 
-You can make all examples with `make examples_all`.
+You can make all examples with `make examples_all PAPAGO_USE_MAPLE=1`.
 
 *NOTE*: some examples require `PAPAGO_USE_MAPLE=1` to be set.
 
