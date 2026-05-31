@@ -75,6 +75,8 @@ make example_websocket
 
 ### Hello World
 
+aDefault server runs on port `:8080`.
+
 ```c
 #include <stdio.h>
 
@@ -95,7 +97,6 @@ main(void)
 	papago_t *server = papago_new();
 	
     papago_config_t config = papago_default_config();
-	config.port = 8080;
 	papago_configure(server, &config);
 	
 	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
