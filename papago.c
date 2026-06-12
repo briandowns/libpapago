@@ -1409,6 +1409,25 @@ papago_start(papago_t *server, const papago_config_t *config)
     if (server == NULL || config == NULL) {
         return 1;
     }
+
+    papago_config_t existing_config = server->config;
+
+    if (existing_config.enable_rate_limiting) {
+         server->config.enable_rate_limiting = true;
+         server->config.rate_limit_requests = existing_config.rate_limit_requests;
+         server->config.rate_limit_window = existing_config.rate_limit_window;
+     }
+     if (server->config.static_dir == NULL && existing_config.static_dir != NULL) {
+         server->config.static_dir = existing_config.static_dir;
+     }
+     if (server->config.enable_rate_limiting && server->rate_limit_map == NULL) {
+         server->rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
+             sizeof(papago_rate_limit_entry_t));
+         if (server->rate_limit_map == NULL) {
+             server->config.enable_rate_limiting = false;
+         }
+    }
+    
     server->config = *config;
     server->running = true;
 
