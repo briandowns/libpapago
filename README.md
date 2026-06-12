@@ -80,7 +80,7 @@ aDefault server runs on port `:8080`.
 ```c
 #include <stdio.h>
 
-#include "papago.h"
+#include <papago.h>
 
 void
 hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
@@ -110,7 +110,7 @@ main(void)
 Build and run:
 
 ```sh
-cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -lz -lm -lpthread
+cc -o hello hello.c -lpapago
 ./hello
 ```
 
