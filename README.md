@@ -80,7 +80,7 @@ aDefault server runs on port `:8080`.
 ```c
 #include <stdio.h>
 
-#include "papago.h"
+#include <papago.h>
 
 void
 hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
@@ -96,12 +96,10 @@ main(void)
 {
 	papago_t *server = papago_new();
 	
-    papago_config_t config = papago_default_config();
-	papago_configure(server, &config);
-	
 	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
 	
-	papago_start(server); // blocking
+    papago_config_t config = papago_default_config();
+	papago_start(server, &config); // blocking
 	
 	papago_destroy(server);
 
@@ -112,7 +110,7 @@ main(void)
 Build and run:
 
 ```sh
-cc -o hello hello.c papago.c -lwebsockets -lmicrohttpd -lz -lm -lpthread
+cc -o hello hello.c -lpapago
 ./hello
 ```
 

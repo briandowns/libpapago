@@ -89,19 +89,18 @@ main(void)
         return 1;
     }
 
+    // register HTTP routes
+    papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+
     papago_config_t config = papago_default_config();
     config.port = 8282;
     config.enable_template_rendering = true;
-    papago_configure(server, &config);
-
-    // register HTTP routes
-    papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 
     printf("Server starting on:\n");
     printf("  HTTP:      http://%s:%d\n", config.host, config.port);
 
     // start server (blocking)
-    if (papago_start(server) != 0) {
+    if (papago_start(server, &config) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 
@@ -113,4 +112,3 @@ main(void)
 
     return 0;
 }
-

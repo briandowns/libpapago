@@ -70,6 +70,7 @@ api_hello_handler(papago_request_t *req, papago_response_t *res, void *user_data
 {
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
+
     papago_res_set_status(res, PAPAGO_STATUS_OK);
     papago_res_json(res, "{\"message\":\"Hello from Papago!\"}");
 }
@@ -139,10 +140,6 @@ main(void)
         return 1;
     }
 
-    papago_config_t config = papago_default_config();
-    config.port = 8282;
-    papago_configure(server, &config);
-
     papago_middleware_t structured_logger = {
         .before    = logger_before,
         .after     = logger_after,
@@ -155,8 +152,10 @@ main(void)
     papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
     papago_route(server, PAPAGO_GET, "/user/:username", user_handler, NULL);
 
+    papago_config_t config = papago_default_config();
+
     // start server (blocking)
-    if (papago_start(server) != 0) {
+    if (papago_start(server, &config) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

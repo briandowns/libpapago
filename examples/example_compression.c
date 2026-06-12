@@ -119,8 +119,6 @@ info_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 int
 main(void)
 {
-    papago_config_t config;
-
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
@@ -130,17 +128,15 @@ main(void)
         return 1;
     }
 
-    config = papago_default_config();
-    config.port = 8282;
-    config.enable_compression = true;
-    papago_configure(server, &config);
-
     papago_route(server, PAPAGO_GET, "/large", large_handler, NULL);
     papago_route(server, PAPAGO_GET, "/small", small_handler, NULL);
     papago_route(server, PAPAGO_GET, "/info", info_handler, NULL);
     papago_route(server, PAPAGO_GET, "/", info_handler, NULL);
 
-    papago_start(server);
+    papago_config_t config = papago_default_config();
+    config.enable_compression = true;
+
+    papago_start(server, &config);
     papago_destroy(server);
 
     return 0;

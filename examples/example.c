@@ -139,10 +139,6 @@ main(void)
         return 1;
     }
 
-    papago_config_t config = papago_default_config();
-    config.port = 8282;
-    papago_configure(server, &config);
-
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
     papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
@@ -151,6 +147,9 @@ main(void)
     // register websocket endpoint
     papago_ws_endpoint(server, "/ws",
         ws_on_connect, ws_on_message, ws_on_close, ws_on_error);
+
+    papago_config_t config = papago_default_config();
+    config.port = 8282;
 
     printf("Server starting on:\n");
     printf("  HTTP:      http://%s:%d\n", config.host, config.port);
@@ -161,7 +160,7 @@ main(void)
     printf("curl http://%s:%d/user/alice\n\n", config.host, config.port);
 
     // start server (blocking)
-    if (papago_start(server) != 0) {
+    if (papago_start(server, &config) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

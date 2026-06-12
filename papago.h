@@ -194,13 +194,6 @@ const char*
 papago_error(void);
 
 /**
- * Configure the server. This must be called before papago_start. Returns 0 on
- * success or 1 on failure.
- */
-int
-papago_configure(papago_t *server, const papago_config_t *config);
-
-/**
  * Retrieves default configuration.
  */
 papago_config_t
@@ -210,7 +203,7 @@ papago_default_config(void);
  * Start the server, (blocking). Returns 0 on success or 1 on failure.
  */
 int
-papago_start(papago_t *server);
+papago_start(papago_t *server, const papago_config_t *config);
 
 /**
  * Stop the server.
