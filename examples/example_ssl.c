@@ -134,8 +134,6 @@ ws_on_error(papago_ws_connection_t *conn, const char *error)
 int
 main(void)
 {
-    papago_config_t config;
-
     printf("Papago HTTPS + WSS (Secure WebSocket)\n\n");
 
     // check for certificate files
@@ -163,15 +161,6 @@ main(void)
         return 1;
     }
 
-    // configure with SSL enabled
-    config = papago_default_config();
-    config.port = 8443;
-    config.enable_ssl = true;
-    config.cert_file = "server.crt";
-    config.key_file = "server.key";
-
-    papago_configure(server, &config);
-
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
     papago_route(server, PAPAGO_GET, "/api/secure", api_secure_handler, NULL);
@@ -179,6 +168,12 @@ main(void)
     // register WebSocket endpoint
     papago_ws_endpoint(server, "/ws", ws_on_connect, ws_on_message,
         ws_on_close, ws_on_error);
+
+    papago_config_t config = papago_default_config();
+    config.port = 8443;
+    config.enable_ssl = true;
+    config.cert_file = "server.crt";
+    config.key_file = "server.key";
 
     printf("SSL/TLS Configuration:\n");
     printf("  Certificate: %s\n", config.cert_file);
@@ -203,7 +198,7 @@ main(void)
     printf("══════════════════════════════════════════\n\n");
 
     // start server (blocking)
-    if (papago_start(server) != 0) {
+    if (papago_start(server, &config) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

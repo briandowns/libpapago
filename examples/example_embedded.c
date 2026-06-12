@@ -138,16 +138,14 @@ main(void)
         return 1;
     }
 
-    papago_config_t config = papago_default_config();
-    config.port = 8282;
-    papago_configure(server, &config);
-
     papago_register_embedded_files(server, embedded_files);
     papago_route(server, PAPAGO_GET, "/*", papago_serve_embedded_handler,
         NULL);
 
+    papago_config_t config = papago_default_config();
+
     // start server (blocking)
-    if (papago_start(server) != 0) {
+    if (papago_start(server, &config) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

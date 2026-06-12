@@ -96,12 +96,10 @@ main(void)
 {
 	papago_t *server = papago_new();
 	
-    papago_config_t config = papago_default_config();
-	papago_configure(server, &config);
-	
 	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
 	
-	papago_start(server); // blocking
+    papago_config_t config = papago_default_config();
+	papago_start(server, &config); // blocking
 	
 	papago_destroy(server);
 

@@ -56,7 +56,6 @@ signal_handler(int sig)
 void
 index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
- 
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
     
@@ -169,10 +168,6 @@ main(void)
         return 1;
     }
 
-    papago_config_t config = papago_default_config();
-    config.port = 8282;
-    papago_configure(server, &config);
-
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
     papago_route(server, PAPAGO_GET, "/slow", slow_handler, NULL);
@@ -182,8 +177,10 @@ main(void)
     papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, server);
     papago_route(server, PAPAGO_GET, "/health", health_handler, NULL);
 
+    papago_config_t config = papago_default_config();
+
     // start server (blocking)
-    if (papago_start(server) != 0) {
+    if (papago_start(server, &config) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

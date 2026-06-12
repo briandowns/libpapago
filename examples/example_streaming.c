@@ -269,17 +269,11 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    papago_config_t config;
-
     server = papago_new();
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
     }
-
-    config = papago_default_config();
-    config.port = 8484;
-    papago_configure(server, &config);
 
     // register routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
@@ -291,7 +285,16 @@ main(void)
     printf("Serving files from: %s\n\n", files_dir);
     printf("Server running on http://localhost:8484\n\n");
 
-    papago_start(server);
+    papago_config_t config = papago_default_config();
+    config.port = 8484;
+
+    // start server (blocking)
+    if (papago_start(server, &config) != 0) {
+        fprintf(stderr, "%s\n", papago_error());
+        papago_destroy(server);
+
+        return 1;
+    }
     papago_destroy(server);
 
     return 0;

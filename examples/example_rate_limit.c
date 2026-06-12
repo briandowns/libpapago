@@ -89,11 +89,6 @@ main(void)
         return 1;
     }
 
-    papago_config_t config = papago_default_config();
-    config.port = 8282;
-    config.enable_compression = true;
-    papago_configure(server, &config);
-
     papago_middleware_t rate_limit_mw = {
         .before    = rate_limit_middleware,
         .after     = NULL,
@@ -105,11 +100,15 @@ main(void)
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 
+    papago_config_t config = papago_default_config();
+    config.port = 8282;
+    config.enable_compression = true;
+
     printf("Server starting on:\n");
     printf("  HTTP:      http://%s:%d\n", config.host, config.port);
 
     // start server (blocking)
-    if (papago_start(server) != 0) {
+    if (papago_start(server, &config) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

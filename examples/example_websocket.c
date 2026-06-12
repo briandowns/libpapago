@@ -635,16 +635,11 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    // create and configure server
     server = papago_new();
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
     }
-
-    papago_config_t config = papago_default_config();
-    config.port = 8484;
-    papago_configure(server, &config);
 
     // add some demo users
     strcpy(users[0].username, "Jess");
@@ -659,12 +654,6 @@ main(void)
 
     user_count = 2;
 
-    papago_middleware_t auth_mw = {
-        .before    = auth_middleware,
-        .after     = NULL,
-        .user_data = NULL,
-    };
-
     papago_middleware_t structured_logger = {
         .before    = logger_before,
         .after     = logger_after,
@@ -677,6 +666,11 @@ main(void)
     papago_route(server, PAPAGO_GET, "/api/stats", api_stats, NULL);
 
     // protected API routes (require X-API-Key header)
+    papago_middleware_t auth_mw = {
+        .before    = auth_middleware,
+        .after     = NULL,
+        .user_data = NULL,
+    };
     papago_middleware_path_add(server, "/api/users", &auth_mw);
     papago_route(server, PAPAGO_GET, "/api/users", api_users_list, NULL);
     papago_route(server, PAPAGO_POST, "/api/users", api_users_create, NULL);
@@ -708,8 +702,11 @@ main(void)
 
     printf("Press Ctrl+C to stop\n");
 
+    papago_config_t config = papago_default_config();
+    config.port = 8484;
+
     // start server (blocking)
-    if (papago_start(server) != 0) {
+    if (papago_start(server, &config) != 0) {
         printf("failed to start server: %s\n", papago_error());
         papago_destroy(server);
 

@@ -1394,17 +1394,6 @@ papago_new(void)
     return server;
 }
 
-int
-papago_configure(papago_t *server, const papago_config_t *config)
-{
-    if (server == NULL || config == NULL) {
-        return 1;
-    }
-    server->config = *config;
-
-    return 0;
-}
-
 #ifndef PAPAGO_DEBUG
 static void
 suppress_lws_output(int level, const char *line)
@@ -1415,12 +1404,12 @@ suppress_lws_output(int level, const char *line)
 #endif
 
 int
-papago_start(papago_t *server)
+papago_start(papago_t *server, const papago_config_t *config)
 {
-    if (server == NULL) {
+    if (server == NULL || config == NULL) {
         return 1;
     }
-
+    server->config = *config;
     server->running = true;
 
     char *cert_pem = NULL;
