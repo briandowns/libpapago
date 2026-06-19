@@ -1821,7 +1821,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
     const char *path = papago_req_path(req);
  
     // prevent directory traversal
-    if (strcmp(path, "..") == 0) {
+    if (strcmp(path, "/..") == 0) {
         papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
         papago_res_send(res, "invalid path");
         return;
