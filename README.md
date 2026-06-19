@@ -2,6 +2,26 @@
 
 Modern web framework designed to be full featured and powerful all while being extremely simple to use.
 
+## Quick Start
+
+Below is a very simple demonstration of how to create a handler for a `GET` request. More examples can be found in the [examples](/examples) directory. Each example has a `make` target.
+
+You can make all examples with `make examples_all PAPAGO_USE_MAPLE=1`.
+
+```sh
+make example
+```
+
+A convenience script is included to generate certificates to be able to run the example below. `generate_certs.sh`
+
+```sh
+make example_ssl
+```
+
+```sh
+make example_websocket
+```
+
 ## Features
 
 - RESTful Routing - GET, POST, PUT, DELETE, PATCH support
@@ -40,7 +60,7 @@ WOFF, WOFF2, TTF
 
 ### Build
 
-Papago has the template engine disabled by default. If those components are desired, add `PAPAGO_USE_MAPLE=1` to the `make` command when building. 
+Papago has the template engine (Maple) disabled by default. If this component is required, add `PAPAGO_USE_MAPLE=1` to the `make` command when building. 
 
 ```sh 
 make
@@ -49,28 +69,6 @@ make
 ### Install
 ```sh
 sudo make install
-```
-
-## Quick Start
-
-Below is a very simple demonstration of how to create a handler for a `GET` request. More examples can be found in the [examples](/examples) directory. Each example has a `Makefile` target.
-
-You can make all examples with `make examples_all PAPAGO_USE_MAPLE=1`.
-
-*NOTE*: some examples require `PAPAGO_USE_MAPLE=1` to be set.
-
-```sh
-make example
-```
-
-A convenience script is included to generate certificates to be able to run the example below. `generate_certs.sh`
-
-```sh
-make example_ssl
-```
-
-```sh
-make example_websocket
 ```
 
 ### Hello World

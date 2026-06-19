@@ -1,5 +1,31 @@
-#define _GNU_SOURCE
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2026 Brian J. Downs
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <inttypes.h>
@@ -245,12 +271,12 @@ static int
 add_kv(papago_kv_t **arr, size_t *count, const char *key, const char *value)
 {
     if (arr == NULL || count == NULL || key == NULL || value == NULL) {
-        return -1;
+        return 1;
     }
 
     papago_kv_t *new_arr = realloc(*arr, (*count + 1) * sizeof(papago_kv_t));
     if (new_arr == NULL) {
-        return -1;
+        return 1;
     }
 
     new_arr[*count].key = _strdup(key);
@@ -260,7 +286,7 @@ add_kv(papago_kv_t **arr, size_t *count, const char *key, const char *value)
         free(new_arr[*count].key);
         free(new_arr[*count].value);
         free(new_arr);
-        return -1;
+        return 1;
     }
 
     *arr = new_arr;
@@ -729,10 +755,10 @@ update_metrics(papago_t *server, const char *url, const char *method,
     if (!found && server->metrics->endpoint_count < 64) {
 #ifdef __FreeBSD__
         strlcpy(server->metrics->endpoints[server->metrics->endpoint_count].path,
-            url, 127);
+            url, 128);
 #else
-        strncpy(server->metrics->endpoints[server->metrics->endpoint_count].path,
-            url, 127);
+        snprintf(server->metrics->endpoints[server->metrics->endpoint_count].path,
+            128, "%s", url);
 #endif
         server->metrics->endpoints[server->metrics->endpoint_count].path[127] = '\0';
         server->metrics->endpoints[server->metrics->endpoint_count].count = 1;
@@ -1340,6 +1366,10 @@ load_file(const char *filepath)
 
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
+    if (size < 0) {
+        fclose(f);
+        return NULL;
+    }
     fseek(f, 0, SEEK_SET);
 
     char *content = malloc(size + 1);
@@ -1791,7 +1821,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
     const char *path = papago_req_path(req);
  
     // prevent directory traversal
-    if (strstr(path, "..") != NULL) {
+    if (strcmp(path, "/..") == 0) {
         papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
         papago_res_send(res, "invalid path");
         return;
@@ -2375,11 +2405,11 @@ papago_check_rate_limit(papago_t *server, papago_request_t *req,
         }
     }
  
-    if (!found && slot != -1) {
+    if (!found && slot != -1) { 
 #ifdef __FreeBSD__
         strlcpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
 #else
-        strncpy(entries[slot].ip, client_ip, sizeof(entries[slot].ip));
+        snprintf(entries[slot].ip, sizeof(entries[slot].ip),"%s", client_ip);
 #endif
         entries[slot].ip[sizeof(entries[slot].ip)-1] = '\0';
         entries[slot].count = 1;
