@@ -12,7 +12,11 @@ You can make all examples with `make examples_all PAPAGO_USE_MAPLE=1`.
 make example
 ```
 
-A convenience script is included to generate certificates to be able to run the example below. `generate_certs.sh`
+A convenience script is included to generate certificates to run the example below.
+
+```sh
+generate_certs.sh
+```
 
 ```sh
 make example_ssl
@@ -73,7 +77,7 @@ sudo make install
 
 ### Hello World
 
-aDefault server runs on port `:8080`.
+Default server runs on port `:8080`.
 
 ```c
 #include <stdio.h>
