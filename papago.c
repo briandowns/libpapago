@@ -957,9 +957,17 @@ query_string_parser(void *cls, enum MHD_ValueKind kind, const char *key,
 {
     PAPAGO_UNUSED(kind);
 
-    papago_request_t *req = (papago_request_t*)cls;
-    add_kv(&req->query, &req->query_count, key, value != NULL ? value : "");
+    if (cls == NULL || key == NULL) {
+        return MHD_NO;
+    }
 
+    papago_request_t *req = (papago_request_t*)cls;
+    int ret = add_kv(&req->query, &req->query_count, key,
+        value != NULL ? value : "");
+    if (ret == 1) {
+        return MHD_NO;
+    }
+    
     return MHD_YES;
 }
 
