@@ -1056,7 +1056,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     }
 
     struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
+    clock_gettime(CLOCK_MONOTONIC, &req->start_time);
 
     // run all before() functions
     for (int j = 0; j < server->middleware_count; j++) {
@@ -1081,8 +1081,6 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
         if (match_route(route->path, req->path, &req->params,
                 &req->param_count)) {
-            clock_gettime(CLOCK_MONOTONIC, &req->start_time);
-
             route->handler(req, res, route->user_data);
             route_found = true;
             break;
@@ -1109,12 +1107,14 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     }
 
     double duration_ms = 0;
-
+    
 send_response:
+    clock_gettime(CLOCK_MONOTONIC, &now);
     duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec)
         * 1000.0
         + (now.tv_nsec - papago_req_start_time(req).tv_nsec) / 1.0e6;
-    update_metrics(server, req->path, papago_req_method(req), res->status, duration_ms);
+    update_metrics(server, req->path, papago_req_method(req),
+        res->status, duration_ms);
 
     if (res->is_stream_file && res->stream_file != NULL) {
         int fd = fileno(res->stream_file);
