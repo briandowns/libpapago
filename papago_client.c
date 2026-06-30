@@ -241,8 +241,8 @@ papago_http_send(papago_http_client_t *client,
 
     curl_easy_setopt(curl, CURLOPT_URL, req->url);
 
-    size_t blen = req->body
-        ? (req->body_len > 0 ? req->body_len : strlen(req->body)) : 0;
+    size_t blen = req->body ?
+        (req->body_len > 0 ? req->body_len : strlen(req->body)) : 0;
 
     switch (req->method) {
     case PAPAGO_POST:
@@ -256,8 +256,8 @@ papago_http_send(papago_http_client_t *client,
         break;
     case PAPAGO_PUT:
     case PAPAGO_PATCH:
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, curl_easy_setopt(curl,
-            CURLOPT_CUSTOMREQUEST, papago_req_method(req)));
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST,
+            papago_req_method((papago_request_t*)req));
         if (req->body) {
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, req->body);
             curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)blen);
@@ -267,7 +267,7 @@ papago_http_send(papago_http_client_t *client,
     case PAPAGO_HEAD:
     case PAPAGO_OPTIONS:
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST,
-            papago_req_method(req->method));
+            papago_req_method((papago_request_t*)req));
         break;
     default:
         curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
@@ -374,12 +374,12 @@ papago_header_append(papago_http_header_t *list, const char *key,
                      const char *value)
 {
     if (list == NULL) {
-        return NULL;
+        return list;
     }
 
     papago_http_header_t *node = papago_header_new(key, value);
     if (node == NULL) {
-        return NULL;
+        return list;
     }
 
     papago_http_header_t *tail = list;
