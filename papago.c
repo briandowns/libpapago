@@ -88,7 +88,6 @@ struct papago_request {
     papago_method_t method;
     char *path;
     char version[12];
-    char *query_string;
     char *body;
     char host[256];
     char user_agent[256];
@@ -953,6 +952,26 @@ compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
 // libmicrohttpd request handler
 
 static enum MHD_Result
+query_string_parser(void *cls, enum MHD_ValueKind kind, const char *key,
+                  const char *value)
+{
+    PAPAGO_UNUSED(kind);
+
+    if (cls == NULL || key == NULL) {
+        return MHD_NO;
+    }
+
+    papago_request_t *req = (papago_request_t*)cls;
+    int ret = add_kv(&req->query, &req->query_count, key,
+        value != NULL ? value : "");
+    if (ret == 1) {
+        return MHD_NO;
+    }
+    
+    return MHD_YES;
+}
+
+static enum MHD_Result
 mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             const char *method, const char *version, const char *upload_data,
             size_t *upload_data_size, void **con_cls)
@@ -1015,6 +1034,11 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         *upload_data_size = 0;
 
         return MHD_YES;
+    }
+
+    if (req->query == NULL) {
+        MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND,
+            query_string_parser, req);
     }
 
     // create response
