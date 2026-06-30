@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <ctype.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
