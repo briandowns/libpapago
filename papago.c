@@ -802,6 +802,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->total_requests);
     if (len >= (int)sizeof(metrics)) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
  
@@ -818,6 +819,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->total_duration_ms);
     if (len >= (int)sizeof(metrics)) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
  
@@ -844,6 +846,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->requests_by_method[8]);
     if (len >= (int)sizeof(metrics)) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
  
@@ -864,6 +867,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->requests_by_status[5]);
     if (len >= (int)sizeof(metrics)) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
  
@@ -874,6 +878,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         (long)uptime);
     if (len >= (int)sizeof(metrics)) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
  
@@ -1053,6 +1058,18 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
 
+    // run all before() functions
+    for (int j = 0; j < server->middleware_count; j++) {
+        papago_middleware_slot_t *slot = &server->middleware[j];
+        if (slot->path != NULL &&
+            strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
+            continue;
+        }
+        if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
+            goto send_response;
+        }
+    }
+
     // find matching route
     route_found = false;
     for (size_t i = 0; i < server->route_count; i++) {
@@ -1060,18 +1077,6 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
         if (route->method != req->method) {
             continue;
-        }
-
-        // run all before() functions
-        for (int j = 0; j < server->middleware_count; j++) {
-            papago_middleware_slot_t *slot = &server->middleware[j];
-            if (slot->path != NULL &&
-                strncmp(req->path, slot->path, strlen(slot->path)) != 0) {
-                continue;
-            }
-            if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
-                goto send_response;
-            }
         }
 
         if (match_route(route->path, req->path, &req->params,
@@ -1443,19 +1448,19 @@ papago_start(papago_t *server, const papago_config_t *config)
     papago_config_t existing_config = server->config;
 
     if (existing_config.enable_rate_limiting) {
-         server->config.enable_rate_limiting = true;
-         server->config.rate_limit_requests = existing_config.rate_limit_requests;
-         server->config.rate_limit_window = existing_config.rate_limit_window;
-     }
-     if (server->config.static_dir == NULL && existing_config.static_dir != NULL) {
-         server->config.static_dir = existing_config.static_dir;
-     }
-     if (server->config.enable_rate_limiting && server->rate_limit_map == NULL) {
-         server->rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
-             sizeof(papago_rate_limit_entry_t));
-         if (server->rate_limit_map == NULL) {
-             server->config.enable_rate_limiting = false;
-         }
+        server->config.enable_rate_limiting = true;
+        server->config.rate_limit_requests = existing_config.rate_limit_requests;
+        server->config.rate_limit_window = existing_config.rate_limit_window;
+    }
+    if (server->config.static_dir == NULL && existing_config.static_dir != NULL) {
+        server->config.static_dir = existing_config.static_dir;
+    }
+    if (server->config.enable_rate_limiting && server->rate_limit_map == NULL) {
+        server->rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
+            sizeof(papago_rate_limit_entry_t));
+        if (server->rate_limit_map == NULL) {
+            server->config.enable_rate_limiting = false;
+        }
     }
     
     server->config = *config;

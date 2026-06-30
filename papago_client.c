@@ -257,7 +257,7 @@ papago_http_send(papago_http_client_t *client,
     case PAPAGO_PUT:
     case PAPAGO_PATCH:
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, curl_easy_setopt(curl,
-            CURLOPT_CUSTOMREQUEST, papago_req_method(req->method)));
+            CURLOPT_CUSTOMREQUEST, papago_req_method(req)));
         if (req->body) {
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, req->body);
             curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)blen);
@@ -322,8 +322,8 @@ papago_http_send(papago_http_client_t *client,
     long code = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
     res->status_code = (int)code;
-    res->body        = body_buf.data;
-    res->body_len    = body_buf.len;
+    res->body = body_buf.data;
+    res->body_len = body_buf.len;
 
     curl_slist_free_all(slist);
     curl_easy_cleanup(curl);
@@ -373,12 +373,12 @@ papago_http_header_t*
 papago_header_append(papago_http_header_t *list, const char *key,
                      const char *value)
 {
-    papago_http_header_t *node = papago_header_new(key, value);
-    if (node == NULL) {
+    if (list == NULL) {
         return NULL;
     }
 
-    if (list == NULL) {
+    papago_http_header_t *node = papago_header_new(key, value);
+    if (node == NULL) {
         return NULL;
     }
 

@@ -38,7 +38,7 @@ extern "C" {
 #include <stdio.h>
 #include <time.h>
 
-#define PAPAGO_UNUSED(x) (void)x;
+#define PAPAGO_UNUSED(x) (void)x
 
 typedef enum {
     PAPAGO_GET,
