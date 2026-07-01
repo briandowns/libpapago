@@ -60,9 +60,10 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
             "<form action=\"/login\" method=\"POST\">"
                 "<label for=\"username\">Username:</label>"
                 "<input type=\"text\" id=\"username\" name=\"username\" required>"
-                "</br><br>"
+                "<br><br>"
                 "<label for=\"password\">Password:</label>"
                 "<input type=\"password\" id=\"password\" name=\"password\" required>"
+                "<br><br>"
                 "<button type=\"submit\">Submit</button>"
             "</form>"
         "</body></html>");

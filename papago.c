@@ -103,6 +103,7 @@ struct papago_request {
     struct timespec start_time;
     struct MHD_Connection *connection;
     void *user_data;
+    bool   body_too_large;
 };
 
 /**
@@ -1069,16 +1070,29 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
     req = *con_cls;
 
-    // handle upload data (POST/PUT body)
+    // handle upload data POST/PUT
     if (*upload_data_size > 0) {
-        if (req->body == NULL) {
-            req->body = malloc(*upload_data_size + 1);
-            if (req->body != NULL) {
-                memcpy(req->body, upload_data, *upload_data_size);
-                req->body[*upload_data_size] = '\0';
-                req->body_length = *upload_data_size;
-            }
+        if (req->body_length + *upload_data_size > server->config.max_body_size) {
+            free(req->body);
+            req->body = NULL;
+            req->body_length = 0;
+            *upload_data_size = 0;
+            req->body_too_large = true;
+
+            return MHD_YES;
         }
+
+        char *new_body = realloc(req->body, req->body_length + *upload_data_size + 1);
+        if (new_body == NULL) {
+            *upload_data_size = 0;
+            return MHD_YES;
+        }
+
+        memcpy(new_body + req->body_length, upload_data, *upload_data_size);
+        req->body_length += *upload_data_size;
+        new_body[req->body_length] = '\0';
+        req->body = new_body;
+
         *upload_data_size = 0;
 
         return MHD_YES;
@@ -1090,11 +1104,11 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     }
 
     if (req->form == NULL) {
-        const char *ct = MHD_lookup_connection_value(connection,
-            MHD_HEADER_KIND, "Content-Type");
+        const char *ct = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
+            PAPAGO_REQUEST_HEADER_CONTENT_TYPE);
         if (ct != NULL &&
             strncasecmp(ct, PAPAGO_REQUEST_HEADER_FORM_URLENCODED,
-                sizeof(PAPAGO_REQUEST_HEADER_FORM_URLENCODED) - 1) == 0) {
+                sizeof(PAPAGO_REQUEST_HEADER_FORM_URLENCODED)-1) == 0) {
             form_body_parser(req);
         }
     }
@@ -1151,6 +1165,12 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
             goto send_response;
         }
+    }
+
+    if (req->body_too_large) {
+        papago_res_set_status(res, PAPAGO_STATUS_REQUEST_ENTITY_TOO_LARGE);
+        papago_res_json(res, "{\"error\":\"payload too large\"}");
+        goto send_response;
     }
 
     // find matching route
