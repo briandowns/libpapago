@@ -98,9 +98,12 @@ struct papago_request {
     size_t param_count;
     papago_kv_t *query;
     size_t query_count;
+    papago_kv_t *form;
+    size_t form_count;
     struct timespec start_time;
     struct MHD_Connection *connection;
     void *user_data;
+    bool   body_too_large;
 };
 
 /**
@@ -442,6 +445,12 @@ const char*
 papago_req_query(papago_request_t *req, const char *key)
 {
     return find_kv(req->query, req->query_count, key);
+}
+
+const char*
+papago_req_form(papago_request_t *req, const char *key)
+{
+    return find_kv(req->form, req->form_count, key);
 }
 
 const char*
@@ -971,6 +980,46 @@ query_string_parser(void *cls, enum MHD_ValueKind kind, const char *key,
     return MHD_YES;
 }
 
+static void
+form_body_parser(papago_request_t *req)
+{
+    if (req->body == NULL || req->body_length == 0) {
+        return;
+    }
+
+    char *body = _strdup(req->body);
+    if (body == NULL) {
+        return;
+    }
+
+    char *saveptr = NULL;
+    char *pair = strtok_r(body, "&", &saveptr);
+
+    while (pair != NULL) {
+        char *eq = strchr(pair, '=');
+        if (eq != NULL) {
+            *eq = '\0';
+            char *key   = papago_url_decode(pair);
+            char *value = papago_url_decode(eq + 1);
+            if (key != NULL && value != NULL) {
+                add_kv(&req->form, &req->form_count, key, value);
+            }
+            free(key);
+            free(value);
+        } else {
+            // bare key with no '=' — store as empty string
+            char *key = papago_url_decode(pair);
+            if (key != NULL) {
+                add_kv(&req->form, &req->form_count, key, "");
+                free(key);
+            }
+        }
+        pair = strtok_r(NULL, "&", &saveptr);
+    }
+
+    free(body);
+}
+
 static enum MHD_Result
 mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             const char *method, const char *version, const char *upload_data,
@@ -1021,16 +1070,29 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
     req = *con_cls;
 
-    // handle upload data (POST/PUT body)
+    // handle upload data POST/PUT
     if (*upload_data_size > 0) {
-        if (req->body == NULL) {
-            req->body = malloc(*upload_data_size + 1);
-            if (req->body != NULL) {
-                memcpy(req->body, upload_data, *upload_data_size);
-                req->body[*upload_data_size] = '\0';
-                req->body_length = *upload_data_size;
-            }
+        if (req->body_length + *upload_data_size > server->config.max_body_size) {
+            free(req->body);
+            req->body = NULL;
+            req->body_length = 0;
+            *upload_data_size = 0;
+            req->body_too_large = true;
+
+            return MHD_YES;
         }
+
+        char *new_body = realloc(req->body, req->body_length + *upload_data_size + 1);
+        if (new_body == NULL) {
+            *upload_data_size = 0;
+            return MHD_YES;
+        }
+
+        memcpy(new_body + req->body_length, upload_data, *upload_data_size);
+        req->body_length += *upload_data_size;
+        new_body[req->body_length] = '\0';
+        req->body = new_body;
+
         *upload_data_size = 0;
 
         return MHD_YES;
@@ -1039,6 +1101,16 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     if (req->query == NULL) {
         MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND,
             query_string_parser, req);
+    }
+
+    if (req->form == NULL) {
+        const char *ct = MHD_lookup_connection_value(connection, MHD_HEADER_KIND,
+            PAPAGO_REQUEST_HEADER_CONTENT_TYPE);
+        if (ct != NULL &&
+            strncasecmp(ct, PAPAGO_REQUEST_HEADER_FORM_URLENCODED,
+                sizeof(PAPAGO_REQUEST_HEADER_FORM_URLENCODED)-1) == 0) {
+            form_body_parser(req);
+        }
     }
 
     // create response
@@ -1050,6 +1122,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         free_kv_array(req->headers, req->header_count);
         free_kv_array(req->params, req->param_count);
         free_kv_array(req->query, req->query_count);
+        free_kv_array(req->form, req->form_count);
 
         free(req);
 
@@ -1092,6 +1165,12 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         if (!slot->middleware->before(req, res, slot->middleware->user_data)) {
             goto send_response;
         }
+    }
+
+    if (req->body_too_large) {
+        papago_res_set_status(res, PAPAGO_STATUS_REQUEST_ENTITY_TOO_LARGE);
+        papago_res_json(res, "{\"error\":\"payload too large\"}");
+        goto send_response;
     }
 
     // find matching route
@@ -1166,6 +1245,7 @@ send_response:
         free_kv_array(req->headers, req->header_count);
         free_kv_array(req->params, req->param_count);
         free_kv_array(req->query, req->query_count);
+        free_kv_array(req->form, req->form_count);
         free(req);
 
         free_kv_array(res->headers, res->header_count);
@@ -1243,6 +1323,7 @@ send_response:
     free_kv_array(req->headers, req->header_count);
     free_kv_array(req->params, req->param_count);
     free_kv_array(req->query, req->query_count);
+    free_kv_array(req->form, req->form_count);
 
     free(req);
     free(res->body);

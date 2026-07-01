@@ -262,6 +262,13 @@ const char*
 papago_req_query(papago_request_t *req, const char *key);
 
 /**
+ * Retrieve a value from an application/x-www-form-urlencoded body. Returns the
+ * decoded value or NULL.
+ */
+const char*
+papago_req_form(papago_request_t *req, const char *key);
+
+/**
  * Retrieve request body. Returns body string or NULL.
  */
 const char*
@@ -646,6 +653,10 @@ papago_mime_type(const char *filename);
 #define PAPAGO_REQUEST_HEADER_USER_AGENT                     "User-Agent"
 #define PAPAGO_REQUEST_HEADER_UPGRADE                        "Upgrade"
 #define PAPAGO_REQUEST_HEADER_WARNING                        "Warning"
+#define PAPAGO_REQUEST_HEADER_VIA                            "Via"
+#define PAPAGO_REQUEST_HEADER_WWW_AUTHENTICATE               "WWW-Authenticate"
+#define PAPAGO_REQUEST_HEADER_X_FORWARDED_FOR                "X-Forwarded-For"
+#define PAPAGO_REQUEST_HEADER_FORM_URLENCODED                "application/x-www-form-urlencoded"
 
 #define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN      "Access-Control-Allow-Origin"
 #define PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS "Access-Control-Allow-Credentials"

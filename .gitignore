@@ -17,6 +17,7 @@ example_compression
 example_metrics
 example_streaming
 example_embedded
+example_form
 example_logger_middleware
 example_wsclient
 debug_build

@@ -32,6 +32,7 @@ make example_websocket
 - Path Parameters - Dynamic routes like `/users/:id`
 - Wildcard URIs - Example: `/api/v1/*` 
 - Query Parameters - Parse URL query strings
+- Form Parsing - Parse application/x-www-form-urlencoded bodies
 - HTML Templates - Easy dynamic content via server side templating
 - Middleware System - Global and path-specific middleware
 - File stream - video / audio / large files, zero-copy, automatic MIME type detection
