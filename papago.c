@@ -446,7 +446,7 @@ papago_req_query(papago_request_t *req, const char *key)
     return find_kv(req->query, req->query_count, key);
 }
 
-const char *
+const char*
 papago_req_form(papago_request_t *req, const char *key)
 {
     return find_kv(req->form, req->form_count, key);
