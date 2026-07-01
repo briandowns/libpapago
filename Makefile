@@ -131,6 +131,10 @@ example_streaming: clean
 example_embedded: clean
 	$(CC) -o $@ papago.c examples/example_embedded.c $(CFLAGS) $(LDFLAGS)
 
+.PHONY: example_form
+example_form: clean
+	$(CC) -o $@ papago.c examples/example_form.c $(CFLAGS) $(LDFLAGS)
+
 .PHONY: example_logger_middleware
 example_logger_middleware: clean
 	$(CC) -o $@ papago.c examples/example_logger_middleware.c $(CFLAGS) $(LDFLAGS)

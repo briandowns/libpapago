@@ -98,6 +98,8 @@ struct papago_request {
     size_t param_count;
     papago_kv_t *query;
     size_t query_count;
+    papago_kv_t *form;
+    size_t form_count;
     struct timespec start_time;
     struct MHD_Connection *connection;
     void *user_data;
@@ -442,6 +444,12 @@ const char*
 papago_req_query(papago_request_t *req, const char *key)
 {
     return find_kv(req->query, req->query_count, key);
+}
+
+const char *
+papago_req_form(papago_request_t *req, const char *key)
+{
+    return find_kv(req->form, req->form_count, key);
 }
 
 const char*
@@ -971,6 +979,46 @@ query_string_parser(void *cls, enum MHD_ValueKind kind, const char *key,
     return MHD_YES;
 }
 
+static void
+form_body_parser(papago_request_t *req)
+{
+    if (req->body == NULL || req->body_length == 0) {
+        return;
+    }
+
+    char *body = _strdup(req->body);
+    if (body == NULL) {
+        return;
+    }
+
+    char *saveptr = NULL;
+    char *pair = strtok_r(body, "&", &saveptr);
+
+    while (pair != NULL) {
+        char *eq = strchr(pair, '=');
+        if (eq != NULL) {
+            *eq = '\0';
+            char *key   = papago_url_decode(pair);
+            char *value = papago_url_decode(eq + 1);
+            if (key != NULL && value != NULL) {
+                add_kv(&req->form, &req->form_count, key, value);
+            }
+            free(key);
+            free(value);
+        } else {
+            // bare key with no '=' — store as empty string
+            char *key = papago_url_decode(pair);
+            if (key != NULL) {
+                add_kv(&req->form, &req->form_count, key, "");
+                free(key);
+            }
+        }
+        pair = strtok_r(NULL, "&", &saveptr);
+    }
+
+    free(body);
+}
+
 static enum MHD_Result
 mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             const char *method, const char *version, const char *upload_data,
@@ -1041,6 +1089,16 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             query_string_parser, req);
     }
 
+    if (req->form == NULL) {
+        const char *ct = MHD_lookup_connection_value(connection,
+            MHD_HEADER_KIND, "Content-Type");
+        if (ct != NULL &&
+            strncasecmp(ct, PAPAGO_REQUEST_HEADER_FORM_URLENCODED,
+                sizeof(PAPAGO_REQUEST_HEADER_FORM_URLENCODED) - 1) == 0) {
+            form_body_parser(req);
+        }
+    }
+
     // create response
     papago_response_t *res = calloc(1, sizeof(papago_response_t));
     if (res == NULL) {
@@ -1050,6 +1108,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         free_kv_array(req->headers, req->header_count);
         free_kv_array(req->params, req->param_count);
         free_kv_array(req->query, req->query_count);
+        free_kv_array(req->form, req->form_count);
 
         free(req);
 
@@ -1166,6 +1225,7 @@ send_response:
         free_kv_array(req->headers, req->header_count);
         free_kv_array(req->params, req->param_count);
         free_kv_array(req->query, req->query_count);
+        free_kv_array(req->form, req->form_count);
         free(req);
 
         free_kv_array(res->headers, res->header_count);
@@ -1243,6 +1303,7 @@ send_response:
     free_kv_array(req->headers, req->header_count);
     free_kv_array(req->params, req->param_count);
     free_kv_array(req->query, req->query_count);
+    free_kv_array(req->form, req->form_count);
 
     free(req);
     free(res->body);
