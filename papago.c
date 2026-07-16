@@ -306,7 +306,6 @@ find_kv(const papago_kv_t *arr, size_t count, const char *key)
 
     for (size_t i = 0; i < count; i++) {
         if (strcasecmp(arr[i].key, key) == 0) {
-            
             return arr[i].value;
         }
     }
@@ -1027,8 +1026,15 @@ header_iterator(void *cls, enum MHD_ValueKind kind, const char *key,
 {
     PAPAGO_UNUSED(kind);
 
-    papago_request_t *req = cls;
-    add_kv(&req->headers, &req->header_count, key, value);
+    if (cls == NULL || key == NULL) {
+         return MHD_NO;
+    }
+
+    papago_request_t *req = (papago_request_t*)cls;
+    if (add_kv(&req->headers, &req->header_count,
+            key, value != NULL ? value : "") != 0) {
+        return MHD_NO;
+    }
 
     return MHD_YES;
 }
@@ -1083,7 +1089,10 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
     req = *con_cls;
 
-    MHD_get_connection_values(connection, MHD_HEADER_KIND, header_iterator, req);
+    if (req->headers == NULL) {
+        MHD_get_connection_values(connection, MHD_HEADER_KIND, header_iterator,
+            req);
+    }
 
     // handle upload data POST/PUT
     if (*upload_data_size > 0) {

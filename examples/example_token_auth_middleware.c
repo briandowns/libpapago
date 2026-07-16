@@ -88,9 +88,6 @@ token_auth_before(papago_request_t *req, papago_response_t *res, void *user_data
         return false;
     }
 
-    papago_res_set_status(res, PAPAGO_STATUS_OK);
-    papago_res_json(res, "{\"status\":\"authenticated\"}");
-
     return true;
 }
 
@@ -121,7 +118,6 @@ main(void)
         .after     = token_auth_after,
         .user_data = NULL,
     };
-    papago_middleware_add(server, &token_auth);
     papago_middleware_path_add(server, "/protected", &token_auth);
 
     // register HTTP routes

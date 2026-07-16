@@ -33,7 +33,7 @@ ifeq ($(PAPAGO_USE_MAPLE),1)
 	LDFLAGS += -lmaple
 endif
 
-EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded example_logger_middleware example_wsclient
+EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded example_logger_middleware example_token_auth_middleware example_wsclient
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
