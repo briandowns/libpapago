@@ -139,6 +139,10 @@ example_form: clean
 example_logger_middleware: clean
 	$(CC) -o $@ papago.c examples/example_logger_middleware.c $(CFLAGS) $(LDFLAGS)
 
+.PHONY: example_token_auth_middleware
+example_token_auth_middleware: clean
+	$(CC) -o $@ papago.c examples/example_token_auth_middleware.c $(CFLAGS) $(LDFLAGS)
+
 .PHONY: example_wsclient
 example_wsclient: clean
 	$(CC) -o $@ papago_wsc.c examples/example_wsclient.c $(CFLAGS) -lwebsockets -lssl -lcrypto -lz -lm -lpthread
