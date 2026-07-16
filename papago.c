@@ -962,7 +962,7 @@ compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
 
 static enum MHD_Result
 query_string_parser(void *cls, enum MHD_ValueKind kind, const char *key,
-                  const char *value)
+                    const char *value)
 {
     PAPAGO_UNUSED(kind);
 
@@ -1021,6 +1021,25 @@ form_body_parser(papago_request_t *req)
 }
 
 static enum MHD_Result
+header_iterator(void *cls, enum MHD_ValueKind kind, const char *key,
+                const char *value)
+{
+    PAPAGO_UNUSED(kind);
+
+    if (cls == NULL || key == NULL) {
+         return MHD_NO;
+    }
+
+    papago_request_t *req = (papago_request_t*)cls;
+    if (add_kv(&req->headers, &req->header_count,
+            key, value != NULL ? value : "") != 0) {
+        return MHD_NO;
+    }
+
+    return MHD_YES;
+}
+
+static enum MHD_Result
 mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             const char *method, const char *version, const char *upload_data,
             size_t *upload_data_size, void **con_cls)
@@ -1069,6 +1088,11 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     }
 
     req = *con_cls;
+
+    if (req->headers == NULL) {
+        MHD_get_connection_values(connection, MHD_HEADER_KIND, header_iterator,
+            req);
+    }
 
     // handle upload data POST/PUT
     if (*upload_data_size > 0) {
