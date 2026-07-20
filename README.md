@@ -267,7 +267,7 @@ To expose the Prometheus endpoint, register the metrics handler in your applicat
 papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, NULL);
 ```
 
-### Threading Model
+## Threading Model
 
 - HTTP: Thread-per-connection (libmicrohttpd)
 - WebSocket: Event loop in separate thread
