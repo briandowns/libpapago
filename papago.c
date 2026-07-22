@@ -1955,7 +1955,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 {
     papago_t *server = (papago_t *)user_data;
 
-    char filepath[1024];
+    char filepath[PATH_MAX];
  
     if (server == NULL || server->config.static_dir == NULL) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
@@ -1964,17 +1964,29 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
     }
  
     const char *path = papago_req_path(req);
- 
-    // prevent directory traversal
-    if (strcmp(path, "/..") == 0) {
+
+    // resolve to a real path and verify it's still inside directory
+    if (realpath(path, filepath) == NULL) {
+        papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
+        papago_res_send(res, "file not found");
+        return;
+    }
+    char resolved_root[PATH_MAX];
+    if (realpath(server->config.static_dir, resolved_root) == NULL) {
+        papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+        return;
+    }
+    size_t root_len = strlen(resolved_root);
+    if (strncmp(filepath, resolved_root, root_len) != 0 ||
+        (filepath[root_len] != '/' && filepath[root_len] != '\0')) {
         papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
         papago_res_send(res, "invalid path");
         return;
     }
  
     // build full file path
-    snprintf(filepath, sizeof(filepath), "%s%s", 
-        server->config.static_dir, path);
+    snprintf(filepath, sizeof(filepath), "%s%s", server->config.static_dir,
+        path);
  
     // check if file exists
     struct stat st;
