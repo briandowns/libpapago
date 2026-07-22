@@ -8,7 +8,19 @@ UNAME_S = $(shell uname -s)
 INCDIR  = /usr/local/include
 LIBDIR  = /usr/local/lib
 
-CFLAGS  = -O3 -fPIC -Wall -Wextra
+# let's just look for all the things...
+CFLAGS = -O3 -fPIC -Wextra -Wall -Wformat -Wformat=2 \
+	-Wconversion -Wimplicit-fallthrough \
+	-Werror=format-security \
+	-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 \
+	-D_GLIBCXX_ASSERTIONS \
+	-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST \
+	-fstrict-flex-arrays=3 \
+	-fstack-clash-protection -fstack-protector-strong \
+	-Wl,-z,nodlopen -Wl,-z,noexecstack \
+	-Wl,-z,relro -Wl,-z,now \
+	-Wl,--as-needed -Wl,--no-copy-dt-needed-entries
+
 ifeq ($(UNAME_S),Darwin)
 	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
               $(shell pkg-config --cflags --libs libmicrohttpd) \
@@ -16,7 +28,7 @@ ifeq ($(UNAME_S),Darwin)
 			  -lssl -lcrypto -lz
 endif
 
-TEST_CFLAGS = -g -fPIC -Wall -Wextra
+TEST_CFLAGS = $(CFLAGS) -g
 LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread
 
 ifeq ($(UNAME_S),FreeBSD)

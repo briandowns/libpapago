@@ -588,7 +588,7 @@ papago_res_json(papago_response_t *res, const char *json)
  */
 static void
 set_file_headers(papago_response_t *res, const char *filepath,
-                 const char *mime_type, long file_size)
+                 const char *mime_type, uint64_t file_size)
 {
     if (mime_type != NULL) {
         papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, mime_type);
@@ -597,33 +597,33 @@ set_file_headers(papago_response_t *res, const char *filepath,
     }
 
     char size_str[64];
-    snprintf(size_str, sizeof(size_str), "%ld", file_size);
+    snprintf(size_str, sizeof(size_str), "%llu", (unsigned long long)file_size);
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_LENGTH, size_str);
 }
  
 
 /**
- * Validate file for streaming. Returns file size on success or -1 on error.
+ * Validate file for streaming. Returns file size on success or 1 on error.
  */
-static int64_t
+static uint64_t
 validate_file(const char *filepath)
 {
     struct stat st;
  
     if (filepath == NULL)
-        return -1;
+        return 1;
  
     if (stat(filepath, &st) != 0) {
         fprintf(stderr, "file not found: %s\n", filepath);
-        return -1;
+        return 1;
     }
  
     if (!S_ISREG(st.st_mode)) {
         fprintf(stderr, "not a regular file: %s\n", filepath);
-        return -1;
+        return 1;
     }
  
-    return (int64_t)st.st_size;
+    return (uint64_t)st.st_size;
 }
 
 int
@@ -634,8 +634,8 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
         return 1;
     }
  
-    int64_t file_size = validate_file(filepath);
-    if (file_size == (int64_t)-1) {
+    uint64_t file_size = validate_file(filepath);
+    if (file_size == 1) {
         return 1;
     }
  
@@ -797,24 +797,26 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
  
     // calculate average duration
     double avg_duration = server->metrics->total_requests > 0 ?
-        (double)server->metrics->total_duration_ms / server->metrics->total_requests :
-        0.0;
+        (double)server->metrics->total_duration_ms /
+            (double)server->metrics->total_requests : 0.0;
 
-    char metrics[8192];
+    char metrics[10656]; // buffer for metrics output
+    memset(metrics, 0, sizeof(metrics));
 
-    int len = 0;
-    len += snprintf(metrics + len, sizeof(metrics) - len,
+    size_t len = 0;
+    int n = snprintf(metrics + len, sizeof(metrics) - len,
         "# HELP http_requests_total Total number of HTTP requests\n"
         "# TYPE http_requests_total counter\n"
         "http_requests_total %lu\n\n",
         server->metrics->total_requests);
-    if (len >= (int)sizeof(metrics)) {
+    if (n < 0) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
+    len += (size_t)n;
  
-    len += snprintf(metrics + len, sizeof(metrics) - len,
+    n = snprintf(metrics + len, sizeof(metrics) - len,
         "# HELP http_request_duration_milliseconds HTTP request latencies\n"
         "# TYPE http_request_duration_milliseconds summary\n"
         "http_request_duration_milliseconds_min %" PRIu64 "\n"
@@ -825,13 +827,14 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->max_duration_ms,
         avg_duration,
         server->metrics->total_duration_ms);
-    if (len >= (int)sizeof(metrics)) {
+    if (n < 0) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
+    len += (size_t)n;
  
-    len += snprintf(metrics + len, sizeof(metrics) - len,
+    n = snprintf(metrics + len, sizeof(metrics) - len,
         "# HELP http_requests_by_method Requests by HTTP method\n"
         "# TYPE http_requests_by_method counter\n"
         "http_requests_by_method{method=\"GET\"} %lu\n"
@@ -852,13 +855,14 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->requests_by_method[6],
         server->metrics->requests_by_method[7],
         server->metrics->requests_by_method[8]);
-    if (len >= (int)sizeof(metrics)) {
+    if (n < 0) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
+    len += (size_t)n;
  
-    len += snprintf(metrics + len, sizeof(metrics) - len,
+    n = snprintf(metrics + len, sizeof(metrics) - len,
         "# HELP http_requests_by_status Requests by status code class\n"
         "# TYPE http_requests_by_status counter\n"
         "http_requests_by_status{status=\"1xx\"} %" PRIu64 "\n"
@@ -873,36 +877,44 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->requests_by_status[3],
         server->metrics->requests_by_status[4],
         server->metrics->requests_by_status[5]);
-    if (len >= (int)sizeof(metrics)) {
+    if (n < 0) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
+    len += (size_t)n;
  
-    len += snprintf(metrics + len, sizeof(metrics) - len,
+    n = snprintf(metrics + len, sizeof(metrics) - len,
         "# HELP process_uptime_seconds Process uptime in seconds\n"
         "# TYPE process_uptime_seconds gauge\n"
         "process_uptime_seconds %ld\n\n",
         (long)uptime);
-    if (len >= (int)sizeof(metrics)) {
+    if (n < 0) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
+    len += (size_t)n;
  
     // per-endpoint metrics
-    for (size_t i = 0; i < server->metrics->endpoint_count && len < (int)sizeof(metrics) - 256; i++) {
+    for (size_t i = 0; i < server->metrics->endpoint_count && len < sizeof(metrics) - 256; i++) {
         double ep_avg = server->metrics->endpoints[i].count > 0 ?
             (double)server->metrics->endpoints[i].total_ms / 
             server->metrics->endpoints[i].count : 0.0;
 
-        len += snprintf(metrics + len, sizeof(metrics) - len,
+        n = snprintf(metrics + len, sizeof(metrics) - len,
             "http_requests_by_endpoint{endpoint=\"%s\"} %" PRIu64 "\n"
             "http_request_duration_by_endpoint{endpoint=\"%s\"} %.2f\n",
             server->metrics->endpoints[i].path,
             server->metrics->endpoints[i].count,
             server->metrics->endpoints[i].path,
             ep_avg);
+        if (n < 0) {
+            papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+            pthread_mutex_unlock(&server->metrics->mutex);
+            return;
+        }
+        len += (size_t)n;
     }
  
     pthread_mutex_unlock(&server->metrics->mutex);
@@ -1237,11 +1249,11 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     
 send_response:
     clock_gettime(CLOCK_MONOTONIC, &now);
-    duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec)
-        * 1000.0
-        + (now.tv_nsec - papago_req_start_time(req).tv_nsec) / 1.0e6;
+    duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec) *
+        1000.0 + (now.tv_nsec - papago_req_start_time(req).tv_nsec) /
+        1.0e6;
     update_metrics(server, req->path, papago_req_method(req),
-        res->status, duration_ms);
+        res->status, (uint64_t)duration_ms);
 
     if (res->is_stream_file && res->stream_file != NULL) {
         int fd = fileno(res->stream_file);
@@ -1506,13 +1518,13 @@ load_file(const char *filepath)
     }
     fseek(f, 0, SEEK_SET);
 
-    char *content = malloc(size + 1);
+    char *content = malloc((size_t)size + 1);
     if (content == NULL) {
         fclose(f);
         return NULL;
     }
 
-    size_t read_size = fread(content, 1, size, f);
+    size_t read_size = fread(content, 1, (size_t)size, f);
     content[size] = '\0';
     fclose(f);
 
@@ -1676,8 +1688,8 @@ papago_start(papago_t *server, const papago_config_t *config)
     if (server->ws_endpoint_count > 0) {
         info.port = server->config.port + 1; // WS on different port
         info.protocols = papago_lws_protocols;
-        info.gid = -1;
-        info.uid = -1;
+        info.gid = (gid_t)-1;
+        info.uid = (uid_t)-1;
         info.user = server;
 
         // SSL/TLS for websocket
@@ -2498,7 +2510,7 @@ papago_check_rate_limit(papago_t *server, papago_request_t *req,
     pthread_mutex_lock(&server->rate_limit_mutex);
  
     // find existing entry or free slot
-    for (size_t i = 0; i < MAX_RATE_LIMIT_ENTRIES; i++) {
+    for (int i = 0; i < MAX_RATE_LIMIT_ENTRIES; i++) {
         if (entries[i].ip[0] == '\0') {
             if (slot == -1) {
                 slot = i;
