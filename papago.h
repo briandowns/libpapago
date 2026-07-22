@@ -144,7 +144,6 @@ typedef struct {
     char *static_dir;
     int thread_pool_size;
     size_t max_body_size;
-    bool enable_cors;
     bool enable_ssl;
     bool enable_template_rendering;
     bool enable_rate_limiting;

@@ -335,7 +335,6 @@ papago_default_config(void)
     config.static_dir = NULL;
     config.thread_pool_size = 4;
     config.max_body_size = DEFAULT_BODY_SIZE;
-    config.enable_cors = false;
 
     return config;
 }
