@@ -137,7 +137,7 @@ curl http://localhost:8080/hello
 * Max body size = 10485760 (10 * 1024 * 1024)
 * Thread pool size = 4
 
-All config values can be easily set on the `papago_config_t` value. Checks examples for more details.
+All config values can be easily set on the `papago_config_t` value. Check the examples for more details.
 
 ## Core Concepts
 

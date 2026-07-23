@@ -591,7 +591,7 @@ papago_res_json(papago_response_t *res, const char *json)
  */
 static void
 set_file_headers(papago_response_t *res, const char *filepath,
-                 const char *mime_type, uint64_t file_size)
+                 const char *mime_type, int64_t file_size)
 {
     if (mime_type != NULL) {
         papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, mime_type);
@@ -601,7 +601,7 @@ set_file_headers(papago_response_t *res, const char *filepath,
     }
 
     char size_str[64];
-    snprintf(size_str, sizeof(size_str), "%llu", (unsigned long long)file_size);
+    snprintf(size_str, sizeof(size_str), "%lld", (long long)file_size);
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_LENGTH, size_str);
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_X_CONTENT_TYPE_OPTIONS, "nosniff");
 }
@@ -610,25 +610,25 @@ set_file_headers(papago_response_t *res, const char *filepath,
 /**
  * Validate file for streaming. Returns file size on success or 1 on error.
  */
-static uint64_t
+static int64_t
 validate_file(const char *filepath)
 {
     struct stat st;
  
     if (filepath == NULL)
-        return 1;
+        return -1;
  
     if (stat(filepath, &st) != 0) {
         fprintf(stderr, "file not found: %s\n", filepath);
-        return 1;
+        return -1;
     }
  
     if (!S_ISREG(st.st_mode)) {
         fprintf(stderr, "not a regular file: %s\n", filepath);
-        return 1;
+        return -1;
     }
  
-    return (uint64_t)st.st_size;
+    return (int64_t)st.st_size;
 }
 
 int
@@ -639,8 +639,8 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
         return 1;
     }
  
-    uint64_t file_size = validate_file(filepath);
-    if (file_size == 1) {
+    int64_t file_size = validate_file(filepath);
+    if (file_size == -1) {
         return 1;
     }
  
@@ -672,7 +672,7 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
     // mark response as file-based for special handling in send_response
     res->is_stream_file = true;
     res->stream_file = fp; // MHD will close fd
-    res->stream_file_size = file_size;
+    res->stream_file_size = (unsigned)file_size;
 
     return 0;
 }
