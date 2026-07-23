@@ -601,7 +601,7 @@ set_file_headers(papago_response_t *res, const char *filepath,
     }
 
     char size_str[64];
-    snprintf(size_str, sizeof(size_str), "%lld", (long long)file_size);
+    snprintf(size_str, sizeof(size_str), "%ju", (uintmax_t)file_size);
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_LENGTH, size_str);
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_X_CONTENT_TYPE_OPTIONS, "nosniff");
 }
