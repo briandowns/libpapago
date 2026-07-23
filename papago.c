@@ -1613,7 +1613,8 @@ papago_start(papago_t *server, const papago_config_t *config)
     unsigned int mhd_flags = MHD_USE_THREAD_PER_CONNECTION
         | MHD_USE_INTERNAL_POLLING_THREAD;
 
-#ifdef PAPAGO_USE_MAPLE
+
+        #ifdef PAPAGO_USE_MAPLE
     if (server->config.enable_template_rendering) {
         server->template_ctx = mp_init();
         if (server->template_ctx == NULL) {
@@ -1625,6 +1626,8 @@ papago_start(papago_t *server, const papago_config_t *config)
     }
 #endif
 
+    uint32_t server_timeout = server->config.connection_timeout > 0 ?
+            server->config.connection_timeout : 30; // default 30 seconds
     // start libmicrohttpd daemon with optional SSL
     if (server->config.enable_ssl) {
         if (server->config.cert_file == NULL ||
@@ -1655,6 +1658,7 @@ papago_start(papago_t *server, const papago_config_t *config)
             &mhd_handler, server,
             MHD_OPTION_HTTPS_MEM_KEY, key_pem,
             MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
+            MHD_OPTION_CONNECTION_TIMEOUT, server_timeout,
             MHD_OPTION_END);
 
         // free certificate memory after daemon starts
@@ -1666,6 +1670,7 @@ papago_start(papago_t *server, const papago_config_t *config)
             server->config.port,
             NULL, NULL,
             &mhd_handler, server,
+            MHD_OPTION_CONNECTION_TIMEOUT, server_timeout,
             MHD_OPTION_END);
     }
 

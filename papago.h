@@ -137,6 +137,7 @@ typedef void (*papago_ws_on_error_t)(papago_ws_connection_t *conn,
 typedef struct {
     uint16_t port;
     char *host;
+    uint32_t connection_timeout;
     uint16_t rate_limit_requests;
     uint16_t rate_limit_window;
     char *cert_file;
