@@ -2,30 +2,6 @@
 
 Modern web framework designed to be full featured and powerful all while being extremely simple to use.
 
-## Quick Start
-
-Below is a very simple demonstration of how to create a handler for a `GET` request. More examples can be found in the [examples](/examples) directory. Each example has a `make` target.
-
-You can make all examples with `make examples_all PAPAGO_USE_MAPLE=1`.
-
-```sh
-make example
-```
-
-A convenience script is included to generate certificates to run the example below.
-
-```sh
-generate_certs.sh
-```
-
-```sh
-make example_ssl
-```
-
-```sh
-make example_websocket
-```
-
 ## Features
 
 - RESTful Routing - GET, POST, PUT, DELETE, PATCH support
@@ -63,7 +39,7 @@ WOFF, WOFF2, TTF
 * openssl
 * libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 
-### Build
+## Build
 
 Papago has the template engine (Maple) disabled by default. If this component is required, add `PAPAGO_USE_MAPLE=1` to the `make` command when building. 
 
@@ -71,12 +47,14 @@ Papago has the template engine (Maple) disabled by default. If this component is
 make
 ```
 
-### Install
+## Install
 ```sh
 sudo make install
 ```
 
-### Hello World
+## Quick Start
+
+Below is a very simple demonstration of how to create a handler for a `GET` request.
 
 Default server runs on port `:8080`.
 
@@ -122,6 +100,28 @@ Test:
 ```sh
 curl http://localhost:8080/hello
 # {"message":"Hello, World!"}
+```
+
+More examples can be found in the [examples](/examples) directory. Each example has a `make` target.
+
+You can make all examples with `make examples_all PAPAGO_USE_MAPLE=1`.
+
+```sh
+make example
+```
+
+A convenience script is included to generate certificates to run the example below.
+
+```sh
+generate_certs.sh
+```
+
+```sh
+make example_ssl
+```
+
+```sh
+make example_websocket
 ```
 
 ## Sane Config Defaults
@@ -284,7 +284,7 @@ papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, NULL);
 
 ## Threading Model
 
-- HTTP: Thread-per-connection (libmicrohttpd)
+- HTTP: Thread pool - 4 (default) (libmicrohttpd)
 - WebSocket: Event loop in separate thread
 - Broadcast: Thread-safe with mutex protection
 
