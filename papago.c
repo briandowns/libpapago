@@ -59,6 +59,7 @@
 #define MAX_RATE_LIMIT_ENTRIES 1024
 #define MAX_CONN_TIMEOUT 30
 #define MAX_CONNECTIONS 256
+#define METRICS_BUF_SIZE 16384
 
 typedef struct {
     char *key;
@@ -803,25 +804,25 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
     // calculate average duration
     double avg_duration = server->metrics->total_requests > 0 ?
         (double)server->metrics->total_duration_ms /
-            (double)server->metrics->total_requests : 0.0;
+        (double)server->metrics->total_requests : 0.0;
 
-    char metrics[10656]; // buffer for metrics output
-    memset(metrics, 0, sizeof(metrics));
+    char metrics[METRICS_BUF_SIZE]; // buffer for metrics output
+    memset(metrics, 0, METRICS_BUF_SIZE);
 
     size_t len = 0;
-    int n = snprintf(metrics + len, sizeof(metrics) - len,
+    int n = snprintf(metrics + len, METRICS_BUF_SIZE - len,
         "# HELP http_requests_total Total number of HTTP requests\n"
         "# TYPE http_requests_total counter\n"
         "http_requests_total %lu\n\n",
         server->metrics->total_requests);
-    if (n < 0) {
+    if (n < 0 || len + (size_t)n >= METRICS_BUF_SIZE) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
     len += (size_t)n;
  
-    n = snprintf(metrics + len, sizeof(metrics) - len,
+    n = snprintf(metrics + len, METRICS_BUF_SIZE - len,
         "# HELP http_request_duration_milliseconds HTTP request latencies\n"
         "# TYPE http_request_duration_milliseconds summary\n"
         "http_request_duration_milliseconds_min %" PRIu64 "\n"
@@ -832,14 +833,14 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->max_duration_ms,
         avg_duration,
         server->metrics->total_duration_ms);
-    if (n < 0) {
+    if (n < 0 || len + (size_t)n >= METRICS_BUF_SIZE) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
     len += (size_t)n;
  
-    n = snprintf(metrics + len, sizeof(metrics) - len,
+    n = snprintf(metrics + len, METRICS_BUF_SIZE - len,
         "# HELP http_requests_by_method Requests by HTTP method\n"
         "# TYPE http_requests_by_method counter\n"
         "http_requests_by_method{method=\"GET\"} %lu\n"
@@ -860,14 +861,14 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->requests_by_method[6],
         server->metrics->requests_by_method[7],
         server->metrics->requests_by_method[8]);
-    if (n < 0) {
+    if (n < 0 || len + (size_t)n >= METRICS_BUF_SIZE) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
     len += (size_t)n;
  
-    n = snprintf(metrics + len, sizeof(metrics) - len,
+    n = snprintf(metrics + len, METRICS_BUF_SIZE - len,
         "# HELP http_requests_by_status Requests by status code class\n"
         "# TYPE http_requests_by_status counter\n"
         "http_requests_by_status{status=\"1xx\"} %" PRIu64 "\n"
@@ -882,19 +883,19 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
         server->metrics->requests_by_status[3],
         server->metrics->requests_by_status[4],
         server->metrics->requests_by_status[5]);
-    if (n < 0) {
+    if (n < 0 || len + (size_t)n >= METRICS_BUF_SIZE) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
     }
     len += (size_t)n;
  
-    n = snprintf(metrics + len, sizeof(metrics) - len,
+    n = snprintf(metrics + len, METRICS_BUF_SIZE - len,
         "# HELP process_uptime_seconds Process uptime in seconds\n"
         "# TYPE process_uptime_seconds gauge\n"
         "process_uptime_seconds %ld\n\n",
         (long)uptime);
-    if (n < 0) {
+    if (n < 0 || len + (size_t)n >= METRICS_BUF_SIZE) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         pthread_mutex_unlock(&server->metrics->mutex);
         return;
@@ -902,19 +903,19 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
     len += (size_t)n;
  
     // per-endpoint metrics
-    for (size_t i = 0; i < server->metrics->endpoint_count && len < sizeof(metrics) - 256; i++) {
+    for (size_t i = 0; i < server->metrics->endpoint_count && len < METRICS_BUF_SIZE - 256; i++) {
         double ep_avg = server->metrics->endpoints[i].count > 0 ?
             (double)server->metrics->endpoints[i].total_ms / 
             server->metrics->endpoints[i].count : 0.0;
 
-        n = snprintf(metrics + len, sizeof(metrics) - len,
+        n = snprintf(metrics + len, METRICS_BUF_SIZE - len,
             "http_requests_by_endpoint{endpoint=\"%s\"} %" PRIu64 "\n"
             "http_request_duration_by_endpoint{endpoint=\"%s\"} %.2f\n",
             server->metrics->endpoints[i].path,
             server->metrics->endpoints[i].count,
             server->metrics->endpoints[i].path,
             ep_avg);
-        if (n < 0) {
+        if (n < 0 || len + (size_t)n >= METRICS_BUF_SIZE) {
             papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
             pthread_mutex_unlock(&server->metrics->mutex);
             return;
