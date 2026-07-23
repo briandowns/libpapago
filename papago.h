@@ -704,6 +704,7 @@ papago_mime_type(const char *filename);
 #define PAPAGO_RESPONSE_HEADER_WARNING                          "Warning"
 #define PAPAGO_RESPONSE_HEADER_WWW_AUTHENTICATE                 "WWW-Authenticate"
 #define PAPAGO_RESPONSE_HEADER_X_FRAME_OPTIONS                  "X-Frame-Options"
+#define PAPAGO_RESPONSE_HEADER_X_CONTENT_TYPE_OPTIONS           "X-Content-Type-Options"
 
 #ifdef __cplusplus
 }

@@ -596,12 +596,14 @@ set_file_headers(papago_response_t *res, const char *filepath,
     if (mime_type != NULL) {
         papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, mime_type);
     } else {
-        papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, papago_mime_type(filepath));
+        papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
+            papago_mime_type(filepath));
     }
 
     char size_str[64];
     snprintf(size_str, sizeof(size_str), "%llu", (unsigned long long)file_size);
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_LENGTH, size_str);
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_X_CONTENT_TYPE_OPTIONS, "nosniff");
 }
  
 
@@ -924,6 +926,8 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
  
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, 
         "text/plain; version=0.0.4; charset=utf-8");
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_X_CONTENT_TYPE_OPTIONS,
+        "nosniff");
     papago_res_send(res, metrics);
 }
 
@@ -2739,6 +2743,8 @@ papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
     // send as HTML response
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
         "text/html; charset=utf-8");
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_X_CONTENT_TYPE_OPTIONS,
+        "nosniff");
  
     return papago_res_send(res, output);
 }
