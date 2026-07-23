@@ -57,6 +57,8 @@
 #define MAX_WS_CONNECTIONS 256
 #define PAPAGO_MAX_HEADERS 64
 #define MAX_RATE_LIMIT_ENTRIES 1024
+#define MAX_CONN_TIMEOUT 30
+#define MAX_CONNECTIONS 256
 
 typedef struct {
     char *key;
@@ -327,6 +329,8 @@ papago_default_config(void)
     config.port = DEFAULT_PORT;
     config.host = DEFAULT_HOST;
     config.enable_ssl = false;
+    config.connection_timeout = MAX_CONN_TIMEOUT;
+    config.connection_limit = MAX_CONNECTIONS;
     config.enable_template_rendering = false;
     config.enable_rate_limiting = false;
     config.enable_compression = false;
@@ -1626,8 +1630,6 @@ papago_start(papago_t *server, const papago_config_t *config)
     }
 #endif
 
-    uint32_t server_timeout = server->config.connection_timeout > 0 ?
-            server->config.connection_timeout : 30; // default 30 seconds
     // start libmicrohttpd daemon with optional SSL
     if (server->config.enable_ssl) {
         if (server->config.cert_file == NULL ||
@@ -1658,7 +1660,8 @@ papago_start(papago_t *server, const papago_config_t *config)
             &mhd_handler, server,
             MHD_OPTION_HTTPS_MEM_KEY, key_pem,
             MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
-            MHD_OPTION_CONNECTION_TIMEOUT, server_timeout,
+            MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
+            MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
             MHD_OPTION_END);
 
         // free certificate memory after daemon starts
@@ -1670,7 +1673,8 @@ papago_start(papago_t *server, const papago_config_t *config)
             server->config.port,
             NULL, NULL,
             &mhd_handler, server,
-            MHD_OPTION_CONNECTION_TIMEOUT, server_timeout,
+            MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
+            MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
             MHD_OPTION_END);
     }
 

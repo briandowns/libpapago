@@ -138,6 +138,7 @@ typedef struct {
     uint16_t port;
     char *host;
     uint32_t connection_timeout;
+    uint32_t connection_limit;
     uint16_t rate_limit_requests;
     uint16_t rate_limit_window;
     char *cert_file;
