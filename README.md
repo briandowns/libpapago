@@ -124,6 +124,21 @@ curl http://localhost:8080/hello
 # {"message":"Hello, World!"}
 ```
 
+## Sane Config Defaults
+
+* Port = 8080
+* Host = 0.0.0.0
+* Timeout = 30s
+* Max conns = 256
+* SSL Enabled = off
+* Rate Limiting = off
+* Template rendering = off
+* Compression = off
+* Max body size = 10485760 (10 * 1024 * 1024)
+* Thread pool size = 4
+
+All config values can be easily set on the `papago_config_t` value. Checks examples for more details.
+
 ## Core Concepts
 
 ### HTTP Routes
