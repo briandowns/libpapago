@@ -1619,12 +1619,18 @@ papago_start(papago_t *server, const papago_config_t *config)
     char *cert_pem = NULL;
     char *key_pem = NULL;
 
-    // determine libmicrohttpd flags
-    unsigned int mhd_flags = MHD_USE_THREAD_PER_CONNECTION
-        | MHD_USE_INTERNAL_POLLING_THREAD;
+    unsigned int mhd_flags = MHD_USE_INTERNAL_POLLING_THREAD;
+ 
+    if (MHD_is_feature_supported(MHD_FEATURE_EPOLL) == MHD_YES) {
+        mhd_flags |= MHD_USE_EPOLL; // linux only
+    } else {
+        mhd_flags |= MHD_USE_POLL; // *BSD, macOS
+    }
 
+    unsigned int thread_pool_size = server->config.thread_pool_size > 0 ?
+        (unsigned int)server->config.thread_pool_size : 4;
 
-        #ifdef PAPAGO_USE_MAPLE
+#ifdef PAPAGO_USE_MAPLE
     if (server->config.enable_template_rendering) {
         server->template_ctx = mp_init();
         if (server->template_ctx == NULL) {
@@ -1901,7 +1907,8 @@ papago_middleware_path_add(papago_t *server, const char *path,
 static const papago_embedded_file_t *g_embedded_files = NULL;
  
 void
-papago_register_embedded_files(papago_t *server, const papago_embedded_file_t *files)
+papago_register_embedded_files(papago_t *server,
+                               const papago_embedded_file_t *files)
 {
     PAPAGO_UNUSED(server);
     g_embedded_files = files;
