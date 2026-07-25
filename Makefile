@@ -17,9 +17,6 @@ CFLAGS = -O3 -fPIC -Wextra -Wall -Wformat -Wformat=2 \
 	-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_FAST \
 	-fstrict-flex-arrays=3 \
 	-fstack-clash-protection -fstack-protector-strong \
-	-Wl,-z,nodlopen -Wl,-z,noexecstack \
-	-Wl,-z,relro -Wl,-z,now \
-	-Wl,--as-needed -Wl,--no-copy-dt-needed-entries
 
 ifeq ($(UNAME_S),Darwin)
 	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
@@ -29,7 +26,10 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 TEST_CFLAGS = $(CFLAGS) -g
-LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread
+LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread \
+	-Wl,-z,nodlopen -Wl,-z,noexecstack \
+	-Wl,-z,relro -Wl,-z,now \
+	-Wl,--as-needed -Wl,--no-copy-dt-needed-entries
 
 ifeq ($(UNAME_S),FreeBSD)
 	CFLAGS += -I$(INCDIR)

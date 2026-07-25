@@ -1627,9 +1627,6 @@ papago_start(papago_t *server, const papago_config_t *config)
         mhd_flags |= MHD_USE_POLL; // *BSD, macOS
     }
 
-    unsigned int thread_pool_size = server->config.thread_pool_size > 0 ?
-        (unsigned int)server->config.thread_pool_size : 4;
-
 #ifdef PAPAGO_USE_MAPLE
     if (server->config.enable_template_rendering) {
         server->template_ctx = mp_init();
