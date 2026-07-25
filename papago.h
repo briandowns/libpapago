@@ -135,8 +135,10 @@ typedef void (*papago_ws_on_error_t)(papago_ws_connection_t *conn,
                                      const char *error);
 
 typedef struct {
-    int port;
+    uint16_t port;
     char *host;
+    uint32_t connection_timeout;
+    uint32_t connection_limit;
     uint16_t rate_limit_requests;
     uint16_t rate_limit_window;
     char *cert_file;
@@ -144,7 +146,6 @@ typedef struct {
     char *static_dir;
     int thread_pool_size;
     size_t max_body_size;
-    bool enable_cors;
     bool enable_ssl;
     bool enable_template_rendering;
     bool enable_rate_limiting;
@@ -703,6 +704,7 @@ papago_mime_type(const char *filename);
 #define PAPAGO_RESPONSE_HEADER_WARNING                          "Warning"
 #define PAPAGO_RESPONSE_HEADER_WWW_AUTHENTICATE                 "WWW-Authenticate"
 #define PAPAGO_RESPONSE_HEADER_X_FRAME_OPTIONS                  "X-Frame-Options"
+#define PAPAGO_RESPONSE_HEADER_X_CONTENT_TYPE_OPTIONS           "X-Content-Type-Options"
 
 #ifdef __cplusplus
 }

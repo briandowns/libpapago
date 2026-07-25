@@ -57,9 +57,12 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
+    papago_res_header(res, "Content-Type", "text/html");
     papago_res_send(res,
-        "<h1>Welcome to Papago!</h1>"
-        "<p>Built on libmicrohttpd + libwebsockets</p>");
+        "<html>"
+        "  <h1>Welcome to Papago!</h1>"
+        "  <p>Built on libmicrohttpd + libwebsockets</p>"
+        "</html>");
 }
 
 void
