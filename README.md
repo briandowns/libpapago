@@ -124,7 +124,7 @@ make example_ssl
 make example_websocket
 ```
 
-## Sane Config Defaults
+## Config Defaults
 
 * Port = 8080
 * Host = 0.0.0.0
