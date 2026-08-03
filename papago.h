@@ -382,12 +382,6 @@ papago_serve_embedded_handler(papago_request_t *req, papago_response_t *res,
                               void *user_data);
 
 // static files
-
-/**
- * Set static files directory
- */
-void
-papago_set_static_dir(papago_t *server, const char *directory);
  
 /**
  * Static file handler serves files from static directory.

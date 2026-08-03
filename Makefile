@@ -45,7 +45,18 @@ ifeq ($(PAPAGO_USE_MAPLE),1)
 	LDFLAGS += -lmaple
 endif
 
-EXAMPLES = example example_ssl example_websocket example_template example_rate_limit example_compression example_metrics example_streaming example_embedded example_logger_middleware example_token_auth_middleware example_wsclient
+EXAMPLES = example example_ssl \
+	example_websocket \
+	example_template \
+	example_rate_limit \
+	example_compression \
+	example_metrics \
+	example_streaming \
+	example_embedded \
+	example_logger_middleware \
+	example_token_auth_middleware \
+	example_wsclient \
+	example_static_dir
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
@@ -158,6 +169,10 @@ example_token_auth_middleware: clean
 .PHONY: example_wsclient
 example_wsclient: clean
 	$(CC) -o $@ papago_wsc.c examples/example_wsclient.c $(CFLAGS) -lwebsockets -lssl -lcrypto -lz -lm -lpthread
+
+.PHONY: example_static_dir
+example_static_dir: clean
+	$(CC) -o $@ papago.c examples/example_static_dir.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)
