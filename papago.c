@@ -1961,104 +1961,12 @@ papago_serve_embedded_handler(papago_request_t *req, papago_response_t *res,
 
 // static file serving
 
-// void
-// papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
-//                             void *user_data)
-// {
-//     papago_t *server = (papago_t *)user_data;
-//     char filepath[PATH_MAX];
-
-//     if (server == NULL) {
-//         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-//         papago_res_send(res, "server context is NULL");
-//         return;
-//     } else if (server->config.static_dir == NULL) {
-//         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-//         papago_res_send(res, "static directory not configured");
-//         return;
-//     }
-
-//     if (server == NULL || server->config.static_dir == NULL) {
-//         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-//         papago_res_send(res, "static directory not configured");
-//         return;
-//     }
-
-//     // prefer the wildcard remainder captured by the router; fall back to
-//     // the raw path so the handler still works when mounted at "/*" 
-//     const char *rel = papago_req_param(req, "*");
-//     char path_buf[PATH_MAX];
-//     const char *path;
-//     if (rel != NULL) {
-//         snprintf(path_buf, sizeof(path_buf), "/%s", rel);
-//         path = path_buf;
-//     } else {
-//         path = papago_req_path(req);
-//     }
-
-//     char resolved_root[PATH_MAX];
-//     if (realpath(server->config.static_dir, resolved_root) == NULL) {
-//         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-//         papago_res_send(res, "static directory not configured");
-//         return;
-//     }
-//     size_t root_len = strlen(resolved_root);
-
-//     snprintf(filepath, sizeof(filepath), "%s%s", server->config.static_dir,
-//         path);
-
-//     struct stat st;
-//     if (stat(filepath, &st) != 0) {
-//         papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
-//         papago_res_send(res, "file not found");
-//         return;
-//     }
- 
-//     if (!S_ISREG(st.st_mode)) {
-//         if (S_ISDIR(st.st_mode)) {
-//             snprintf(filepath, sizeof(filepath), "%s%s/index.html",
-//                 server->config.static_dir, path);
- 
-//             if (stat(filepath, &st) != 0 || !S_ISREG(st.st_mode)) {
-//                 papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
-//                 papago_res_send(res, "directory listing not allowed");
-//                 return;
-//             }
-//         } else {
-//             papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
-//             papago_res_send(res, "not a regular file");
-//             return;
-//         }
-//     }
- 
-//     // prevent directory traversal: resolve the actual file path, collapsing
-//     // any "..", symlinks, etc., and verify it still lives inside the
-//     // configured static_dir before serving it
-//     char resolved_path[PATH_MAX];
-//     if (realpath(filepath, resolved_path) == NULL) {
-//         papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
-//         papago_res_send(res, "file not found");
-//         return;
-//     }
-//     if (strncmp(resolved_path, resolved_root, root_len) != 0 ||
-//         (resolved_path[root_len] != '/' && resolved_path[root_len] != '\0')) {
-//         papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
-//         papago_res_send(res, "invalid path");
-//         return;
-//     }
- 
-//     if (papago_res_sendfile(server, res, resolved_path) != 0) {
-//         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-//         papago_res_send(res, "failed to serve file");
-//     }
-// }
 void
 papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
                             void *user_data)
 {
     papago_t *server = (papago_t *)user_data;
     char filepath[PATH_MAX];
-    int n;
 
     if (server == NULL || server->config.static_dir == NULL) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
@@ -2066,10 +1974,12 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
         return;
     }
 
-    /* prefer the wildcard remainder captured by the router; fall back to
-     * the raw path so the handler still works when mounted at "/*" */
+    // prefer the wildcard remainder captured by the router; fall back to
+    // the raw path so the handler still works when mounted at "/*"
     const char *rel = papago_req_param(req, "*");
     char path_buf[PATH_MAX];
+    
+    int n;
     const char *path;
     if (rel != NULL) {
         n = snprintf(path_buf, sizeof(path_buf), "/%s", rel);

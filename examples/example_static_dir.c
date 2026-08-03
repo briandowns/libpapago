@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  */
 
-#include "papago.h"
+#include "../papago.h"
 
 int
 main(void)
