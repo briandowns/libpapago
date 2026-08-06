@@ -74,6 +74,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "</ul>"
         "</body></html>";
     
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, "text/html");
     papago_res_send(res, html);
 }
 

@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <linux/limits.h>
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <ctype.h>
@@ -47,7 +46,8 @@
 #include <maple.h>
 #endif
 #include <microhttpd.h>
-#include <openssl/crypto.h>
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 #include <zlib.h>
 
 #include "papago.h"
@@ -107,7 +107,10 @@ struct papago_request {
     struct timespec start_time;
     struct MHD_Connection *connection;
     void *user_data;
-    bool   body_too_large;
+    bool body_too_large;
+    X509 *client_cert;
+    char client_cert_cn[256];
+    bool has_client_cert;
 };
 
 /**
@@ -541,6 +544,16 @@ const char*
 papago_req_version(const papago_request_t *req)
 {
     return req->version;
+}
+
+const char*
+papago_req_client_cert_cn(const papago_request_t *req)
+{
+    if (!req->has_client_cert) {
+        return NULL;
+    }
+
+    return req->client_cert_cn;
 }
 
 int
@@ -1074,7 +1087,6 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     enum MHD_Result ret;
     bool route_found;
 
-    // first call - allocate request structure
     if (*con_cls == NULL) {
         req = calloc(1, sizeof(papago_request_t));
         if (req == NULL) {
@@ -1175,6 +1187,41 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         return MHD_NO;
     }
     res->status = PAPAGO_STATUS_OK;
+
+    if (server->config.enable_ssl && server->config.require_client_cert) {
+        const union MHD_ConnectionInfo *session_info = MHD_get_connection_info(
+            connection, MHD_CONNECTION_INFO_GNUTLS_SESSION);
+
+        gnutls_session_t session = (session_info != NULL) ?
+            (gnutls_session_t)session_info->tls_session : NULL;
+
+        unsigned int cert_list_size = 0;
+        const gnutls_datum_t *cert_list = (session != NULL) ?
+            gnutls_certificate_get_peers(session, &cert_list_size) : NULL;
+
+        req->has_client_cert = false;
+
+        if (cert_list != NULL && cert_list_size > 0) {
+            gnutls_x509_crt_t peer_cert;
+            gnutls_x509_crt_init(&peer_cert);
+
+            if (gnutls_x509_crt_import(peer_cert, &cert_list[0],
+                    GNUTLS_X509_FMT_DER) == GNUTLS_E_SUCCESS) {
+                size_t cn_len = sizeof(req->client_cert_cn);
+                req->has_client_cert = (gnutls_x509_crt_get_dn_by_oid(
+                    peer_cert, GNUTLS_OID_X520_COMMON_NAME, 0, 0,
+                    req->client_cert_cn, &cn_len) == GNUTLS_E_SUCCESS);
+            }
+
+            gnutls_x509_crt_deinit(peer_cert);
+        }
+
+        if (!req->has_client_cert) {
+            papago_res_set_status(res, PAPAGO_STATUS_FORBIDDEN);
+            papago_res_json(res, "{\"error\":\"client certificate required\"}");
+            goto send_response;
+        }
+    }
 
     const char *user_agent = MHD_lookup_connection_value(connection,
         MHD_HEADER_KIND, "User-Agent");
@@ -1292,6 +1339,7 @@ send_response:
         free_kv_array(req->params, req->param_count);
         free_kv_array(req->query, req->query_count);
         free_kv_array(req->form, req->form_count);
+        X509_free(req->client_cert);
         free(req);
 
         free_kv_array(res->headers, res->header_count);
@@ -1617,9 +1665,6 @@ papago_start(papago_t *server, const papago_config_t *config)
     server->config = *config;
     server->running = true;
 
-    char *cert_pem = NULL;
-    char *key_pem = NULL;
-
     unsigned int mhd_flags = MHD_USE_INTERNAL_POLLING_THREAD;
  
     if (MHD_is_feature_supported(MHD_FEATURE_EPOLL) == MHD_YES) {
@@ -1649,34 +1694,61 @@ papago_start(papago_t *server, const papago_config_t *config)
         }
 
         // load certificate and key into memory
-        cert_pem = load_file(server->config.cert_file);
-        key_pem = load_file(server->config.key_file);
-
-        if (cert_pem == NULL || key_pem == NULL) {
-            free(cert_pem);
-            free(key_pem);
-
-            papago_set_error(PAPAGO_ERR, "failed to load SSL certificate or key");
-
+        char *cert_pem = load_file(server->config.cert_file);
+        if (cert_pem == NULL) {
+            papago_set_error(PAPAGO_ERR, "failed to load SSL certificate");
             return 1;
+        }
+
+        char *key_pem = load_file(server->config.key_file);
+        if (key_pem == NULL) {
+            free(cert_pem);
+            papago_set_error(PAPAGO_ERR, "failed to load SSL key");
+            return 1;
+        }
+
+        char *ca_pem = NULL;
+        if (server->config.ca_cert_file != NULL) {
+            ca_pem = load_file(server->config.ca_cert_file);
+            if (ca_pem == NULL) {
+                free(cert_pem);
+                free(key_pem);
+                papago_set_error(PAPAGO_ERR, "failed to load CA certificate");
+                return 1;
+            }
         }
 
         mhd_flags |= MHD_USE_TLS;
 
-        server->mhd_daemon = MHD_start_daemon(
-            mhd_flags,
-            server->config.port,
-            NULL, NULL,
-            &mhd_handler, server,
-            MHD_OPTION_HTTPS_MEM_KEY, key_pem,
-            MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
-            MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
-            MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
-            MHD_OPTION_END);
+        if (ca_pem != NULL) {
+            server->mhd_daemon = MHD_start_daemon(
+                mhd_flags,
+                server->config.port,
+                NULL, NULL,
+                &mhd_handler, server,
+                MHD_OPTION_HTTPS_MEM_KEY, key_pem,
+                MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
+                MHD_OPTION_HTTPS_MEM_TRUST, ca_pem,
+                MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
+                MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
+                MHD_OPTION_END);
+        } else {
+            server->mhd_daemon = MHD_start_daemon(
+                mhd_flags,
+                server->config.port,
+                NULL, NULL,
+                &mhd_handler, server,
+                MHD_OPTION_HTTPS_MEM_KEY, key_pem,
+                MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
+                MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
+                MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
+                MHD_OPTION_END);
+        }
 
         // free certificate memory after daemon starts
         free(cert_pem);
         free(key_pem);
+        free(ca_pem);
     } else {
         server->mhd_daemon = MHD_start_daemon(
             mhd_flags,
@@ -1726,9 +1798,9 @@ papago_start(papago_t *server, const papago_config_t *config)
             info.ssl_private_key_filepath = server->config.key_file;
         }
 
-        #ifndef PAPAGO_DEBUG
+#ifndef PAPAGO_DEBUG
         lws_set_log_level(LLL_ERR | LLL_WARN | LLL_NOTICE, suppress_lws_output);
-        #endif
+#endif
         server->lws_context = lws_create_context(&info);
         if (server->lws_context == NULL) {
             MHD_stop_daemon(server->mhd_daemon);

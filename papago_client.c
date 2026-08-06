@@ -78,9 +78,10 @@ ref_dec(void)
 }
 
 struct papago_http_client {
-    // reserved for future options 
-    // (proxy, auth, pool size)
     int pad;
+    char *ca_cert_file;
+    char *ca_cert_path;
+    bool verify_ssl;
 };
 
 typedef struct {
@@ -189,6 +190,10 @@ papago_client_new(void)
         return NULL;
     }
 
+    c->verify_ssl = false;
+    c->ca_cert_file = NULL;
+    c->ca_cert_path = NULL;
+
     return c;
 }
 
@@ -215,7 +220,6 @@ papago_request_default(void)
         .headers = NULL,
         .timeout_ms = 30000,
         .follow_redirects = true,
-        .verify_ssl = true,
     };
 }
 
@@ -300,9 +304,9 @@ papago_http_send(papago_http_client_t *client,
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION,
         req->follow_redirects ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER,
-        req->verify_ssl ? 1L : 0L);
+        client->verify_ssl ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST,
-        req->verify_ssl ? 2L : 0L);
+        client->verify_ssl ? 2L : 0L);
 
     CURLcode rc = curl_easy_perform(curl);
     if (rc != CURLE_OK) {
