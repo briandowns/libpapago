@@ -34,6 +34,20 @@
 static papago_t *server = NULL;
 
 /**
+ * Signal handler for graceful shutdown.
+ */
+static void
+signal_handler(int sig)
+{
+    PAPAGO_UNUSED(sig);
+
+    printf("\nShutting down...\n");
+    if (server != NULL) {
+        papago_stop(server);
+    }
+}
+
+/**
  * Rate limit middleware
  */
 static bool
@@ -50,20 +64,6 @@ rate_limit_middleware(papago_request_t *req, papago_response_t *res,
     return true;
 }
 
-/**
- * Signal handler for graceful shutdown.
- */
-static void
-signal_handler(int sig)
-{
-    PAPAGO_UNUSED(sig);
-
-    printf("\nShutting down...\n");
-    if (server != NULL) {
-        papago_stop(server);
-    }
-}
-
 // HTTP route handlers
 
 void
@@ -72,6 +72,8 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
+        "text/html; charset=utf-8");
     papago_res_send(res,
         "<h1>Welcome to Papago!</h1>"
         "<p>Rate Limiting Example</p>");

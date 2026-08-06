@@ -56,11 +56,12 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
 	PAPAGO_UNUSED(user_data);
 
 	const char *cn = papago_req_client_cert_cn(req);
+	const char *client_cn = (cn != NULL) ? cn : "";
 
 	char payload[1024];
 	snprintf(payload, sizeof(payload),
-        "{\"status\": \"mutually authenticated tls\", \"client_cn\":\"%s\"}",
-        (cn != NULL) ? cn : "{\"status\": \"no client cert\"}");
+		"{\"status\":\"authenticated\",\"client_cn\":\"%s\"}",
+ 	    client_cn);
 
 	papago_res_json(res, payload);
 }

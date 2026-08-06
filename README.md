@@ -263,7 +263,8 @@ void
 handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     // read request
-    const char *header = papago_req_header(req, "Content-Type");
+    const char *content_type = papago_req_header(req,
+        PAPAGO_RESPONSE_HEADER_CONTENT_TYPE);
     const char *id = papago_req_param(req, "id");
     const char *search = papago_req_query(req, "q");
     const char *body = papago_req_body(req);

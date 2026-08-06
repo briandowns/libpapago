@@ -108,7 +108,6 @@ struct papago_request {
     struct MHD_Connection *connection;
     void *user_data;
     bool body_too_large;
-    X509 *client_cert;
     char client_cert_cn[256];
     bool has_client_cert;
 };
@@ -1203,7 +1202,12 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
         if (cert_list != NULL && cert_list_size > 0) {
             gnutls_x509_crt_t peer_cert;
-            gnutls_x509_crt_init(&peer_cert);
+            int ret = gnutls_x509_crt_init(&peer_cert);
+            if (ret != GNUTLS_E_SUCCESS) {
+                papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+                papago_res_json(res, "{\"error\":\"failed loading client certificate\"}");
+                goto send_response;
+            }
 
             if (gnutls_x509_crt_import(peer_cert, &cert_list[0],
                     GNUTLS_X509_FMT_DER) == GNUTLS_E_SUCCESS) {
@@ -1339,7 +1343,6 @@ send_response:
         free_kv_array(req->params, req->param_count);
         free_kv_array(req->query, req->query_count);
         free_kv_array(req->form, req->form_count);
-        X509_free(req->client_cert);
         free(req);
 
         free_kv_array(res->headers, res->header_count);
@@ -1684,6 +1687,13 @@ papago_start(papago_t *server, const papago_config_t *config)
         }
     }
 #endif
+
+    if (existing_config.require_client_cert && 
+       (config->ca_cert_file == NULL || config->ca_cert_file[0] == '\0')) {
+        papago_set_error(PAPAGO_ERR,
+            "require_client_cert is true but ca_cert_file is not set");
+        return 1;
+    }
 
     // start libmicrohttpd daemon with optional SSL
     if (server->config.enable_ssl) {

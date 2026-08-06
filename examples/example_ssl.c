@@ -72,7 +72,8 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "</body>\n"
         "</html>\n";
 
-    papago_res_header(res, "Content-Type", "text/html; charset=utf-8");
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
+        "text/html; charset=utf-8");
     papago_res_send(res, html);
 }
 
@@ -83,7 +84,6 @@ api_secure_handler(papago_request_t *req, papago_response_t *res, void *user_dat
     PAPAGO_UNUSED(res);
     PAPAGO_UNUSED(user_data);
 
-    papago_res_header(res, "Content-Type", "application/json");
     papago_res_json(res,
         "{\"message\":\"This API is served over HTTPS\","
         "\"secure\":true}");

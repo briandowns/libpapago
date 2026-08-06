@@ -26,15 +26,11 @@
  */
 
 /**
- * papago_wsc example — connect to a running example_websocket server,
- * exchange a few messages, then exit cleanly.
- *
- * Build:
- *   make example_wsclient
+ * papago_wsc example connect to a running example_websocket server,
+ * exchange a few messages, then exit.
  *
  * Run (start the websocket server first):
- *   ./example_websocket &
- *   ./example_wsclient
+ *   ./example_websocket & ./example_wsclient
  */
 
 #include <signal.h>
@@ -51,7 +47,8 @@ on_connect(papago_wsc_t *client)
 {
     printf("[connect] connected to server\n");
 
-    papago_wsc_send(client, "{\"type\":\"message\",\"text\":\"Hello from C client!\"}");
+    papago_wsc_send(client,
+        "{\"type\":\"message\",\"text\":\"Hello from C client!\"}");
 }
 
 static void
@@ -69,7 +66,7 @@ on_message(papago_wsc_t *client, const char *message, size_t length,
 
     /**
      * The example_websocket server sends a JSON welcome message on connect
-     * and echoes/broadcasts chat messages.  Once we have received the
+     * and echoes/broadcasts chat messages. Once we have received the
      * welcome we send one more message and then ask for a clean disconnect.
      */
     if (strstr(message, "\"type\":\"welcome\"") != NULL) {
@@ -143,5 +140,6 @@ main(void)
     g_client = NULL;
 
     printf("done\n");
+
     return 0;
 }

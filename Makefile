@@ -26,7 +26,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 TEST_CFLAGS = $(CFLAGS) -g
-LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread -lgnutls\
+LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread -lgnutls \
 	-Wl,-z,nodlopen -Wl,-z,noexecstack \
 	-Wl,-z,relro -Wl,-z,now \
 	-Wl,--as-needed -Wl,--no-copy-dt-needed-entries
@@ -105,7 +105,7 @@ clean:
 	rm -f $(EXAMPLES)
 	rm -f tests/tests
 
-EXAMPLES =  \
+EXAMPLES =  example \
 	example_ssl \
 	example_websocket \
 	example_template \

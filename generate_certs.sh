@@ -30,7 +30,7 @@ subjectAltName = @alt_names
 
 [ alt_names ]
 DNS.1 = localhost
-$(printf "${SAN_CONFIG}")
+$(printf '%s' "${SAN_CONFIG}")
 EOF
 
     SERVER_CSR="$(mktemp)"

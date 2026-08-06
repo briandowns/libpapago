@@ -93,7 +93,6 @@ main(void)
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 
     papago_config_t config = papago_default_config();
-    config.port = 8282;
     config.enable_template_rendering = true;
 
     printf("Server starting on:\n");
