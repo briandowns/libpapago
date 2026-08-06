@@ -26,7 +26,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 TEST_CFLAGS = $(CFLAGS) -g
-LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread \
+LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread -lgnutls \
 	-Wl,-z,nodlopen -Wl,-z,noexecstack \
 	-Wl,-z,relro -Wl,-z,now \
 	-Wl,--as-needed -Wl,--no-copy-dt-needed-entries
@@ -44,19 +44,6 @@ ifeq ($(PAPAGO_USE_MAPLE),1)
 	CFLAGS += -DPAPAGO_USE_MAPLE
 	LDFLAGS += -lmaple
 endif
-
-EXAMPLES = example example_ssl \
-	example_websocket \
-	example_template \
-	example_rate_limit \
-	example_compression \
-	example_metrics \
-	example_streaming \
-	example_embedded \
-	example_logger_middleware \
-	example_token_auth_middleware \
-	example_wsclient \
-	example_static_dir
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
@@ -118,61 +105,80 @@ clean:
 	rm -f $(EXAMPLES)
 	rm -f tests/tests
 
+EXAMPLES =  example \
+	example_ssl \
+	example_websocket \
+	example_template \
+	example_rate_limit \
+	example_compression \
+	example_metrics \
+	example_streaming \
+	example_embedded \
+	example_logger_middleware \
+	example_token_auth_middleware \
+	example_wsclient \
+	example_static_dir \
+	example_mtls
+
 .PHONY: example
 example: clean
-	$(CC) -o $@ papago.c examples/example.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_ssl
 example_ssl: clean
-	$(CC) -o $@ papago.c examples/example_ssl.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_websocket
 example_websocket: clean
-	$(CC) -o $@ papago.c examples/example_websocket.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_template
 example_template: clean
-	$(CC) -o $@ examples/example_template.c papago.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ examples/$@.c papago.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_rate_limit
 example_rate_limit: clean
-	$(CC) -o $@ papago.c examples/example_rate_limit.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_compression
 example_compression: clean
-	$(CC) -o $@ papago.c examples/example_compression.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_metrics
 example_metrics: clean
-	$(CC) -o $@ papago.c examples/example_metrics.c $(CFLAGS) $(LDFLAGS) -ljansson
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS) -ljansson
 
 .PHONY: example_streaming
 example_streaming: clean
-	$(CC) -o $@ papago.c examples/example_streaming.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_embedded
 example_embedded: clean
-	$(CC) -o $@ papago.c examples/example_embedded.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_form
 example_form: clean
-	$(CC) -o $@ papago.c examples/example_form.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_logger_middleware
 example_logger_middleware: clean
-	$(CC) -o $@ papago.c examples/example_logger_middleware.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_token_auth_middleware
 example_token_auth_middleware: clean
-	$(CC) -o $@ papago.c examples/example_token_auth_middleware.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: example_wsclient
 example_wsclient: clean
-	$(CC) -o $@ papago_wsc.c examples/example_wsclient.c $(CFLAGS) -lwebsockets -lssl -lcrypto -lz -lm -lpthread
+	$(CC) -o $@ papago_wsc.c examples/$@.c $(CFLAGS) -lwebsockets -lssl -lcrypto -lz -lm -lpthread
 
 .PHONY: example_static_dir
 example_static_dir: clean
-	$(CC) -o $@ papago.c examples/example_static_dir.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_mtls
+example_mtls: clean
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)

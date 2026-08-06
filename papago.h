@@ -143,6 +143,8 @@ typedef struct {
     uint16_t rate_limit_window;
     char *cert_file;
     char *key_file;
+    char *ca_cert_file;
+    bool require_client_cert;
     char *static_dir;
     int thread_pool_size;
     size_t max_body_size;
@@ -323,6 +325,13 @@ papago_req_user_agent(const papago_request_t *req);
  */
 const char*
 papago_req_version(const papago_request_t *req);
+
+/**
+ * Retrieve client certificate common name (CN). Returns CN string or NULL if
+ * no client certificate is present.
+ */
+const char*
+papago_req_client_cert_cn(const papago_request_t *req);
 
 // response helpers
 

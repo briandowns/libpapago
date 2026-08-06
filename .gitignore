@@ -21,6 +21,8 @@ example_form
 example_logger_middleware
 example_token_auth_middleware
 example_wsclient
+example_static_dir
+example_mtls
 debug_build
 
 libpapago.dylib
@@ -29,7 +31,7 @@ libpapago.so
 libpapago_wsc.so
 libpapago.a
 
-server.crt
-server.key
+*.crt
+*.key
 
 *.mp*

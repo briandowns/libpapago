@@ -188,7 +188,8 @@ list_files_handler(papago_request_t *req, papago_response_t *res, void *user_dat
     char html[8192];
     int len = 0;
     len += snprintf(html + len, sizeof(html) - len,
-        "<html><head><title>Files</title>"
+        "<html>"
+        "<head><title>Files</title>"
         "<style>body{font-family:sans-serif;margin:40px;}"
         "table{border-collapse:collapse;width:100%%;}"
         "th,td{border:1px solid #ddd;padding:8px;text-align:left;}"
@@ -240,7 +241,8 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(user_data);
 
     const char *html = 
-        "<html><head><title>Papago File Streaming Demo</title>"
+        "<html>"
+        "<head><title>Papago File Streaming Demo</title>"
         "<style>body{font-family:sans-serif;margin:40px;max-width:800px;}"
         "h1{color:#4CAF50;}</style></head>"
         "<body>"
@@ -258,7 +260,8 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "<ul>"
         "<li><a href='/files'>List all files</a></li>"
         "</ul>"
-        "</body></html>";
+        "</body>"
+        "</html>";
 
     papago_res_send(res, html);
 }

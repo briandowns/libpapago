@@ -60,7 +60,8 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(user_data);
     
     const char *html = 
-        "<html><body>"
+        "<html>"
+        "<body>"
         "<h1>Prometheus Metrics Example</h1>"
         "<h2>Test Endpoints:</h2>"
         "<ul>"
@@ -72,8 +73,10 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "<li><a href='/metrics'>/metrics</a> (Prometheus format)</li>"
         "<li><a href='/health'>/health</a> (Health check)</li>"
         "</ul>"
-        "</body></html>";
+        "</body>"
+        "</html>";
     
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, "text/html");
     papago_res_send(res, html);
 }
 

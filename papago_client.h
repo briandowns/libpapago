@@ -62,7 +62,6 @@ typedef struct {
     papago_http_header_t *headers; // extra headers linked list
     long timeout_ms; // 0 to 30 000 ms
     bool follow_redirects; // default: true
-    bool verify_ssl; // default: true
 } papago_http_request_t;
 
 /**

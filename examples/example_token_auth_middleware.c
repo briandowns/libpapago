@@ -28,9 +28,7 @@
 #define _POSIX_C_SOURCE 199309L
 #include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "../papago.h"
@@ -114,8 +112,8 @@ main(void)
     }
 
     papago_middleware_t token_auth = {
-        .before    = token_auth_before,
-        .after     = token_auth_after,
+        .before = token_auth_before,
+        .after = token_auth_after,
         .user_data = NULL,
     };
     papago_middleware_path_add(server, "/protected", &token_auth);

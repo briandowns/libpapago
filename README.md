@@ -1,28 +1,31 @@
 # papago
 
-Modern web framework designed to be full featured and powerful all while being extremely simple to use.
+Modern web framework designed to be simple, full featured, and powerful all while being extremely user friendly.
 
 ## Features
 
-- RESTful Routing - GET, POST, PUT, DELETE, PATCH support
-- Path Parameters - Dynamic routes like `/users/:id`
-- Wildcard URIs - Example: `/api/v1/*` 
-- Query Parameters - Parse URL query strings
-- Form Parsing - Parse application/x-www-form-urlencoded bodies
-- HTML Templates - Easy dynamic content via server side templating
-- Middleware System - Global and path-specific middleware
-- File stream - video / audio / large files, zero-copy, automatic MIME type detection
-- WebSocket Support - Real-time bidirectional communication
-- WebSocket Client - included
-- Embedded File Support - Embed HTML, JS, CSS, etc into the application
-- JSON Responses - Built-in JSON helpers
-- Static Files - Serve files from directories
-- Thread-Safe - Built on proven concurrent architecture
-- Low Dependencies - Only requires libmicrohttpd + libwebsockets
-- Rate limiting by IP
-- Compression with Gzip
-- Metrics collection and exposure via Prometheus endpoint
-- Simple HTTP Client
+| Feature | Description |
+|---|---|
+| RESTful Routing | GET, POST, PUT, DELETE, PATCH support |
+| SSL/TLS Encryption | Server and client side |
+| Path Parameters | Dynamic routes like `/users/:id` |
+| Wildcard URIs | Example: `/api/v1/*` |
+| Query Parameters | Parse URL query strings |
+| Form Parsing | Parse application/x-www-form-urlencoded bodies |
+| HTML Templates | Easy dynamic content via server side templating |
+| Middleware System | Global and path-specific middleware |
+| File stream | video / audio / large files, zero-copy, automatic MIME type detection |
+| WebSocket Support | Real-time bidirectional communication |
+| WebSocket Client | included |
+| Embedded File Support | Embed HTML, JS, CSS, etc into the application |
+| JSON Responses | Built-in JSON helpers |
+| Static Files | Serve files from directories |
+| Thread-Safe | Built on proven concurrent architecture |
+| Low Dependencies | Only requires libmicrohttpd + libwebsockets |
+| Rate limiting by IP | |
+| Compression with Gzip | |
+| Metrics collection and exposure via Prometheus endpoint | |
+| Simple HTTP Client | |
 
 ### MIME Types Supported
 HTML, CSS, JS, JSON, XML, TXT
@@ -260,7 +263,8 @@ void
 handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     // read request
-    const char *header = papago_req_header(req, "Content-Type");
+    const char *content_type = papago_req_header(req,
+        PAPAGO_RESPONSE_HEADER_CONTENT_TYPE);
     const char *id = papago_req_param(req, "id");
     const char *search = papago_req_query(req, "q");
     const char *body = papago_req_body(req);
