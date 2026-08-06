@@ -62,7 +62,7 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "{\"status\": \"mutually authenticated tls\", \"client_cn\":\"%s\"}",
         (cn != NULL) ? cn : "{\"status\": \"no client cert\"}");
 
-	papago_res_send(res, payload);
+	papago_res_json(res, payload);
 }
 
 int
