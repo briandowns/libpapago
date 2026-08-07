@@ -600,6 +600,14 @@ papago_res_json(papago_response_t *res, const char *json)
     return papago_res_send(res, json);
 }
 
+int
+papago_res_html(papago_response_t *res, const char *html)
+{
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
+        "text/html; charset=utf-8");
+    return papago_res_send(res, html);
+}
+
 /**
  * Set file streaming headers
  */
@@ -801,7 +809,6 @@ void
 papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     PAPAGO_UNUSED(req);
-
 
     papago_t *server = (papago_t*)user_data; 
     if (server == NULL) {
@@ -1383,7 +1390,6 @@ send_response:
             if (mhd_response == NULL) {
                 return MHD_NO;
             }
-
 
             MHD_add_response_header(mhd_response, "Content-Encoding", "gzip");
             MHD_add_response_header(mhd_response, "Vary", "Accept-Encoding");

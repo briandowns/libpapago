@@ -72,9 +72,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "</body>\n"
         "</html>\n";
 
-    papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
-        "text/html; charset=utf-8");
-    papago_res_send(res, html);
+    papago_res_html(res, html);
 }
 
 void

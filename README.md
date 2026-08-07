@@ -4,28 +4,26 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 
 ## Features
 
-| Feature | Description |
-|---|---|
-| RESTful Routing | GET, POST, PUT, DELETE, PATCH support |
-| SSL/TLS Encryption | Server and client side |
-| Path Parameters | Dynamic routes like `/users/:id` |
-| Wildcard URIs | Example: `/api/v1/*` |
-| Query Parameters | Parse URL query strings |
-| Form Parsing | Parse application/x-www-form-urlencoded bodies |
-| HTML Templates | Easy dynamic content via server side templating |
-| Middleware System | Global and path-specific middleware |
-| File stream | video / audio / large files, zero-copy, automatic MIME type detection |
-| WebSocket Support | Real-time bidirectional communication |
-| WebSocket Client | included |
-| Embedded File Support | Embed HTML, JS, CSS, etc into the application |
-| JSON Responses | Built-in JSON helpers |
-| Static Files | Serve files from directories |
-| Thread-Safe | Built on proven concurrent architecture |
-| Low Dependencies | Only requires libmicrohttpd + libwebsockets |
-| Rate limiting by IP | |
-| Compression with Gzip | |
-| Metrics collection and exposure via Prometheus endpoint | |
-| Simple HTTP Client | |
+* RESTful Routing - GET, POST, PUT, DELETE, PATCH support
+* SSL/TLS Encryption - Server and client side
+* Path Parameters - Dynamic routes like `/users/:id`
+* Wildcard URIs - Example: `/api/v1/*` 
+* Query Parameters - Parse URL query strings
+* Form Parsing - Parse application/x-www-form-urlencoded bodies
+* HTML Templates - Easy dynamic content via server side templating
+* Middleware System - Global and path-specific middleware
+* File stream - video / audio / large files, zero-copy, automatic MIME type detection
+* WebSocket Support - Real-time bidirectional communication
+* WebSocket Client - included
+* Embedded File Support - Embed HTML, JS, CSS, etc into the application
+* JSON Responses - Built-in JSON helpers
+* Static Files - Serve files from directories
+* Thread-Safe - Built on proven concurrent architecture
+* Low Dependencies - Only requires libmicrohttpd + libwebsockets
+* Rate limiting by IP
+* Compression with Gzip
+* Metrics collection and exposure via Prometheus endpoint
+* Simple HTTP Client
 
 ### MIME Types Supported
 HTML, CSS, JS, JSON, XML, TXT
@@ -172,6 +170,12 @@ search_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 }
 papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
 ```
+
+### Convenience Functions
+
+Convenience functions are provided to make seneding responses even easier.
+
+`papago_res_send`, `papago_res_html`, `papago_res_json` are meant to be used when sending simple text, HTML, and JSON respectively. The last 2 set appropriate headers for the payload while the first leaves this to the user.
 
 ### Middleware
 
