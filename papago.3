@@ -1,0 +1,371 @@
+.nh
+.TH papago
+.PP
+Modern web framework designed to be simple, full featured, and powerful all while being extremely user friendly.
+
+.SH Features
+.RS
+.IP \(bu 2
+RESTful Routing - GET, POST, PUT, DELETE, PATCH support
+.IP \(bu 2
+SSL/TLS Encryption - Server and client side
+.IP \(bu 2
+Path Parameters - Dynamic routes like \fB/users/:id\fR
+.IP \(bu 2
+Wildcard URIs - Example: \fB/api/v1/*\fR
+.IP \(bu 2
+Query Parameters - Parse URL query strings
+.IP \(bu 2
+Form Parsing - Parse application/x-www-form-urlencoded bodies
+.IP \(bu 2
+HTML Templates - Easy dynamic content via server side templating
+.IP \(bu 2
+Middleware System - Global and path-specific middleware
+.IP \(bu 2
+File stream - video / audio / large files, zero-copy, automatic MIME type detection
+.IP \(bu 2
+WebSocket Support - Real-time bidirectional communication
+.IP \(bu 2
+WebSocket Client - included
+.IP \(bu 2
+Embedded File Support - Embed HTML, JS, CSS, etc into the application
+.IP \(bu 2
+JSON Responses - Built-in JSON helpers
+.IP \(bu 2
+Static Files - Serve files from directories
+.IP \(bu 2
+Thread-Safe - Built on proven concurrent architecture
+.IP \(bu 2
+Low Dependencies - Only requires libmicrohttpd + libwebsockets
+.IP \(bu 2
+Rate limiting by IP
+.IP \(bu 2
+Compression with Gzip
+.IP \(bu 2
+Metrics collection and exposure via Prometheus endpoint
+.IP \(bu 2
+Simple HTTP Client
+
+.RE
+
+.SS MIME Types Supported
+.PP
+HTML, CSS, JS, JSON, XML, TXT
+PNG, JPG, GIF, SVG, ICO, WebP
+MP4, WebM, OGG
+MP3, WAV, M4A
+PDF, ZIP, TAR, GZ
+WOFF, WOFF2, TTF
+
+.SH Dependencies
+.RS
+.IP \(bu 2
+libmicrohttpd
+.IP \(bu 2
+libwebsockets
+.IP \(bu 2
+openssl
+.IP \(bu 2
+libmaple - Maple Template Engine
+\[la]https://github.com/briandowns/libmaple\[ra]
+
+.RE
+
+.SH Build
+.PP
+Papago has the template engine (Maple) disabled by default. If this component is required, add \fBPAPAGO_USE_MAPLE=1\fR to the \fBmake\fR command when building.
+
+.EX
+make
+.EE
+
+.SH Install
+.EX
+sudo make install
+.EE
+
+.SH Quick Start
+.PP
+Below is a very simple demonstration of how to create a handler for a \fBGET\fR request.
+
+.PP
+Default server runs on port \fB:8080\fR\&.
+
+.EX
+#include <stdio.h>
+
+#include <papago.h>
+
+void
+hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(user_data);
+
+	papago_res_json(res, "{\\"message\\":\\"Hello, World!\\"}");
+}
+
+int
+main(void)
+{
+	papago_t *server = papago_new();
+	
+	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
+	
+    papago_config_t config = papago_default_config();
+	papago_start(server, &config); // blocking
+	
+	papago_destroy(server);
+
+	return 0;
+}
+.EE
+
+.PP
+Build and run:
+
+.EX
+cc -o hello hello.c -lpapago
+\&./hello
+.EE
+
+.PP
+Test:
+
+.EX
+curl http://localhost:8080/hello
+# {"message":"Hello, World!"}
+.EE
+
+.PP
+More examples can be found in the examples
+\[la]/examples\[ra] directory. Each example has a \fBmake\fR target.
+
+.PP
+You can make all examples with \fBmake examples_all PAPAGO_USE_MAPLE=1\fR\&.
+
+.EX
+make example
+.EE
+
+.PP
+A convenience script is included to generate certificates to run the example below.
+
+.EX
+generate_certs.sh
+.EE
+
+.EX
+make example_ssl
+.EE
+
+.EX
+make example_websocket
+.EE
+
+.SH Config Defaults
+.RS
+.IP \(bu 2
+Port = 8080
+.IP \(bu 2
+Host = 0.0.0.0
+.IP \(bu 2
+Timeout = 30s
+.IP \(bu 2
+Max conns = 256
+.IP \(bu 2
+SSL Enabled = off
+.IP \(bu 2
+Rate Limiting = off
+.IP \(bu 2
+Template rendering = off
+.IP \(bu 2
+Compression = off
+.IP \(bu 2
+Max body size = 10485760 (10 * 1024 * 1024)
+.IP \(bu 2
+Thread pool size = 4
+
+.RE
+
+.PP
+All config values can be easily set on the \fBpapago_config_t\fR value. Check the examples for more details.
+
+.SH Core Concepts
+.SS HTTP Routes
+.EX
+// basic routes
+papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+papago_route(server, PAPAGO_POST, "/users", create_user, NULL);
+papago_route(server, PAPAGO_PUT, "/users/:id", update_user, NULL);
+papago_route(server, PAPAGO_DELETE, "/users/:id", delete_user, NULL);
+
+// path parameters
+void
+user_handler(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+    const char *id = papago_req_param(req, "id");
+    // use id...
+}
+papago_route(server, PAPAGO_GET, "/users/:id", user_handler, NULL);
+
+// query parameters
+void
+search_handler(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+    const char *q = papago_req_query(req, "q");
+    const char *page = papago_req_query(req, "page");
+    // use q and page...
+}
+papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
+.EE
+
+.SS Convenience Functions
+.PP
+Convenience functions are provided to make seneding responses even easier.
+
+.PP
+\fBpapago_res_send\fR, \fBpapago_res_html\fR, \fBpapago_res_html\fR are meant to be used when sending simple text, HTML, and JSON respectiely. The last 2 set appropriate headers for the payload while the first leaves this to the user.
+
+.SS Middleware
+.PP
+Papago middleware consists of defining 2 functions, \fBbefore\fR and \fBafter\fR and assigning them to the \fBpapago_middleware_t\fR struct. The \fBbefore\fR function is ran on every request and is required to be present. The \fBafter\fR function is optional.
+
+.EX
+static bool
+mw_before(papago_request_t *req, papago_response_t *res, void *user_data);
+
+static void
+mw_after(papago_request_t *req, papago_response_t *res, void *user_data);
+.EE
+
+.EX
+papago_middleware_t middleware = {
+    .before    = mw_before,
+    .after     = mw_after,
+    .user_data = NULL,
+};
+.EE
+
+.PP
+After defining the middleware and assigning the functions to the struct, Papago supports setting the middleware to run globally or on specific routes. This is especially helpful when writing loggers or authentication middleware.
+
+.EX
+// global middleware - runs on ALL routes
+papago_middleware_add(server, middleware);
+
+// path-specific - runs only on /api/* routes
+papago_middleware_path_add(server, "/api", middleware);
+.EE
+
+.PP
+Examples of some common middlewares (logger, rate-limiting) can be found in the examples
+\[la]examples/\[ra] directory.
+
+.SS Websocket
+.PP
+Below is example code of how to use the websocket functionality. For the available websocket client API, reference the Papago Websocket Client Header
+\[la]papago_wsc.h\[ra] file.
+
+.EX
+void
+ws_on_connect(papago_ws_connection_t *conn)
+{
+    printf("Client connected: %s\\n", papago_ws_get_client_ip(conn));
+    papago_ws_send(conn, "{\\"type\\":\\"welcome\\"}");
+}
+
+void
+ws_on_message(papago_ws_connection_t *conn, const char *message,
+              size_t length, bool is_binary)
+{
+    printf("Received: %s\\n", message);
+    
+    // echo back
+    papago_ws_send(conn, message);
+    
+    // or broadcast to all
+    papago_ws_broadcast(papago_get_current_server(), message);
+}
+
+void
+ws_on_close(papago_ws_connection_t *conn)
+{
+    printf("client disconnected\\n");
+}
+
+void
+ws_on_error(papago_ws_connection_t *conn, const char *error)
+{
+    fprintf(stderr, "error: %s\\n", error);
+}
+
+// register websocket endpoint
+papago_ws_endpoint(server, "/ws", 
+    ws_on_connect, ws_on_message, ws_on_close, ws_on_error);
+.EE
+
+.PP
+Client-side JavaScript:
+
+.EX
+const ws = new WebSocket('ws://localhost:8081/ws');
+
+ws.onopen = () => ws.send('Hello!');
+ws.onmessage = (e) => console.log('Received:', e.data);
+.EE
+
+.SS Request & Response
+.EX
+void
+handler(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+    // read request
+    const char *content_type = papago_req_header(req,
+        PAPAGO_RESPONSE_HEADER_CONTENT_TYPE);
+    const char *id = papago_req_param(req, "id");
+    const char *search = papago_req_query(req, "q");
+    const char *body = papago_req_body(req);
+    
+    // send response
+    papago_res_status(res, PAPAGO_STATUS_OK);
+    papago_res_header(res, "X-Custom", "value");
+    papago_res_json(res, "{\\"status\\":\\"ok\\"}");
+}
+.EE
+
+.PP
+To build the client along with the Papago framework, use: \fBmake PAPAGO_WITH_WSC\fR and \fBsudo make install PAPAGO_WITH_WSC=1\fR\&.
+
+.SH Metrics
+.PP
+To expose the Prometheus endpoint, register the metrics handler in your application.
+
+.EX
+papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, NULL);
+.EE
+
+.SH Threading Model
+.RS
+.IP \(bu 2
+HTTP: Thread pool - 4 (default) (libmicrohttpd)
+.IP \(bu 2
+WebSocket: Event loop in separate thread
+.IP \(bu 2
+Broadcast: Thread-safe with mutex protection
+
+.RE
+
+.SH Contributing
+.PP
+Please feel free to open a PR!
+
+.SH Contact
+.PP
+Brian Downs @bdowns328
+\[la]http://twitter.com/bdowns328\[ra]
+
+.SH License
+.PP
+BSD 2 Clause License
+\[la]/LICENSE\[ra]\&.

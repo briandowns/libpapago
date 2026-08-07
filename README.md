@@ -175,7 +175,7 @@ papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
 
 Convenience functions are provided to make seneding responses even easier.
 
-`papago_res_send`, `papago_res_html`, `papago_res_html` are meant to be used when sending simple text, HTML, and JSON respectiely. The last 2 set appropriate headers for the payload while the first leaves this to the user.
+`papago_res_send`, `papago_res_html`, `papago_res_json` are meant to be used when sending simple text, HTML, and JSON respectively. The last 2 set appropriate headers for the payload while the first leaves this to the user.
 
 ### Middleware
 

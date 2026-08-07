@@ -47,7 +47,6 @@ signal_handler(int sig)
     }
 }
 
-
 /**
  * Generate large JSON response for compression testing
  */
@@ -61,6 +60,7 @@ large_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     if (large_text == NULL) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         papago_res_json(res, "{\"error\":\"failed to generate response\"}");
+        return;
     }
 
     strcpy(large_text, "{\"data\":[");
