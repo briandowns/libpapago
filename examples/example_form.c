@@ -56,7 +56,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(user_data);
 
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, "text/html");
-    papago_res_send(res,
+    papago_res_html(res,
         "<html><head><title>Example Form</title></head><body>"
             "<form action=\"/login\" method=\"POST\">"
                 "<label for=\"username\">Username:</label>"

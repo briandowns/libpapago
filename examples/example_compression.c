@@ -58,25 +58,25 @@ large_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(user_data);
 
     char *large_text = malloc(10000);
-    if (large_text != NULL) {
-        strcpy(large_text, "{\"data\":[");
-
-        for (int i = 0; i < 100; i++) {
-            char item[100];
-            snprintf(item, sizeof(item), 
-                "{\"id\":%d,\"name\":\"Item %d\",\"value\":\"data\"}%s",
-                i, i, i < 99 ? "," : "");
-            strcat(large_text, item);
-        }
-        strcat(large_text, "]}");
-        
-        printf("sending large text: %zu bytes\n", strlen(large_text));
-        papago_res_send(res, large_text);
-        free(large_text);
-    } else {
+    if (large_text == NULL) {
         papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
         papago_res_json(res, "{\"error\":\"failed to generate response\"}");
     }
+
+    strcpy(large_text, "{\"data\":[");
+
+    for (int i = 0; i < 100; i++) {
+        char item[100];
+        snprintf(item, sizeof(item), 
+            "{\"id\":%d,\"name\":\"Item %d\",\"value\":\"data\"}%s",
+            i, i, i < 99 ? "," : "");
+        strcat(large_text, item);
+    }
+    strcat(large_text, "]}");
+    
+    printf("sending large text: %zu bytes\n", strlen(large_text));
+    papago_res_send(res, large_text);
+    free(large_text);
 }
 
 /**
@@ -113,7 +113,7 @@ info_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "  curl -i -H \"Accept-Encoding: gzip\" http://localhost:8080/large\n"
     );
 
-    papago_res_send(res, info);
+    papago_res_html(res, info);
 }
 
 int

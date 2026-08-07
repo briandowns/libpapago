@@ -57,8 +57,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-    papago_res_set_status(res, PAPAGO_STATUS_OK);
-    papago_res_send(res,
+    papago_res_html(res,
         "<h1>Welcome to Papago!</h1>"
         "<p>Built on libmicrohttpd + libwebsockets</p>");
 }
@@ -69,7 +68,6 @@ protected_handler(papago_request_t *req, papago_response_t *res, void *user_data
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-    papago_res_set_status(res, PAPAGO_STATUS_OK);
     papago_res_json(res, "{\"status\":\"authenticated\"}");
 }
 

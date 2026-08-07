@@ -75,9 +75,8 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "</ul>"
         "</body>"
         "</html>";
-    
-    papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE, "text/html");
-    papago_res_send(res, html);
+
+    papago_res_html(res, html);
 }
 
 void
@@ -141,8 +140,7 @@ slow_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     
     // simulate slow endpoint
     sleep(1);
-    
-    papago_res_set_status(res, PAPAGO_STATUS_OK);
+
     papago_res_send(res, "slow response completed");
 }
  

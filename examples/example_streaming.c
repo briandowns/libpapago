@@ -228,7 +228,7 @@ list_files_handler(papago_request_t *req, papago_response_t *res, void *user_dat
 
     len += snprintf(html + len, sizeof(html) - len, "</table></body></html>");
 
-    papago_res_send(res, html);
+    papago_res_html(res, html);
 }
 
 /**
@@ -263,7 +263,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "</body>"
         "</html>";
 
-    papago_res_send(res, html);
+    papago_res_html(res, html);
 }
 
 int

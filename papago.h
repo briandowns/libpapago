@@ -354,16 +354,25 @@ void
 papago_res_header(papago_response_t *res, const char *key, const char *value);
 
 /**
- * Send response body. Returns 0 on success or 1 on failure.
+ * Send a response body. Appropriate headers should be set before this
+ * function. Returns 0 on success or 1 on failure.
  */
 int
 papago_res_send(papago_response_t *res, const char *body);
 
 /**
- * Send JSON response. Returns 0 on success or 1 on failure.
+ * Send a JSON response. Expected headers set. Returns 0 on success or 1 on
+ * failure.
  */
 int
 papago_res_json(papago_response_t *res, const char *json);
+
+/**
+ * Send an HTML response. Expected headers set. Returns 0 on success or 1 on
+ * failure.
+ */
+int
+papago_res_html(papago_response_t *res, const char *html);
 
 // static content embedding
  
