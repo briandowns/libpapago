@@ -22,4 +22,4 @@ jobs:
           pip install codespell
       - name: Check spelling
         run: |
-          codespell --skip=.git,LICENSE --check-filenames --ignore-words-list=te --ignore-regex=.template --ignore-regex=.md --ignore-regex=.3 --ignore-regex=.yml --ignore-regex=.yaml --ignore-regex=.json --ignore-regex=.xml --ignore-regex=.csv --ignore-regex=.tsv --ignore-regex=.log --ignore-regex=.bin
+          codespell --skip=.git,LICENSE,*.3 --check-filenames --ignore-words-list=te --ignore-regex=.template --ignore-regex=.md --ignore-regex=.yml --ignore-regex=.yaml --ignore-regex=.json --ignore-regex=.xml --ignore-regex=.csv --ignore-regex=.tsv --ignore-regex=.log --ignore-regex=.bin

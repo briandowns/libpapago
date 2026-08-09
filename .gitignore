@@ -23,6 +23,7 @@ example_token_auth_middleware
 example_wsclient
 example_static_dir
 example_mtls
+example_cors
 debug_build
 
 libpapago.dylib

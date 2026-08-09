@@ -27,7 +27,6 @@
 
 #include <signal.h>
 #include <stdio.h>
-#include <unistd.h>
 
 #include "../papago.h"
 
@@ -47,23 +46,6 @@ signal_handler(int sig)
     }
 }
 
-/**
- * Rate limit middleware
- */
-static bool
-rate_limit_middleware(papago_request_t *req, papago_response_t *res,
-                      void *user_data)
-{
-    PAPAGO_UNUSED(user_data);
-
-    if (papago_check_rate_limit(server, req, res)) {
-        printf("rate limit exceeded for client\n");
-        return false;  
-    }
- 
-    return true;
-}
-
 // HTTP route handlers
 
 void
@@ -72,40 +54,78 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-    papago_res_html(res,
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
+    papago_res_send(res,
         "<h1>Welcome to Papago!</h1>"
-        "<p>Rate Limiting Example</p>");
+        "<p>CORS example -- open tests/cors_test.html from a different "
+        "origin to exercise this route.</p>");
+}
+
+void
+api_hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+    PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(user_data);
+
+    papago_res_set_status(res, PAPAGO_STATUS_OK);
+    papago_res_json(res, "{\"message\":\"Hello from Papago!\"}");
+}
+
+/*
+ * A POST route so there's a real non-"simple" request to preflight --
+ * browsers only send a preflight for methods/headers outside the
+ * CORS-safelisted set, and a bare GET usually won't trigger one.
+ */
+void
+api_widget_create_handler(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+    PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(user_data);
+
+    papago_res_set_status(res, PAPAGO_STATUS_CREATED);
+    papago_res_json(res, "{\"id\":42,\"status\":\"created\"}");
 }
 
 int
 main(void)
 {
+    // setup signal handling
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
+    // create server
     server = papago_new();
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
     }
 
-    papago_enable_rate_limit(server, 5, 30);
-    papago_middleware_t rate_limit_mw = {
-        .before    = rate_limit_middleware,
+    static const char *allowed_origins[] = {"http://0.0.0.0:8000"};
+
+    papago_cors_config_t cors_cfg = papago_cors_default_config();
+    cors_cfg.allowed_origins = allowed_origins;
+    cors_cfg.allowed_origins_count = 1;
+    cors_cfg.allowed_methods = "GET,POST,OPTIONS";
+    cors_cfg.allowed_headers = "Content-Type,Authorization";
+    cors_cfg.allow_credentials = true;
+    cors_cfg.max_cache_age = 600;
+
+    papago_enable_cors(server);
+    papago_middleware_t rate_cors_mw = {
+        .before    = papago_cors_mw,
         .after     = NULL,
-        .user_data = NULL,
+        .user_data = &cors_cfg
     };
-    papago_middleware_path_add(server, "/", &rate_limit_mw);
+    papago_middleware_add(server, &rate_cors_mw);
 
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
+    papago_route(server, PAPAGO_OPTIONS, "/api/hello", api_hello_handler, NULL);
+    papago_route(server, PAPAGO_POST, "/api/widgets", api_widget_create_handler, NULL);
+    papago_route(server, PAPAGO_OPTIONS, "/api/widgets", api_widget_create_handler, NULL);
 
     papago_config_t config = papago_default_config();
-    config.port = 8282;
-    config.enable_compression = true;
-
-    printf("Server starting on:\n");
-    printf("  HTTP:      http://%s:%d\n", config.host, config.port);
 
     // start server (blocking)
     if (papago_start(server, &config) != 0) {
