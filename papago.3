@@ -36,15 +36,19 @@ Static Files - Serve files from directories
 .IP \(bu 2
 Thread-Safe - Built on proven concurrent architecture
 .IP \(bu 2
-Low Dependencies - Only requires libmicrohttpd + libwebsockets
+Few Dependencies - Only requires libmicrohttpd + libwebsockets
 .IP \(bu 2
 Rate limiting by IP
 .IP \(bu 2
 Compression with Gzip
 .IP \(bu 2
+CORS Support
+.IP \(bu 2
 Metrics collection and exposure via Prometheus endpoint
 .IP \(bu 2
 Simple HTTP Client
+.IP \(bu 2
+Extensible Middlware System
 
 .RE
 
@@ -225,7 +229,7 @@ papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
 Convenience functions are provided to make seneding responses even easier.
 
 .PP
-\fBpapago_res_send\fR, \fBpapago_res_html\fR, \fBpapago_res_html\fR are meant to be used when sending simple text, HTML, and JSON respectiely. The last 2 set appropriate headers for the payload while the first leaves this to the user.
+\fBpapago_res_send\fR, \fBpapago_res_html\fR, \fBpapago_res_json\fR are meant to be used when sending simple text, HTML, and JSON respectively. The last 2 set appropriate headers for the payload while the first leaves this to the user.
 
 .SS Middleware
 .PP
