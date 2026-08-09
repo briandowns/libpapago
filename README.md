@@ -39,7 +39,8 @@ WOFF, WOFF2, TTF
 
 * libmicrohttpd
 * libwebsockets
-* openssl
+* GnuTLS
+* Zlib
 * libmaple - [Maple Template Engine](https://github.com/briandowns/libmaple)
 
 ## Build
