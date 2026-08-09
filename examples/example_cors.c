@@ -123,19 +123,6 @@ main(void)
     papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
     papago_route(server, PAPAGO_POST, "/api/widgets", api_widget_create_handler, NULL);
 
-    /*
-     * If your router requires an explicit route per verb rather than
-     * dispatching OPTIONS to whatever route matched the path, register
-     * an OPTIONS route per path here too so preflight requests reach
-     * the CORS middleware instead of 404ing:
-     *
-     *   papago_route(server, PAPAGO_OPTIONS, "/api/hello", api_hello_handler, NULL);
-     *   papago_route(server, PAPAGO_OPTIONS, "/api/widgets", api_widget_create_handler, NULL);
-     *
-     * cors_before() short-circuits before the handler body runs, so
-     * reusing the same handler function is safe.
-     */
-
     papago_config_t config = papago_default_config();
 
     // start server (blocking)
