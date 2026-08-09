@@ -523,6 +523,10 @@ papago_check_rate_limit(papago_t *server, papago_request_t *req,
 void
 papago_enable_cors(papago_t *server);
 
+/**
+ * CORS middleware returns true to continue to the next middleware/handler or
+ * false to short-circuit the request.
+ */
 bool
 papago_cors_mw(papago_request_t *req, papago_response_t *res, void *user_data);
 
