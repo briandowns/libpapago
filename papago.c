@@ -2787,6 +2787,10 @@ papago_cors_mw(papago_request_t *req, papago_response_t *res, void *user_data)
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN,
         allow_origin);
 
+    if (strcmp(allow_origin, "*") != 0) {
+         papago_res_header(res, "Vary", "Origin");
+    }
+
     if (config->allow_credentials) {
         papago_res_header(res,
             PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");

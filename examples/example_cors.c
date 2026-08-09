@@ -116,12 +116,14 @@ main(void)
         .after     = NULL,
         .user_data = &cors_cfg
     };
-    papago_middleware_path_add(server, "/", &rate_cors_mw);
+    papago_middleware_add(server, &rate_cors_mw);
 
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
     papago_route(server, PAPAGO_GET, "/api/hello", api_hello_handler, NULL);
+    papago_route(server, PAPAGO_OPTIONS, "/api/hello", api_hello_handler, NULL);
     papago_route(server, PAPAGO_POST, "/api/widgets", api_widget_create_handler, NULL);
+    papago_route(server, PAPAGO_OPTIONS, "/api/widgets", api_widget_create_handler, NULL);
 
     papago_config_t config = papago_default_config();
 

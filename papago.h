@@ -518,7 +518,7 @@ papago_check_rate_limit(papago_t *server, papago_request_t *req,
                         papago_response_t *res);
 
 /**
- * Enable CORS with the given configuration.
+ * Enable CORS.
  */
 void
 papago_enable_cors(papago_t *server);

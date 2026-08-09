@@ -25,7 +25,7 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 * CORS Support
 * Metrics collection and exposure via Prometheus endpoint
 * Simple HTTP Client
-* Extensible Middlware System
+* Extensible Middleware System
 
 ### MIME Types Supported
 HTML, CSS, JS, JSON, XML, TXT
