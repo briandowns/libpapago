@@ -19,7 +19,6 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 * JSON Responses - Built-in JSON helpers
 * Static Files - Serve files from directories
 * Thread-Safe - Built on proven concurrent architecture
-* Few Dependencies - Only requires libmicrohttpd + libwebsockets
 * Rate limiting by IP
 * Compression with Gzip
 * CORS Support
