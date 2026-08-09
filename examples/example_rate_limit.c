@@ -89,12 +89,12 @@ main(void)
         return 1;
     }
 
+    papago_enable_rate_limit(server, 5, 30);
     papago_middleware_t rate_limit_mw = {
         .before    = rate_limit_middleware,
         .after     = NULL,
         .user_data = NULL,
     };
-    papago_enable_rate_limit(server, 5, 30);
     papago_middleware_path_add(server, "/", &rate_limit_mw);
 
     // register HTTP routes

@@ -199,6 +199,7 @@ struct papago_server {
     pthread_mutex_t rate_limit_mutex;
     pthread_cond_t shutdown_cond;
     papago_metrics_t *metrics;
+    papago_cors_config_t cors_config;
     const papago_embedded_file_t *embedded_files;
     void *rate_limit_map;
     char *error_message;
@@ -338,6 +339,7 @@ papago_default_config(void)
     config.enable_template_rendering = false;
     config.enable_rate_limiting = false;
     config.enable_compression = false;
+    config.enable_cors = false;
     config.cert_file = NULL;
     config.key_file = NULL;
     config.static_dir = NULL;
@@ -2704,6 +2706,139 @@ papago_check_rate_limit(papago_t *server, papago_request_t *req,
     pthread_mutex_unlock(&server->rate_limit_mutex);
  
     return false;
+}
+
+papago_cors_config_t
+papago_cors_default_config(void)
+{
+    return (papago_cors_config_t){
+        .allowed_origins = NULL,
+        .allowed_origins_count = 0,
+        .allowed_methods = "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+        .allowed_headers = NULL,
+        .exposed_headers = NULL,
+        .allow_credentials = false,
+        .max_cache_age = 600,
+    };
+}
+
+void
+papago_enable_cors(papago_t *server)
+{
+    if (server == NULL ) {
+        return;
+    }
+
+    server->config.enable_cors = true;
+}
+
+static const char*
+match_allowed_origin(const papago_cors_config_t *config, const char *origin)
+{
+    if (origin == NULL) {
+        return NULL;
+    }
+
+    /* No allowlist configured -> allow everything. */
+    if (config->allowed_origins == NULL ||
+        config->allowed_origins_count == 0) {
+        return origin;
+    }
+
+    for (size_t i = 0; i < config->allowed_origins_count; i++) {
+        if (strcmp(config->allowed_origins[i], origin) == 0) {
+            return origin;
+        }
+        /* allow a literal "*" entry in the allowlist too */
+        if (strcmp(config->allowed_origins[i], "*") == 0) {
+            return "*";
+        }
+    }
+
+    return NULL;
+}
+
+bool
+papago_cors_mw(papago_request_t *req, papago_response_t *res, void *user_data)
+{
+    const char *origin = papago_req_header(req, "Origin");
+    if (origin == NULL) {
+        return true;
+    }
+
+    const papago_cors_config_t *config =
+        (const papago_cors_config_t*)user_data;
+    const char *allow_origin = match_allowed_origin(config, origin);
+    if (allow_origin == NULL) {
+        // Origin not permitted. Let the request continue with no CORS headers
+        // set. the browser will block the response from the calling page's JS.
+        // We don't 403 here because a non-browser client (curl) may still have
+        // a legitimate reason to hit the route.
+        return true;
+    }
+
+    // Credentialed requests can never use a wildcard origin per the fetch
+    // spec. If credentials are enabled and we matched via "*", fall back to
+    // reflecting the exact origin instead of literally sending "*".
+    if (config->allow_credentials && strcmp(allow_origin, "*") == 0) {
+        allow_origin = origin;
+    }
+
+    papago_res_header(res, PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN,
+        allow_origin);
+
+    if (config->allow_credentials) {
+        papago_res_header(res,
+            PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+    }
+
+    if (config->exposed_headers != NULL) {
+        papago_res_header(res,
+            PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS,
+            config->exposed_headers);
+    }
+
+    const char *method = papago_req_method(req);
+    if (method != NULL && strcmp(method, "OPTIONS") == 0 &&
+        papago_req_header(req,
+            PAPAGO_REQUEST_HEADER_ACCEPT_CONTROL_REQUEST_METHOD) != NULL) {
+        // preflight request
+        const char *req_headers;
+
+        papago_res_header(res,
+            PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_METHODS,
+            config->allowed_methods);
+
+        if (config->allowed_headers != NULL) {
+            papago_res_header(res,
+                PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_HEADERS,
+                config->allowed_headers);
+        } else {
+            req_headers = papago_req_header(req,
+                PAPAGO_REQUEST_HEADER_ACCEPT_CONTROL_REQUEST_HEADERS);
+            if (req_headers != NULL) {
+                papago_res_header(res,
+                    PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_HEADERS,
+                    req_headers);
+            }
+        }
+
+        if (config->max_cache_age > 0) {
+            char max_age_buf[16];
+            snprintf(max_age_buf, sizeof(max_age_buf), "%d",
+                config->max_cache_age);
+            papago_res_header(res,
+                PAPAGO_RESPONSE_HEADER_ACCESS_CONTROL_MAX_AGE, max_age_buf);
+        }
+
+        papago_res_set_status(res, PAPAGO_STATUS_NO_CONTENT);
+        papago_res_send(res, "");
+
+        //short-circuit and skip route handler
+        return false;
+    }
+
+    return true;
 }
 
 #ifdef PAPAGO_USE_MAPLE

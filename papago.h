@@ -134,6 +134,19 @@ typedef void (*papago_ws_on_close_t)(papago_ws_connection_t *conn);
 typedef void (*papago_ws_on_error_t)(papago_ws_connection_t *conn,
                                      const char *error);
 
+                                     /**
+ * CORS configuration.
+ */
+typedef struct {
+    const char **allowed_origins;
+    size_t allowed_origins_count;
+    const char *allowed_methods;
+    const char *allowed_headers;
+    const char *exposed_headers;
+    int max_cache_age;
+    bool allow_credentials;
+} papago_cors_config_t;
+
 typedef struct {
     uint16_t port;
     char *host;
@@ -152,6 +165,7 @@ typedef struct {
     bool enable_template_rendering;
     bool enable_rate_limiting;
     bool enable_compression;
+    bool enable_cors;
 } papago_config_t;
 
 /**
@@ -201,6 +215,9 @@ papago_error(void);
  */
 papago_config_t
 papago_default_config(void);
+
+papago_cors_config_t
+papago_cors_default_config(void);
 
 /**
  * Start the server, (blocking). Returns 0 on success or 1 on failure.
@@ -489,7 +506,7 @@ papago_url_decode(const char *str);
 void
 papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
                          uint16_t window_seconds);
- 
+
 /**
  * Check if request has exceeded the rate limit. Returns true when the rate
  * limit is exceeded. In that case, this function also mutates res by setting
@@ -499,6 +516,15 @@ papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
 bool
 papago_check_rate_limit(papago_t *server, papago_request_t *req,
                         papago_response_t *res);
+
+/**
+ * Enable CORS with the given configuration.
+ */
+void
+papago_enable_cors(papago_t *server);
+
+bool
+papago_cors_mw(papago_request_t *req, papago_response_t *res, void *user_data);
 
 #ifdef PAPAGO_USE_MAPLE
 // template rendering

@@ -118,7 +118,8 @@ EXAMPLES =  example \
 	example_token_auth_middleware \
 	example_wsclient \
 	example_static_dir \
-	example_mtls
+	example_mtls \
+	example_cors
 
 .PHONY: example
 example: clean
@@ -179,6 +180,10 @@ example_static_dir: clean
 .PHONY: example_mtls
 example_mtls: clean
 	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_cors
+example_cors: clean
+	$(CC) -g -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)

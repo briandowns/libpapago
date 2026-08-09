@@ -19,11 +19,13 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 * JSON Responses - Built-in JSON helpers
 * Static Files - Serve files from directories
 * Thread-Safe - Built on proven concurrent architecture
-* Low Dependencies - Only requires libmicrohttpd + libwebsockets
+* Few Dependencies - Only requires libmicrohttpd + libwebsockets
 * Rate limiting by IP
 * Compression with Gzip
+* CORS Support
 * Metrics collection and exposure via Prometheus endpoint
 * Simple HTTP Client
+* Extensible Middlware System
 
 ### MIME Types Supported
 HTML, CSS, JS, JSON, XML, TXT
