@@ -183,7 +183,7 @@ example_mtls: clean
 
 .PHONY: example_cors
 example_cors: clean
-	$(CC) -g -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)
