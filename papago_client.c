@@ -190,7 +190,7 @@ papago_client_new(void)
         return NULL;
     }
 
-    c->verify_ssl = false;
+    c->verify_ssl = true;
     c->ca_cert_file = NULL;
     c->ca_cert_path = NULL;
 
@@ -204,8 +204,62 @@ papago_client_destroy(papago_http_client_t *client)
         return;
     }
 
+    free(client->ca_cert_file);
+    free(client->ca_cert_path);
     ref_dec();
     free(client);
+}
+
+void
+papago_client_set_ssl_verify(papago_http_client_t *client, bool verify)
+{
+    if (client == NULL) {
+        return;
+    }
+
+    client->verify_ssl = verify;
+}
+
+int
+papago_client_set_ca_file(papago_http_client_t *client, const char *path)
+{
+    if (client == NULL) {
+        return 1;
+    }
+
+    free(client->ca_cert_file);
+    client->ca_cert_file = NULL;
+
+    if (path != NULL) {
+        client->ca_cert_file = strdup(path);
+        if (client->ca_cert_file == NULL) {
+            hc_set_err("papago_client: out of memory");
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int
+papago_client_set_ca_path(papago_http_client_t *client, const char *path)
+{
+    if (client == NULL) {
+        return 1;
+    }
+
+    free(client->ca_cert_path);
+    client->ca_cert_path = NULL;
+
+    if (path != NULL) {
+        client->ca_cert_path = strdup(path);
+        if (client->ca_cert_path == NULL) {
+            hc_set_err("papago_client: out of memory");
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 papago_http_request_t
@@ -307,6 +361,13 @@ papago_http_send(papago_http_client_t *client,
         client->verify_ssl ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST,
         client->verify_ssl ? 2L : 0L);
+
+    if (client->ca_cert_file != NULL) {
+        curl_easy_setopt(curl, CURLOPT_CAINFO, client->ca_cert_file);
+    }
+    if (client->ca_cert_path != NULL) {
+        curl_easy_setopt(curl, CURLOPT_CAPATH, client->ca_cert_path);
+    }
 
     CURLcode rc = curl_easy_perform(curl);
     if (rc != CURLE_OK) {
