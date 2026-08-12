@@ -365,7 +365,10 @@ const papago_file_upload_t*
 papago_req_file(papago_request_t *req, const char *field_name);
 
 /**
- * Retrieve all uploaded files for a given field name.
+ * Retrieve uploaded files for a given field name.
+ *
+ * If "out" is non-NULL, at most `max_out` entries are written and the return
+ * value is the number written. Call with `out == NULL` to get the total count.
  */
 size_t
 papago_req_files(papago_request_t *req, const char *field_name,

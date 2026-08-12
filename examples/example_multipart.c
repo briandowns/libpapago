@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -160,9 +161,10 @@ upload_avatar_handler(papago_request_t *req, papago_response_t *res, void *user_
     mkdir(UPLOAD_DIR, 0755);
 
     const char *filename = papago_multipart_filename(avatar);
-    if (filename == NULL) {
+    if (filename == NULL || filename[0] == '\0' ||
+        strpbrk(filename, "/\\\"") != NULL || strstr(filename, "..") != NULL) {
         papago_res_set_status(res, PAPAGO_STATUS_BAD_REQUEST);
-        papago_res_json(res, "{\"error\":\"missing filename for uploaded file\"}");
+        papago_res_json(res, "{\"error\":\"invalid uploaded filename\"}");
         return;
     }
 

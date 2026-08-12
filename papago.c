@@ -628,7 +628,12 @@ papago_req_files(papago_request_t *req, const char *field_name,
         }
     }
 
+    size_t written = count;
+
     if (out != NULL && max_out > 0) {
+        if (written > max_out) {
+            written = max_out;
+        }
         // req->files is newest first (each commit prepends). Walk it again and
         // fill out back to front so out[0] ends up as the first uploaded file
         // with this field name, not the last.
@@ -643,7 +648,7 @@ papago_req_files(papago_request_t *req, const char *field_name,
         }
     }
 
-    return count;
+    return written;
 }
 
 bool
@@ -1223,16 +1228,29 @@ multipart_proc_current_field(papago_request_t *req, bool commit)
         if (commit) {
             papago_file_upload_t *f = calloc(1, sizeof(*f));
             if (f != NULL) {
-                f->field_name = strdup(mpf->key);
-                f->filename = mpf->filename ? strdup(mpf->filename) : NULL;
-                f->content_type = mpf->content_type ? 
-                    strdup(mpf->content_type) : NULL;
-                f->tmp_path = strdup(mpf->tmp_path);
-                f->size = mpf->value_len;
-                f->next = req->files;
+                f->field_name = _strdup(mpf->key);
+                f->filename = _strdup(mpf->filename);
+                f->content_type = _strdup(mpf->content_type);
+                f->tmp_path = _strdup(mpf->tmp_path);
 
-                req->files = f;
-                req->file_count++;
+                if (f->field_name == NULL || f->tmp_path == NULL) {
+                     if (mpf->tmp_path[0] != '\0') {
+                         unlink(mpf->tmp_path);
+                     }
+
+                     free(f->field_name);
+                     free(f->filename);
+                     free(f->content_type);
+                     free(f->tmp_path);
+                     free(f);
+                 } else {
+                     f->size = mpf->value_len;
+                     f->next = req->files;
+                     req->files = f;
+                     req->file_count++;
+                 }
+            } else if (mpf->tmp_path[0] != '\0') {
+                unlink(mpf->tmp_path);
             }
         } else if (mpf->tmp_path[0] != '\0') {
             unlink(mpf->tmp_path);
@@ -1286,8 +1304,8 @@ multipart_iterator(void *cls, enum MHD_ValueKind kind, const char *key,
         mpf->is_file = (filename != NULL);
 
         if (mpf->is_file) {
-            mpf->filename = filename ? strdup(filename) : NULL;
-            mpf->content_type = content_type ? strdup(content_type) : NULL;
+            mpf->filename = filename ? _strdup(filename) : NULL;
+            mpf->content_type = content_type ? _strdup(content_type) : NULL;
             mpf->value_len = 0;
 
             snprintf(mpf->tmp_path, sizeof(mpf->tmp_path),
