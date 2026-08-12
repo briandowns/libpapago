@@ -105,7 +105,7 @@ clean:
 	rm -f $(EXAMPLES)
 	rm -f tests/tests
 
-EXAMPLES =  example \
+EXAMPLES = example \
 	example_ssl \
 	example_websocket \
 	example_template \
@@ -119,7 +119,8 @@ EXAMPLES =  example \
 	example_wsclient \
 	example_static_dir \
 	example_mtls \
-	example_cors
+	example_cors \
+	example_multipart
 
 .PHONY: example
 example: clean
@@ -183,6 +184,10 @@ example_mtls: clean
 
 .PHONY: example_cors
 example_cors: clean
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_multipart
+example_multipart: clean
 	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
 
 .PHONY: examples_all

@@ -83,26 +83,24 @@ papago_http_client_t*
 papago_client_new(void);
 
 /**
- * Enable or disable TLS peer/host certificate verification for requests
- * made with this client. Defaults to true (verification ON) as of this
- * version -- previous versions defaulted to false. Only disable this for
- * local development against self-signed certificates; never in production.
+ * Enable or disable TLS peer/host certificate verification for requests.
+ * Defaults to true. Only disable this for local development against
+ * self-signed certificates.
  */
 void
 papago_client_set_ssl_verify(papago_http_client_t *client, bool verify);
 
 /**
- * Load a CA bundle file (PEM) to validate server certificates against,
- * in addition to (or instead of) the system default trust store.
- * Pass NULL to clear a previously set file.
+ * Load a CA bundle file (PEM) to validate server certificates against, in
+ * addition to (or instead of) the system default trust store. Pass NULL to
+ * clear a previously set file.
  */
 int
 papago_client_set_ca_file(papago_http_client_t *client, const char *path);
 
 /**
- * Load a directory of CA certificates (OpenSSL c_rehash format) to
- * validate server certificates against. Pass NULL to clear a
- * previously set path.
+ * Load a directory of CA certificates (OpenSSL c_rehash format) to validate
+ * server certificates against. Pass NULL to clear a previously set path.
  */
 int
 papago_client_set_ca_path(papago_http_client_t *client, const char *path);

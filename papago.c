@@ -85,6 +85,37 @@ typedef struct {
 } papago_ws_endpoint_t;
 
 /**
+ * papago_file_upload represents a single uploaded file from a
+ * multipart/form-data request. Persisted to a temp file on disk as it streams,
+ * the handler must read/copy tmp_path before returning since it's unlinked
+ * automatically once the request completes.
+ */
+struct papago_file_upload {
+    char *field_name;
+    char *filename;       // could be NULL
+    char *content_type;   // could be NULL
+    char *tmp_path;
+    size_t size;
+    struct papago_file_upload *next;
+};
+
+/**
+ * multipart_field_t is internal state for the field currently being streamed
+ * by the multipart post-processor iterator.
+ */
+typedef struct {
+    char key[256];
+    char *value;
+    size_t value_len;
+    size_t value_cap;
+    char *filename;
+    char *content_type;
+    char tmp_path[PATH_MAX];
+    FILE *fp;
+    bool is_file;
+} multipart_field_t;
+
+/**
  * Request structure
  */
 struct papago_request {
@@ -110,6 +141,13 @@ struct papago_request {
     bool body_too_large;
     char client_cert_cn[256];
     bool has_client_cert;
+
+    // multipart/form-data
+    bool is_multipart;
+    struct MHD_PostProcessor *mhd_post_processor;
+    multipart_field_t *multipart_field;
+    papago_file_upload_t *files;
+    size_t file_count;
 };
 
 /**
@@ -556,6 +594,106 @@ papago_req_client_cert_cn(const papago_request_t *req)
 
     return req->client_cert_cn;
 }
+
+size_t
+papago_req_file_count(papago_request_t *req)
+{
+    return req != NULL ? req->file_count : 0;
+}
+
+const papago_file_upload_t*
+papago_req_file(papago_request_t *req, const char *field_name)
+{
+    const papago_file_upload_t *first = NULL;
+
+    if (papago_req_files(req, field_name, &first, 1) == 0) {
+        return NULL;
+    }
+
+    return first;
+}
+
+size_t
+papago_req_files(papago_request_t *req, const char *field_name,
+                 const papago_file_upload_t **out, size_t max_out)
+{
+    if (req == NULL || field_name == NULL) {
+        return 0;
+    }
+
+    size_t count = 0;
+    for (papago_file_upload_t *f = req->files; f != NULL; f = f->next) {
+        if (strcmp(f->field_name, field_name) == 0) {
+            count++;
+        }
+    }
+
+    if (out != NULL && max_out > 0) {
+        // req->files is newest first (each commit prepends). Walk it again and
+        // fill out back to front so out[0] ends up as the first uploaded file
+        // with this field name, not the last.
+        size_t idx = count;
+        for (papago_file_upload_t *f = req->files; f != NULL; f = f->next) {
+            if (strcmp(f->field_name, field_name) == 0) {
+                idx--;
+                if (idx < max_out) {
+                    out[idx] = f;
+                }
+            }
+        }
+    }
+
+    return count;
+}
+
+bool
+papago_req_body_too_large(papago_request_t *req)
+{
+    return req->body_too_large;
+}
+
+const char*
+papago_multipart_filename(const papago_file_upload_t *pfu)
+{
+    if (pfu == NULL) {
+        return NULL;
+    }
+
+    return pfu->filename;
+}
+
+const char*
+papago_multipart_tmp_path(const papago_file_upload_t *pfu)
+{
+    if (pfu == NULL) {
+        return NULL;
+    }
+
+    return pfu->tmp_path;
+}
+
+const char*
+papago_multipart_content_type(const papago_file_upload_t *pfu)
+{
+    if (pfu == NULL) {
+        return NULL;
+    }
+
+    return pfu->content_type;
+}
+
+size_t
+papago_multipart_size(const papago_file_upload_t *pfu)
+{
+    if (pfu == NULL) {
+        return 0;
+    }
+
+    return pfu->size;
+}
+
+
+// response helpers
 
 int
 papago_res_status(papago_response_t *res)
@@ -1050,7 +1188,7 @@ form_body_parser(papago_request_t *req)
             free(key);
             free(value);
         } else {
-            // bare key with no '=' — store as empty string
+            // bare key with no '=' store as empty string
             char *key = papago_url_decode(pair);
             if (key != NULL) {
                 add_kv(&req->form, &req->form_count, key, "");
@@ -1061,6 +1199,169 @@ form_body_parser(papago_request_t *req)
     }
 
     free(body);
+}
+
+/**
+ * Commits or discards the in-progress multipart field. `commit` is false
+ * when aborting (e.g. body-too-large) -- in that case any partial temp
+ * file is unlinked and nothing is added to req->form/req->files.
+ */
+static void
+multipart_proc_current_field(papago_request_t *req, bool commit)
+{
+    multipart_field_t *mpf = req->multipart_field;
+    if (mpf == NULL || (mpf->key[0] == '\0' && !mpf->is_file)) {
+        return;
+    }
+
+    if (mpf->is_file) {
+        if (mpf->fp != NULL) {
+            fclose(mpf->fp);
+            mpf->fp = NULL;
+        }
+
+        if (commit) {
+            papago_file_upload_t *f = calloc(1, sizeof(*f));
+            if (f != NULL) {
+                f->field_name = strdup(mpf->key);
+                f->filename = mpf->filename ? strdup(mpf->filename) : NULL;
+                f->content_type = mpf->content_type ? 
+                    strdup(mpf->content_type) : NULL;
+                f->tmp_path = strdup(mpf->tmp_path);
+                f->size = mpf->value_len;
+                f->next = req->files;
+
+                req->files = f;
+                req->file_count++;
+            }
+        } else if (mpf->tmp_path[0] != '\0') {
+            unlink(mpf->tmp_path);
+        }
+
+        free(mpf->filename);
+        free(mpf->content_type);
+        mpf->filename = NULL;
+        mpf->content_type = NULL;
+        mpf->tmp_path[0] = '\0';
+    } else {
+        if (commit) {
+            add_kv(&req->form, &req->form_count, mpf->key,
+                mpf->value != NULL ? mpf->value : "");
+        }
+        free(mpf->value);
+        mpf->value = NULL;
+        mpf->value_len = 0;
+        mpf->value_cap = 0;
+    }
+
+    mpf->key[0] = '\0';
+    mpf->is_file = false;
+}
+
+/**
+ * libmicrohttpd post-data iterator for multipart/form-data bodies.
+ * Called repeatedly as chunks of each part arrive; a new `key` (at
+ * off == 0) means the previous field is complete and should be settled.
+ */
+static enum MHD_Result
+multipart_iterator(void *cls, enum MHD_ValueKind kind, const char *key,
+                   const char *filename, const char *content_type,
+                   const char *transfer_encoding, const char *data,
+                   uint64_t off, size_t size)
+{
+    PAPAGO_UNUSED(kind);
+    PAPAGO_UNUSED(transfer_encoding);
+
+    papago_request_t *req = (papago_request_t*)cls;
+
+    multipart_field_t *mpf = req->multipart_field;
+    if (mpf == NULL || key == NULL) {
+        return MHD_YES;
+    }
+
+    if (off == 0) {
+        multipart_proc_current_field(req, true);
+
+        snprintf(mpf->key, sizeof(mpf->key), "%s", key);
+        mpf->is_file = (filename != NULL);
+
+        if (mpf->is_file) {
+            mpf->filename = filename ? strdup(filename) : NULL;
+            mpf->content_type = content_type ? strdup(content_type) : NULL;
+            mpf->value_len = 0;
+
+            snprintf(mpf->tmp_path, sizeof(mpf->tmp_path),
+                "%s/papago_upload_XXXXXX", P_tmpdir);
+
+            int fd = mkstemp(mpf->tmp_path);
+            if (fd < 0) {
+                mpf->tmp_path[0] = '\0';
+                return MHD_NO;
+            }
+
+            mpf->fp = fdopen(fd, "wb");
+            if (mpf->fp == NULL) {
+                close(fd);
+                unlink(mpf->tmp_path);
+                mpf->tmp_path[0] = '\0';
+                return MHD_NO;
+            }
+        }
+    }
+
+    if (size == 0) {
+        return MHD_YES;
+    }
+
+    if (mpf->is_file) {
+        if (mpf->fp == NULL || fwrite(data, 1, size, mpf->fp) != size) {
+            return MHD_NO;
+        }
+        mpf->value_len += size;
+    } else {
+        if (mpf->value_len + size + 1 > mpf->value_cap) {
+            size_t nc = mpf->value_cap == 0 ? 4096 : mpf->value_cap * 2;
+            while (nc < mpf->value_len + size + 1) {
+                nc *= 2;
+            }
+
+            char *tmp = realloc(mpf->value, nc);
+            if (tmp == NULL) {
+                return MHD_NO;
+            }
+            mpf->value = tmp;
+            mpf->value_cap = nc;
+        }
+
+        memcpy(mpf->value + mpf->value_len, data, size);
+        mpf->value_len += size;
+        mpf->value[mpf->value_len] = '\0';
+    }
+
+    return MHD_YES;
+}
+
+/**
+ * free_file_uploads frees the memory used by the file-upload list, unlinking
+ * each spooled temp file. Needs to be called once per request, after the
+ * handler has run.
+ */
+static void
+free_file_uploads(papago_file_upload_t *files)
+{
+    while (files != NULL) {
+        papago_file_upload_t *next = files->next;
+        if (files->tmp_path != NULL) {
+            unlink(files->tmp_path);
+        }
+
+        free(files->field_name);
+        free(files->filename);
+        free(files->content_type);
+        free(files->tmp_path);
+        free(files);
+        files = next;
+    }
 }
 
 static enum MHD_Result
@@ -1089,7 +1390,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 {
     PAPAGO_UNUSED(version);
 
-    papago_t *server = (papago_t *)cls;
+    papago_t *server = (papago_t*)cls;
     struct MHD_Response *mhd_response = NULL;
     papago_request_t *req;
     enum MHD_Result ret;
@@ -1126,6 +1427,27 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         }
         *con_cls = req;
 
+        const char *content_type = MHD_lookup_connection_value(connection,
+            MHD_HEADER_KIND, PAPAGO_REQUEST_HEADER_CONTENT_TYPE);
+        if (content_type != NULL &&
+            strncasecmp(content_type, PAPAGO_REQUEST_HEADER_MULTIPART,
+                sizeof(PAPAGO_REQUEST_HEADER_MULTIPART)-1) == 0) {
+            req->multipart_field = calloc(1, sizeof(multipart_field_t));
+            if (req->multipart_field != NULL) {
+                req->mhd_post_processor =
+                    MHD_create_post_processor(connection, 64 * 1024,
+                        multipart_iterator, req);
+                if (req->mhd_post_processor != NULL) {
+                    req->is_multipart = true;
+                } else {
+                    free(req->multipart_field);
+                    req->multipart_field = NULL;
+                }
+            }
+        }
+
+        *con_cls = req;
+
         return MHD_YES;
     }
 
@@ -1138,6 +1460,29 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
     // handle upload data POST/PUT
     if (*upload_data_size > 0) {
+        if (req->is_multipart && req->mhd_post_processor != NULL) {
+            req->body_length += *upload_data_size;
+            if (req->body_length > server->config.max_body_size) {
+                req->body_too_large = true;
+                multipart_proc_current_field(req, false);
+                MHD_destroy_post_processor(req->mhd_post_processor);
+                req->mhd_post_processor = NULL;
+                *upload_data_size = 0;
+
+                return MHD_YES;
+            }
+
+            if (MHD_post_process(req->mhd_post_processor, upload_data, *upload_data_size) != MHD_YES) {
+                req->body_too_large = true;
+                multipart_proc_current_field(req, false);
+                MHD_destroy_post_processor(req->mhd_post_processor);
+                req->mhd_post_processor = NULL;
+            }
+
+            *upload_data_size = 0;
+            return MHD_YES;
+        }
+
         if (req->body_length + *upload_data_size > server->config.max_body_size) {
             free(req->body);
             req->body = NULL;
@@ -1164,6 +1509,14 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         return MHD_YES;
     }
 
+    if (req->is_multipart && req->mhd_post_processor != NULL) {
+        multipart_proc_current_field(req, true);
+        MHD_destroy_post_processor(req->mhd_post_processor);
+        req->mhd_post_processor = NULL;
+    }
+    free(req->multipart_field);
+    req->multipart_field = NULL;
+
     if (req->query == NULL) {
         MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND,
             query_string_parser, req);
@@ -1189,6 +1542,8 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         free_kv_array(req->params, req->param_count);
         free_kv_array(req->query, req->query_count);
         free_kv_array(req->form, req->form_count);
+
+        free_file_uploads(req->files);
 
         free(req);
 
@@ -1320,8 +1675,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 send_response:
     clock_gettime(CLOCK_MONOTONIC, &now);
     duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec) *
-        1000.0 + (now.tv_nsec - papago_req_start_time(req).tv_nsec) /
-        1.0e6;
+        1000.0 + (now.tv_nsec - papago_req_start_time(req).tv_nsec) / 1.0e6;
     update_metrics(server, req->path, papago_req_method(req),
         res->status, (uint64_t)duration_ms);
 
@@ -1352,6 +1706,8 @@ send_response:
         free_kv_array(req->params, req->param_count);
         free_kv_array(req->query, req->query_count);
         free_kv_array(req->form, req->form_count);
+
+        free_file_uploads(req->files);
         free(req);
 
         free_kv_array(res->headers, res->header_count);

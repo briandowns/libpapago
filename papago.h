@@ -118,6 +118,7 @@ typedef struct papago_server papago_t;
 typedef struct papago_request papago_request_t;
 typedef struct papago_response papago_response_t;
 typedef struct papago_ws_connection papago_ws_connection_t;
+typedef struct papago_file_upload papago_file_upload_t;
 
 // callback types 
 typedef void (*papago_handler_t)(papago_request_t *req, papago_response_t *res,
@@ -134,7 +135,7 @@ typedef void (*papago_ws_on_close_t)(papago_ws_connection_t *conn);
 typedef void (*papago_ws_on_error_t)(papago_ws_connection_t *conn,
                                      const char *error);
 
-                                     /**
+/**
  * CORS configuration.
  */
 typedef struct {
@@ -349,6 +350,62 @@ papago_req_version(const papago_request_t *req);
  */
 const char*
 papago_req_client_cert_cn(const papago_request_t *req);
+
+/**
+ * Retrieve the number of uploaded files in the request.
+ */
+size_t
+papago_req_file_count(papago_request_t *req);
+
+/**
+ * Retrieve uploaded file by field name. Returns papago_file_upload pointer or
+ * NULL.
+ */
+const papago_file_upload_t*
+papago_req_file(papago_request_t *req, const char *field_name);
+
+/**
+ * Retrieve all uploaded files for a given field name.
+ */
+size_t
+papago_req_files(papago_request_t *req, const char *field_name,
+                 const papago_file_upload_t **out, size_t max_out);
+
+/**
+ * Check if the request body is too large.
+ */
+bool
+papago_req_body_too_large(papago_request_t *req);
+
+
+// multipart file upload helpers
+
+/**
+ * Retrieve the filename of a multipart file upload. Returns filename string or
+ * NULL.
+ */
+const char*
+papago_multipart_filename(const papago_file_upload_t *pfu);
+
+/**
+ * Retrieve the temporary path of a multipart file upload. Returns path string
+ * or NULL.
+ */
+const char*
+papago_multipart_tmp_path(const papago_file_upload_t *pfu);
+
+/**
+ * Retrieve the content type of a multipart file upload. Returns content type
+ * string or NULL.
+ */
+const char*
+papago_multipart_content_type(const papago_file_upload_t *pfu);
+
+/**
+ * Retrieve the size of a multipart file upload. Returns size or 0.
+ */
+size_t
+papago_multipart_size(const papago_file_upload_t *pfu);
 
 // response helpers
 
@@ -686,6 +743,7 @@ papago_mime_type(const char *filename);
 #define PAPAGO_REQUEST_HEADER_IF_RANGE                       "If-Range"
 #define PAPAGO_REQUEST_HEADER_IF_UNMODIFIED_SINCE            "If-Unmodified-Since"
 #define PAPAGO_REQUEST_HEADER_MAX_FORWARDS                   "Max-Forwards"
+#define PAPAGO_REQUEST_HEADER_MULTIPART                      "multipart/form-data"
 #define PAPAGO_REQUEST_HEADER_PRAGMA                         "Pragma"
 #define PAPAGO_REQUEST_HEADER_PROXY_AUTHORIZATION            "Proxy-Authorization"
 #define PAPAGO_REQUEST_HEADER_RANGE                          "Range"
