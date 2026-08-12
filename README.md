@@ -13,6 +13,7 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 * HTML Templates - Easy dynamic content via server side templating
 * Middleware System - Global and path-specific middleware
 * File stream - video / audio / large files, zero-copy, automatic MIME type detection
+* Multipart Form Uploads - Stream file uploads (single or multiple) to disk without buffering the full body in memory
 * WebSocket Support - Real-time bidirectional communication
 * WebSocket Client - included
 * Embedded File Support - Embed HTML, JS, CSS, etc into the application
