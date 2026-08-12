@@ -634,9 +634,9 @@ papago_req_files(papago_request_t *req, const char *field_name,
         if (written > max_out) {
             written = max_out;
         }
-        // req->files is newest first (each commit prepends). Walk it again and
-        // fill out back to front so out[0] ends up as the first uploaded file
-        // with this field name, not the last.
+        // req->files is newest first. Walk it again and fill out back to front
+        // so out[0] ends up as the first uploaded file with this field name,
+        // not the last.
         size_t idx = count;
         for (papago_file_upload_t *f = req->files; f != NULL; f = f->next) {
             if (strcmp(f->field_name, field_name) == 0) {
