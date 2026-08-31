@@ -18,7 +18,7 @@ CFLAGS = -O3 -fPIC -Wextra -Wall -Wformat -Wformat=2 \
 	-fstrict-flex-arrays=3 \
 	-fstack-clash-protection -fstack-protector-strong \
 
-ifeq ($(UNAME_S),Darwin)
+ifneq ($(UNAME_S),Linux)
 	CFLAGS += $(shell pkg-config --cflags --libs libwebsockets) \
               $(shell pkg-config --cflags --libs libmicrohttpd) \
               $(shell pkg-config --cflags --libs openssl) \
