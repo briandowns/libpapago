@@ -202,7 +202,7 @@ static const struct lws_protocols wsc_protocols[] = {
     LWS_PROTOCOL_LIST_TERM
 };
 
-papago_wsc_t *
+papago_wsc_t*
 papago_wsc_new(void)
 {
     papago_wsc_t *client = calloc(1, sizeof(papago_wsc_t));
@@ -258,6 +258,7 @@ papago_wsc_connect(papago_wsc_t *client,
 
     struct lws_context_creation_info ctx_info;
     memset(&ctx_info, 0, sizeof(ctx_info));
+
     ctx_info.port = CONTEXT_PORT_NO_LISTEN;
     ctx_info.protocols = wsc_protocols;
     ctx_info.user = client;
@@ -268,9 +269,11 @@ papago_wsc_connect(papago_wsc_t *client,
         wsc_set_error(client, "failed to create lws context");
         return 1;
     }
+    lws_set_log_level(0, NULL);
 
     struct lws_client_connect_info conn_info;
     memset(&conn_info, 0, sizeof(conn_info));
+
     conn_info.context = client->lws_ctx;
     conn_info.address = client->host;
     conn_info.port = client->port;
@@ -348,8 +351,10 @@ papago_wsc_destroy(papago_wsc_t *client)
 
     // drain unsent messages
     pthread_mutex_lock(&client->send_mutex);
+
     wsc_msg_t *msg = client->send_head;
     wsc_msg_t *next;
+
     while (msg != NULL) {
         next = msg->next;
         free(msg->buf);
@@ -358,8 +363,8 @@ papago_wsc_destroy(papago_wsc_t *client)
     }
     client->send_head = NULL;
     client->send_tail = NULL;
-    pthread_mutex_unlock(&client->send_mutex);
 
+    pthread_mutex_unlock(&client->send_mutex);
     pthread_mutex_destroy(&client->send_mutex);
 
     free(client);
