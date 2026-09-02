@@ -264,12 +264,12 @@ papago_wsc_connect(papago_wsc_t *client,
     ctx_info.user = client;
     ctx_info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
 
+    lws_set_log_level(0, NULL);
     client->lws_ctx = lws_create_context(&ctx_info);
     if (client->lws_ctx == NULL) {
         wsc_set_error(client, "failed to create lws context");
         return 1;
     }
-    lws_set_log_level(0, NULL);
 
     struct lws_client_connect_info conn_info;
     memset(&conn_info, 0, sizeof(conn_info));
