@@ -2638,6 +2638,20 @@ papago_ws_close(papago_ws_connection_t *conn, const char *reason)
     lws_close_reason(conn->wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
 }
 
+void*
+papago_ws_get_userdata(papago_ws_connection_t *conn)
+{
+    return (conn != NULL) ? conn->user_data : NULL;
+}
+
+void
+papago_ws_set_userdata(papago_ws_connection_t *conn, void *data)
+{
+    if (conn != NULL) {
+        conn->user_data = data;
+    }
+}
+
 /**
  * Retrieve the client's IP address for a websocket connection. Returns NULL if
  * not available.

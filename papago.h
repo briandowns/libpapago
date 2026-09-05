@@ -526,6 +526,18 @@ void
 papago_ws_close(papago_ws_connection_t *conn, const char *reason);
 
 /**
+ * Get user data on websocket connection.
+ */
+void*
+papago_ws_get_userdata(papago_ws_connection_t *conn);
+
+/**
+ * Set user data on websocket connection.
+ */
+void
+papago_ws_set_userdata(papago_ws_connection_t *conn, void *data);
+
+/**
  * Retrieve client IP address. Returns IP address string.
  */
 const char*
