@@ -37,7 +37,9 @@ main(void)
 
     papago_config_t cfg = papago_default_config();
     cfg.static_dir = "./public";
+
     papago_start(server, &cfg);
+
     papago_destroy(server);
 
     return 0;

@@ -149,7 +149,8 @@ typedef struct {
 } papago_cors_config_t;
 
 typedef struct {
-    uint16_t port;
+    uint16_t http_port;
+    uint16_t ws_port;
     char *host;
     uint32_t connection_timeout;
     uint32_t connection_limit;

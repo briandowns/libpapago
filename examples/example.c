@@ -151,15 +151,15 @@ main(void)
         ws_on_connect, ws_on_message, ws_on_close, ws_on_error);
 
     papago_config_t config = papago_default_config();
-    config.port = 8282;
+    config.http_port = 8282;
 
     printf("Server starting on:\n");
-    printf("  HTTP:      http://%s:%d\n", config.host, config.port);
-    printf("  WebSocket: ws://%s:%d/ws\n\n", config.host, config.port + 1);
+    printf("  HTTP:      http://%s:%d\n", config.host, config.http_port);
+    printf("  WebSocket: ws://%s:%d/ws\n\n", config.host, config.ws_port);
 
-    printf("Run\n\ncurl http://%s:%d/\n", config.host, config.port);
-    printf("curl http://%s:%d/api/hello\n", config.host, config.port);
-    printf("curl http://%s:%d/user/alice\n\n", config.host, config.port);
+    printf("Run\n\ncurl http://%s:%d/\n", config.host, config.http_port);
+    printf("curl http://%s:%d/api/hello\n", config.host, config.http_port);
+    printf("curl http://%s:%d/user/alice\n\n", config.host, config.http_port);
 
     // start server (blocking)
     if (papago_start(server, &config) != 0) {

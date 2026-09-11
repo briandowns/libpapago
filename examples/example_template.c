@@ -96,7 +96,7 @@ main(void)
     config.enable_template_rendering = true;
 
     printf("Server starting on:\n");
-    printf("  HTTP:      http://%s:%d\n", config.host, config.port);
+    printf("  HTTP:      http://%s:%d\n", config.host, config.http_port);
 
     // start server (blocking)
     if (papago_start(server, &config) != 0) {

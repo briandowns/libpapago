@@ -168,7 +168,7 @@ main(void)
         ws_on_close, ws_on_error);
 
     papago_config_t config = papago_default_config();
-    config.port = 8443;
+    config.http_port = 8443;
     config.enable_ssl = true;
     config.cert_file = "server.crt";
     config.key_file = "server.key";
@@ -178,8 +178,8 @@ main(void)
     printf("  Private Key: %s\n\n", config.key_file);
 
     printf("Server listening on:\n");
-    printf("  HTTPS: https://localhost:%d\n", config.port);
-    printf("  WSS:   wss://localhost:%d/ws\n\n", config.port + 1);
+    printf("  HTTPS: https://localhost:%d\n", config.http_port);
+    printf("  WSS:   wss://localhost:%d/ws\n\n", config.ws_port);
 
     printf("Test commands:\n");
     printf("  # Test HTTPS (ignore self-signed cert warning)\n");
@@ -187,7 +187,7 @@ main(void)
     printf("  curl -k https://localhost:8443/api/secure\n\n");
 
     printf("  # Test WSS with wscat\n");
-    printf("  wscat -c wss://localhost:8444/ws --no-check\n\n");
+    printf("  wscat -c wss://localhost:%d/ws --no-check\n\n", config.ws_port);
 
     printf("  # Or open in browser (accept certificate warning)\n");
     printf("  open https://localhost:8443\n\n");

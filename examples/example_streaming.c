@@ -289,7 +289,7 @@ main(void)
     printf("Server running on http://localhost:8484\n\n");
 
     papago_config_t config = papago_default_config();
-    config.port = 8484;
+    config.http_port = 8484;
 
     // start server (blocking)
     if (papago_start(server, &config) != 0) {

@@ -107,7 +107,7 @@ main(void)
 	papago_route(server, PAPAGO_GET, "/", handler, NULL);
 
 	papago_config_t config = papago_default_config();
-	config.port = 8443;
+	config.http_port = 8443;
 	config.enable_ssl = true;
 	config.cert_file = "server.crt";
 	config.key_file = "server.key";
@@ -121,7 +121,7 @@ main(void)
 	printf("  Client cert required: yes\n\n");
 
 	printf("Server:\n");
-	printf("  HTTPS: https://localhost:%d\n\n", config.port);
+	printf("  HTTPS: https://localhost:%d\n\n", config.http_port);
 
 	printf("Run:\n");
 	printf("# succeeds: presents a client cert signed by ca.crt\n");
