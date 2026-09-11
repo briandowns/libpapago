@@ -2102,11 +2102,8 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
         if (conn != NULL) {
             if (conn->server != NULL) {
                 server = conn->server;
-
                 pthread_mutex_lock(&server->ws_mutex);
 
-                /* remove from broadcast list first so no NEW caller can even
-                * find this conn via papago_ws_broadcast */
                 for (size_t i = 0; i < server->ws_connection_count; i++) {
                     if (server->ws_connections[i] == conn) {
                         for (; i < server->ws_connection_count - 1; i++) {
@@ -2117,33 +2114,11 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
                         break;
                     }
                 }
-
-                if (conn->send_mutex_ready) {
-                    conn->closing = true;
-                    /* wait for any papago_ws_send/broadcast call that already
-                    * acquired this conn (before closing was set) to finish */
-                    while (conn->inflight > 0) {
-                        pthread_cond_wait(&conn->drain_cond, &server->ws_mutex);
-                    }
-                }
-
                 pthread_mutex_unlock(&server->ws_mutex);
             }
 
-            if (conn->send_mutex_ready) {
-                /* nobody else can be touching send_mutex/queue now — safe */
-                papago_ws_msg_t *m = conn->send_head;
-                while (m != NULL) {
-                    papago_ws_msg_t *next = m->next;
-                    ws_msg_free(m);
-                    m = next;
-                }
-                conn->send_head = conn->send_tail = NULL;
-
-                pthread_mutex_destroy(&conn->send_mutex);
-                pthread_cond_destroy(&conn->drain_cond);
-                conn->send_mutex_ready = false;
-            }
+            ws_queue_drain_and_free(conn);
+            pthread_mutex_destroy(&conn->send_mutex);
 
             if (conn->endpoint != NULL && conn->endpoint->on_close != NULL) {
                 conn->endpoint->on_close(conn);
