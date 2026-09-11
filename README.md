@@ -14,7 +14,7 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 * Middleware System - Global and path-specific middleware
 * File stream - video / audio / large files, zero-copy, automatic MIME type detection
 * Multipart Form Uploads - Stream file uploads (single or multiple) to disk without buffering the full body in memory
-* WebSocket Support - Real-time bidirectional communication
+* WebSocket Support - Real-time bidirectional communication, SSL secure transport
 * WebSocket Client - included
 * Embedded File Support - Embed HTML, JS, CSS, etc into the application
 * JSON Responses - Built-in JSON helpers
@@ -60,7 +60,7 @@ sudo make install
 
 Below is a very simple demonstration of how to create a handler for a `GET` request.
 
-Default server runs on port `:8080`.
+Default server runs on port `8080`.
 
 ```c
 #include <stdio.h>

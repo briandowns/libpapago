@@ -101,11 +101,11 @@ main(void)
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 
     papago_config_t config = papago_default_config();
-    config.port = 8282;
+    config.http_port = 8282;
     config.enable_compression = true;
 
     printf("Server starting on:\n");
-    printf("  HTTP:      http://%s:%d\n", config.host, config.port);
+    printf("  HTTP:      http://%s:%d\n", config.host, config.http_port);
 
     // start server (blocking)
     if (papago_start(server, &config) != 0) {

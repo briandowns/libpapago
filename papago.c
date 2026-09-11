@@ -386,7 +386,8 @@ find_kv(const papago_kv_t *arr, size_t count, const char *key)
 
 // configuration
 
-#define DEFAULT_PORT 8080
+#define DEFAULT_HTTP_PORT 8080
+#define DEFAULT_WS_PORT 8081
 #define DEFAULT_HOST "0.0.0.0"
 #define DEFAULT_BODY_SIZE 10 * 1024 * 1024 /* 10MB */
 
@@ -395,7 +396,8 @@ papago_default_config(void)
 {
     papago_config_t config = {0};
 
-    config.port = DEFAULT_PORT;
+    config.http_port = DEFAULT_HTTP_PORT;
+    config.ws_port = DEFAULT_WS_PORT;
     config.host = DEFAULT_HOST;
     config.enable_ssl = false;
     config.connection_timeout = MAX_CONN_TIMEOUT;
@@ -2363,7 +2365,7 @@ papago_start(papago_t *server, const papago_config_t *config)
         if (ca_pem != NULL) {
             server->mhd_daemon = MHD_start_daemon(
                 mhd_flags,
-                server->config.port,
+                server->config.http_port,
                 NULL, NULL,
                 &mhd_handler, server,
                 MHD_OPTION_HTTPS_MEM_KEY, key_pem,
@@ -2375,7 +2377,7 @@ papago_start(papago_t *server, const papago_config_t *config)
         } else {
             server->mhd_daemon = MHD_start_daemon(
                 mhd_flags,
-                server->config.port,
+                server->config.http_port,
                 NULL, NULL,
                 &mhd_handler, server,
                 MHD_OPTION_HTTPS_MEM_KEY, key_pem,
@@ -2392,7 +2394,7 @@ papago_start(papago_t *server, const papago_config_t *config)
     } else {
         server->mhd_daemon = MHD_start_daemon(
             mhd_flags,
-            server->config.port,
+            server->config.http_port,
             NULL, NULL,
             &mhd_handler, server,
             MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
@@ -2417,7 +2419,7 @@ papago_start(papago_t *server, const papago_config_t *config)
     // start libwebsockets context if we have websocket endpoints
     if (server->ws_endpoint_count > 0) {
         lws_set_log_level(LLL_ERR | LLL_WARN | LLL_NOTICE | LLL_INFO, NULL);
-        info.port = server->config.port + 1; // WS on different port
+        info.port = server->config.ws_port; // WS on different port
         info.protocols = papago_lws_protocols;
         info.gid = (gid_t)-1;
         info.uid = (uid_t)-1;
