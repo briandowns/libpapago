@@ -217,6 +217,9 @@ papago_error(void);
 papago_config_t
 papago_default_config(void);
 
+/**
+ * CORS configuration
+ */
 papago_cors_config_t
 papago_cors_default_config(void);
 
