@@ -56,6 +56,8 @@
 #define PAPAGO_MAX_MIDDLEWARE 256
 #define PAPAGO_MAX_WS_ENDPOINTS 32
 #define MAX_WS_CONNECTIONS 256
+#define WS_MAX_QUEUE_MSGS 256
+#define WS_MAX_QUEUE_BYTES (1u * 1024 * 1024)
 #define PAPAGO_MAX_HEADERS 64
 #define MAX_RATE_LIMIT_ENTRIES 1024
 #define MAX_CONN_TIMEOUT 30
@@ -92,8 +94,8 @@ typedef struct {
  */
 struct papago_file_upload {
     char *field_name;
-    char *filename;       // could be NULL
-    char *content_type;   // could be NULL
+    char *filename; // could be NULL
+    char *content_type; // could be NULL
     char *tmp_path;
     size_t size;
     struct papago_file_upload *next;
@@ -166,14 +168,38 @@ struct papago_response {
 };
 
 /**
+ * Outgoing WebSocket message structure for deferred/thread-safe writes.
+ */
+typedef struct papago_ws_msg {
+    unsigned char *data; // includes LWS_PRE headroom
+    size_t len; // payload length (excludes LWS_PRE)
+    int binary; // 1 = LWS_WRITE_BINARY, 0 = LWS_WRITE_TEXT
+    struct papago_ws_msg *next;
+} papago_ws_msg_t;
+
+/**
  * websocket connection structure
  */
 struct papago_ws_connection {
     struct lws *wsi;
-    char client_ip[64];
+    char client_ip[INET_ADDRSTRLEN];
     void *user_data;
     papago_ws_endpoint_t *endpoint;
     struct papago_server *server;
+
+    pthread_mutex_t   send_mutex;
+    papago_ws_msg_t  *send_head;
+    papago_ws_msg_t  *send_tail;
+
+    size_t queue_msg_count;
+    size_t queue_byte_count;
+
+    /* lifecycle state — ALWAYS guarded by server->ws_mutex, never
+     * conn->send_mutex, so we never touch a possibly-uninitialized lock */
+    bool send_mutex_ready; /* init succeeded */
+    bool closing;          /* CLOSED has started teardown */
+    int inflight;         /* in-progress send/broadcast ops */
+    pthread_cond_t drain_cond;       /* signaled when inflight -> 0 */
 };
 
 /**
@@ -1813,6 +1839,140 @@ send_response:
 
 // libwebsockets Protocol Handler
 
+static bool
+papago_ws_conn_acquire(papago_ws_connection_t *conn)
+{
+    bool ok = false;
+
+    if (conn == NULL || conn->server == NULL) {
+        return false;
+    }
+
+    pthread_mutex_lock(&conn->server->ws_mutex);
+    if (conn->send_mutex_ready && !conn->closing) {
+        conn->inflight++;
+        ok = true;
+    }
+    pthread_mutex_unlock(&conn->server->ws_mutex);
+
+    return ok;
+}
+
+static void
+ws_conn_release(papago_ws_connection_t *conn)
+{
+    pthread_mutex_lock(&conn->server->ws_mutex);
+    conn->inflight--;
+    if (conn->inflight == 0 && conn->closing) {
+        pthread_cond_broadcast(&conn->drain_cond);
+    }
+    pthread_mutex_unlock(&conn->server->ws_mutex);
+}
+
+static papago_ws_msg_t*
+ws_msg_create(const void *data, size_t len, int binary)
+{
+    papago_ws_msg_t *msg = malloc(sizeof(*msg));
+    if (msg == NULL) {
+        return NULL;
+    }
+
+    msg->data = malloc(LWS_PRE + len);
+    if (msg->data == NULL) {
+        free(msg);
+        return NULL;
+    }
+
+    memcpy(&msg->data[LWS_PRE], data, len);
+    msg->len = len;
+    msg->binary = binary;
+    msg->next = NULL;
+
+    return msg;
+}
+
+static void
+ws_msg_free(papago_ws_msg_t *msg)
+{
+    if (msg != NULL) {
+        free(msg->data);
+        free(msg);
+    }
+}
+
+static int
+ws_queue_push(papago_ws_connection_t *conn, papago_ws_msg_t *msg)
+{
+    pthread_mutex_lock(&conn->send_mutex);
+
+    if (conn->queue_msg_count >= WS_MAX_QUEUE_MSGS ||
+        conn->queue_byte_count + msg->len > WS_MAX_QUEUE_BYTES) {
+        pthread_mutex_unlock(&conn->send_mutex);
+        return 1;
+    }
+
+    if (conn->send_tail == NULL) {
+        conn->send_head = conn->send_tail = msg;
+    } else {
+        conn->send_tail->next = msg;
+        conn->send_tail = msg;
+    }
+    conn->queue_msg_count++;
+    conn->queue_byte_count += msg->len;
+
+    pthread_mutex_unlock(&conn->send_mutex);
+    return 0;
+}
+
+static papago_ws_msg_t *
+ws_queue_pop(papago_ws_connection_t *conn)
+{
+    papago_ws_msg_t *msg;
+
+    pthread_mutex_lock(&conn->send_mutex);
+    msg = conn->send_head;
+    if (msg != NULL) {
+        conn->send_head = msg->next;
+        if (conn->send_head == NULL) {
+            conn->send_tail = NULL;
+        }
+        conn->queue_msg_count--;
+        conn->queue_byte_count -= msg->len;
+    }
+    pthread_mutex_unlock(&conn->send_mutex);
+
+    return msg;
+}
+
+static int
+ws_queue_has_more(papago_ws_connection_t *conn)
+{
+    int has_more;
+
+    pthread_mutex_lock(&conn->send_mutex);
+    has_more = (conn->send_head != NULL);
+    pthread_mutex_unlock(&conn->send_mutex);
+
+    return has_more;
+}
+
+static void
+ws_queue_drain_and_free(papago_ws_connection_t *conn)
+{
+    papago_ws_msg_t *msg;
+
+    pthread_mutex_lock(&conn->send_mutex);
+    msg = conn->send_head;
+    conn->send_head = conn->send_tail = NULL;
+    pthread_mutex_unlock(&conn->send_mutex);
+
+    while (msg != NULL) {
+        papago_ws_msg_t *next = msg->next;
+        ws_msg_free(msg);
+        msg = next;
+    }
+}
+
 static int
 lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
              void *in, size_t len)
@@ -1821,39 +1981,48 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
     papago_t *server;
 
     switch (reason) {
-    case LWS_CALLBACK_ESTABLISHED:
-        // connection established
+    case LWS_CALLBACK_ESTABLISHED: {
+        char buf[256];
+        bool matched = false;
+
         server = (papago_t*)lws_context_user(lws_get_context(wsi));
 
-        // get the URI path from the HTTP request
-        char buf[256];
-        lws_hdr_copy(wsi, buf, sizeof(buf), WSI_TOKEN_GET_URI);
+        if (lws_hdr_copy(wsi, buf, sizeof(buf), WSI_TOKEN_GET_URI) < 0) {
+            return 1;
+        }
 
-        // find matching endpoint
         for (size_t i = 0; i < server->ws_endpoint_count; i++) {
             if (strcmp(server->ws_endpoints[i].path, buf) == 0) {
                 conn->wsi = wsi;
                 conn->endpoint = &server->ws_endpoints[i];
                 conn->server = server;
 
-                // get client IP
+                if (pthread_mutex_init(&conn->send_mutex, NULL) != 0) {
+                    return 1;
+                }
+                if (pthread_cond_init(&conn->drain_cond, NULL) != 0) {
+                    pthread_mutex_destroy(&conn->send_mutex);
+                    return 1;
+                }
+
                 int fd = lws_get_socket_fd(wsi);
                 if (fd >= 0) {
                     struct sockaddr_in addr;
                     socklen_t addr_len = sizeof(addr);
-
                     if (getpeername(fd, (struct sockaddr*)&addr, &addr_len) == 0) {
                         inet_ntop(AF_INET, &addr.sin_addr, conn->client_ip,
-                            sizeof(conn->client_ip));
+                                sizeof(conn->client_ip));
                     }
                 }
 
-                // register connection for broadcast
                 pthread_mutex_lock(&server->ws_mutex);
                 if (server->ws_connection_count < 256) {
                     server->ws_connections[server->ws_connection_count++] = conn;
                 }
+                conn->send_mutex_ready = true; /* only now is conn "live" */
                 pthread_mutex_unlock(&server->ws_mutex);
+
+                matched = true;
 
                 if (conn->endpoint->on_connect != NULL) {
                     conn->endpoint->on_connect(conn);
@@ -1861,45 +2030,125 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
                 break;
             }
         }
-        break;
 
+        if (!matched) {
+            return 1; /* conn->send_mutex_ready stays false (zero-initialized) —
+                        CLOSED will see this and skip all teardown of sync
+                        primitives that were never created */
+        }
+        break;
+    }
+
+    case LWS_CALLBACK_SERVER_WRITEABLE: {
+        if (conn == NULL) {
+            break;
+        }
+
+        if (lws_partial_buffered(wsi)) {
+            /* lws is still internally flushing a previous write; don't
+            * start a new one, just ask to be called again */
+            lws_callback_on_writable(wsi);
+            break;
+        }
+
+        papago_ws_msg_t *msg = ws_queue_pop(conn);
+        if (msg != NULL) {
+            int n = lws_write(wsi, &msg->data[LWS_PRE], msg->len,
+                            msg->binary ? LWS_WRITE_BINARY : LWS_WRITE_TEXT);
+
+            if (n < 0) {
+                ws_msg_free(msg);
+                if (conn->endpoint != NULL && conn->endpoint->on_error != NULL) {
+                    conn->endpoint->on_error(conn, "lws_write failed");
+                }
+                return -1; /* tell lws to close this connection */
+            }
+
+            if ((size_t)n < msg->len && !lws_partial_buffered(wsi)) {
+                /* lws neither sent it all nor took ownership of the remainder
+                * internally — that's an unexpected/ambiguous state, treat it
+                * as a failure rather than silently dropping the tail */
+                ws_msg_free(msg);
+                if (conn->endpoint != NULL && conn->endpoint->on_error != NULL) {
+                    conn->endpoint->on_error(conn, "truncated write");
+                }
+                return -1;
+            }
+
+            /* either n == msg->len (fully sent), or n < msg->len and
+            * lws_partial_buffered() confirms lws has copied and taken
+            * ownership of flushing the remainder itself — safe to free
+            * our copy either way */
+            ws_msg_free(msg);
+
+            if (ws_queue_has_more(conn) && !lws_partial_buffered(wsi)) {
+                lws_callback_on_writable(wsi);
+            }
+        }
+        break;
+    }
     case LWS_CALLBACK_RECEIVE:
-        // message received
         if (conn != NULL && conn->endpoint != NULL &&
             conn->endpoint->on_message != NULL) {
             bool is_binary = lws_frame_is_binary(wsi);
-            conn->endpoint->on_message(conn, (const char *)in, len, is_binary);
+            conn->endpoint->on_message(conn, (const char *)in, len,
+                                        is_binary);
         }
         break;
 
-    case LWS_CALLBACK_CLOSED:
-        // connection closed
-        if (conn != NULL && conn->endpoint != NULL) {
-            // unregister connection
+    case LWS_CALLBACK_CLOSED: {
+        if (conn != NULL) {
             if (conn->server != NULL) {
                 server = conn->server;
+
                 pthread_mutex_lock(&server->ws_mutex);
 
+                /* remove from broadcast list first so no NEW caller can even
+                * find this conn via papago_ws_broadcast */
                 for (size_t i = 0; i < server->ws_connection_count; i++) {
                     if (server->ws_connections[i] == conn) {
-                        // shift remaining connections
                         for (; i < server->ws_connection_count - 1; i++) {
                             server->ws_connections[i] =
                                 server->ws_connections[i + 1];
                         }
-
                         server->ws_connection_count--;
                         break;
                     }
                 }
+
+                if (conn->send_mutex_ready) {
+                    conn->closing = true;
+                    /* wait for any papago_ws_send/broadcast call that already
+                    * acquired this conn (before closing was set) to finish */
+                    while (conn->inflight > 0) {
+                        pthread_cond_wait(&conn->drain_cond, &server->ws_mutex);
+                    }
+                }
+
                 pthread_mutex_unlock(&server->ws_mutex);
             }
 
-            if (conn->endpoint->on_close != NULL) {
+            if (conn->send_mutex_ready) {
+                /* nobody else can be touching send_mutex/queue now — safe */
+                papago_ws_msg_t *m = conn->send_head;
+                while (m != NULL) {
+                    papago_ws_msg_t *next = m->next;
+                    ws_msg_free(m);
+                    m = next;
+                }
+                conn->send_head = conn->send_tail = NULL;
+
+                pthread_mutex_destroy(&conn->send_mutex);
+                pthread_cond_destroy(&conn->drain_cond);
+                conn->send_mutex_ready = false;
+            }
+
+            if (conn->endpoint != NULL && conn->endpoint->on_close != NULL) {
                 conn->endpoint->on_close(conn);
             }
         }
         break;
+    }
     default:
         break;
     }
@@ -2167,6 +2416,7 @@ papago_start(papago_t *server, const papago_config_t *config)
 
     // start libwebsockets context if we have websocket endpoints
     if (server->ws_endpoint_count > 0) {
+        lws_set_log_level(LLL_ERR | LLL_WARN | LLL_NOTICE | LLL_INFO, NULL);
         info.port = server->config.port + 1; // WS on different port
         info.protocols = papago_lws_protocols;
         info.gid = (gid_t)-1;
@@ -2555,21 +2805,32 @@ papago_ws_endpoint(papago_t *server, const char *path,
 int
 papago_ws_send(papago_ws_connection_t *conn, const char *message)
 {
-    if (conn == NULL || conn->wsi == NULL || message == NULL) {
+    if (conn == NULL || message == NULL) {
         return 1;
     }
 
-    size_t len = strlen(message);
-    unsigned char *buf = malloc(LWS_PRE + len);
-    if (buf == NULL) {
+    if (!papago_ws_conn_acquire(conn)) {
         return 1;
     }
 
-    memcpy(&buf[LWS_PRE], message, len);
-    lws_write(conn->wsi, &buf[LWS_PRE], len, LWS_WRITE_TEXT);
+    papago_ws_msg_t *msg = ws_msg_create(message, strlen(message), 0);
+    if (msg == NULL) {
+        ws_conn_release(conn);
+        return 1;
+    }
 
-    free(buf);
+    if (ws_queue_push(conn, msg) != 0) {
+        ws_msg_free(msg);
+        ws_conn_release(conn);
+        return 1;
+    }
 
+    lws_callback_on_writable(conn->wsi);
+    if (conn->server->lws_context != NULL) {
+        lws_cancel_service(conn->server->lws_context);
+    }
+
+    ws_conn_release(conn);
     return 0;
 }
 
@@ -2581,15 +2842,21 @@ papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
         return 1;
     }
 
-    unsigned char *buf = malloc(LWS_PRE + length);
-    if (buf == NULL) {
+    papago_ws_msg_t *msg = ws_msg_create(data, length, 1);
+    if (msg == NULL) {
         return 1;
     }
 
-    memcpy(&buf[LWS_PRE], data, length);
-    lws_write(conn->wsi, &buf[LWS_PRE], length, LWS_WRITE_BINARY);
+    if (ws_queue_push(conn, msg) != 0) {
+        ws_msg_free(msg);
+        return 1;
+    }
 
-    free(buf);
+    lws_callback_on_writable(conn->wsi);
+
+    if (conn->server != NULL && conn->server->lws_context != NULL) {
+        lws_cancel_service(conn->server->lws_context);
+    }
 
     return 0;
 }
@@ -2602,27 +2869,35 @@ papago_ws_broadcast(papago_t *server, const char *message)
     }
 
     size_t len = strlen(message);
-    unsigned char * buf = malloc(LWS_PRE + len);
-    if (buf == NULL) {
-        return 0;
-    }
 
-    memcpy(&buf[LWS_PRE], message, len);
-
-    uint16_t count = 0;
     pthread_mutex_lock(&server->ws_mutex);
 
+    uint16_t count = 0;
     for (size_t i = 0; i < server->ws_connection_count; i++) {
-        if (server->ws_connections[i] != NULL &&
-            server->ws_connections[i]->wsi != NULL) {
-            lws_write(server->ws_connections[i]->wsi,
-                &buf[LWS_PRE], len, LWS_WRITE_TEXT);
-            count++;
-        }
-    }
+        papago_ws_connection_t *conn = server->ws_connections[i];
 
+        if (conn == NULL || conn->wsi == NULL) {
+            continue;
+        }
+
+        papago_ws_msg_t *msg = ws_msg_create(message, len, 0);
+        if (msg == NULL) {
+            continue;
+        }
+
+        if (ws_queue_push(conn, msg) != 0) {
+            ws_msg_free(msg);
+            continue;
+        }
+
+        lws_callback_on_writable(conn->wsi);
+        count++;
+    }
     pthread_mutex_unlock(&server->ws_mutex);
-    free(buf);
+
+    if (server->lws_context != NULL) {
+        lws_cancel_service(server->lws_context);
+    }
 
     return count;
 }
@@ -2630,11 +2905,12 @@ papago_ws_broadcast(papago_t *server, const char *message)
 void
 papago_ws_close(papago_ws_connection_t *conn, const char *reason)
 {
+    PAPAGO_UNUSED(reason);
+
     if (conn == NULL || conn->wsi == NULL) {
         return;
     }
 
-    PAPAGO_UNUSED(reason);
     lws_close_reason(conn->wsi, LWS_CLOSE_STATUS_NORMAL, NULL, 0);
 }
 

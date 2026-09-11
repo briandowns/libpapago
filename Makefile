@@ -102,6 +102,8 @@ endif
 clean:
 	rm -f $(NAME).dylib
 	rm -f $(NAME).so
+	rm -f $(NAME)_wsc.dylib
+	rm -f $(NAME)_wsc.so
 	rm -f $(EXAMPLES)
 	rm -f tests/tests
 
