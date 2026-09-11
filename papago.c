@@ -1908,8 +1908,7 @@ ws_queue_push(papago_ws_connection_t *conn, papago_ws_msg_t *msg)
     if (conn->queue_msg_count >= WS_MAX_QUEUE_MSGS ||
         conn->queue_byte_count + msg->len > WS_MAX_QUEUE_BYTES) {
         pthread_mutex_unlock(&conn->send_mutex);
-        return 1; /* backpressure: reject the new message rather than
-                     let one slow reader grow memory unbounded */
+        return 1;
     }
 
     if (conn->send_tail == NULL) {
