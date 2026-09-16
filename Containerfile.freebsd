@@ -1,0 +1,41 @@
+FROM ghcr.io/freebsd/freebsd-toolchain:15.1 AS build
+
+ENV ASSUME_ALWAYS_YES=yes
+RUN pkg update && \
+    pkg install -y \
+        FreeBSD-clang \
+        llvm \
+        libmicrohttpd \
+        jansson \
+        libwebsockets \
+        git \
+        gmake \
+        openssl \
+        gnutls \
+        curl
+
+WORKDIR /app
+COPY . .
+
+RUN git clone --depth 1 https://github.com/briandowns/libmaple && \
+    cd libmaple && \
+    gmake && \
+    gmake install
+
+RUN gmake PAPAGO_USE_MAPLE=1 PAPAGO_WITH_WSC=1 && \
+    gmake install PAPAGO_USE_MAPLE=1 PAPAGO_WITH_WSC=1
+
+FROM ghcr.io/freebsd/freebsd-notoolchain:15.1
+
+ENV ASSUME_ALWAYS_YES=yes
+RUN pkg update && \
+    pkg install -y \
+        libmicrohttpd \
+        jansson \
+        libwebsockets \
+        openssl \
+        gnutls
+
+COPY --from=build /app/papago.h /usr/local/include/
+COPY --from=build /app/libpapago.so /usr/local/lib/
+
