@@ -36,6 +36,9 @@ RUN pkg update && \
         openssl \
         gnutls
 
+COPY --from=build /usr/local/include/maple.h /usr/local/include/
+COPY --from=build /usr/local/lib/libmaple.so /usr/local/lib/
 COPY --from=build /app/papago.h /usr/local/include/
 COPY --from=build /app/libpapago.so /usr/local/lib/
+COPY --from=build /app/libpapago_wsc.so /usr/local/lib/
 
