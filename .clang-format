@@ -1,0 +1,45 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# C23
+Standard: c23
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# Line length
+ColumnLimit: 80
+
+# Braces
+BreakBeforeBraces: Attach
+
+# Pointers
+PointerAlignment: Right
+DerivePointerAlignment: false
+
+# Parentheses
+SpaceBeforeParens: Control
+
+# Function declarations / calls
+BinPackArguments: true
+BinPackParameters: true
+AlignAfterOpenBracket: Align
+
+# Short constructs
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: Never
+
+# switch
+IndentCaseLabels: true
+
+# Includes
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+
+# Comments
+ReflowComments: false
+
