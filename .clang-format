@@ -3,7 +3,7 @@ Language: Cpp
 BasedOnStyle: LLVM
 
 # C23
-Standard: c23
+Standard: Latest
 
 # Indentation
 IndentWidth: 4

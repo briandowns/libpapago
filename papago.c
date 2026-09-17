@@ -2126,7 +2126,7 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
         }
         break;
     }
-    default: 
+    default:
         break;
     }
 
