@@ -545,7 +545,15 @@ papago_ws_set_userdata(papago_ws_connection_t *conn, void *data);
  * Retrieve client IP address. Returns IP address string.
  */
 const char*
-papago_ws_get_client_ip(papago_ws_connection_t *conn);
+papago_ws_get_client_ip(const papago_ws_connection_t *conn);
+
+/**
+ * Retrieve client certificate common name (CN). Returns CN string or NULL if
+ * no client certificate is present. Requires require_client_cert to be
+ * enabled in the server config.
+ */
+const char*
+papago_ws_client_cert_cn(const papago_ws_connection_t *conn);
 
 /**
  * URL encode a string. Returns encoded string. Caller is responsible to free

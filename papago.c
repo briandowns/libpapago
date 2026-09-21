@@ -194,12 +194,13 @@ struct papago_ws_connection {
     size_t queue_msg_count;
     size_t queue_byte_count;
 
-    /* lifecycle state — ALWAYS guarded by server->ws_mutex, never
-     * conn->send_mutex, so we never touch a possibly-uninitialized lock */
-    bool send_mutex_ready; /* init succeeded */
-    bool closing;          /* CLOSED has started teardown */
-    int inflight;         /* in-progress send/broadcast ops */
-    pthread_cond_t drain_cond;       /* signaled when inflight -> 0 */
+    char client_cert_cn[256];
+    bool has_client_cert;
+
+    bool send_mutex_ready;
+    bool closing;
+    int inflight;
+    pthread_cond_t drain_cond;
 };
 
 /**
@@ -1926,7 +1927,7 @@ ws_queue_push(papago_ws_connection_t *conn, papago_ws_msg_t *msg)
     return 0;
 }
 
-static papago_ws_msg_t *
+static papago_ws_msg_t*
 ws_queue_pop(papago_ws_connection_t *conn)
 {
     papago_ws_msg_t *msg;
@@ -1973,6 +1974,16 @@ ws_queue_drain_and_free(papago_ws_connection_t *conn)
         ws_msg_free(msg);
         msg = next;
     }
+}
+
+const char*
+papago_ws_client_cert_cn(const papago_ws_connection_t *conn)
+{
+    if (!conn->has_client_cert) {
+        return NULL;
+    }
+
+    return conn->client_cert_cn;
 }
 
 static int
@@ -2414,6 +2425,21 @@ papago_start(papago_t *server, const papago_config_t *config)
             info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
             info.ssl_cert_filepath = server->config.cert_file;
             info.ssl_private_key_filepath = server->config.key_file;
+
+            if (server->config.require_client_cert) {
+                if (server->config.ca_cert_file == NULL ||
+                    server->config.ca_cert_file[0] == '\0') {
+                    MHD_stop_daemon(server->mhd_daemon);
+                    server->running = false;
+                    papago_set_error(PAPAGO_ERR,
+                        "require_client_cert is true but ca_cert_file is not set for WebSocket");
+
+                    return 1;
+                }
+
+                info.ssl_ca_filepath = server->config.ca_cert_file;
+                info.options |= LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT;
+            }
         }
 
 #ifndef PAPAGO_DEBUG
@@ -2910,7 +2936,7 @@ papago_ws_set_userdata(papago_ws_connection_t *conn, void *data)
  * not available.
  */
 const char*
-papago_ws_get_client_ip(papago_ws_connection_t *conn)
+papago_ws_get_client_ip(const papago_ws_connection_t *conn)
 {
     return (conn != NULL) ? conn->client_ip : NULL;
 }
