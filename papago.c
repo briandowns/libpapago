@@ -1606,12 +1606,30 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         gnutls_session_t session = (session_info != NULL) ?
             (gnutls_session_t)session_info->tls_session : NULL;
 
+        req->has_client_cert = false;
+        req->client_cert_cn[0] = '\0';
+
         unsigned int cert_list_size = 0;
         const gnutls_datum_t *cert_list = (session != NULL) ?
             gnutls_certificate_get_peers(session, &cert_list_size) : NULL;
 
-        req->has_client_cert = false;
-        req->client_cert_cn[0] = '\0';
+        unsigned int status = 0;
+        int ret = gnutls_certificate_verify_peers3(session, NULL, &status);
+        if (ret != GNUTLS_E_SUCCESS || status != 0) {
+            papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+            if (status & GNUTLS_CERT_EXPIRED) {
+                papago_res_json(res, "{\"error\":\"client certificate has expired\"}");
+            } else if (status & GNUTLS_CERT_NOT_ACTIVATED) {
+                papago_res_json(res, "{\"error\":\"client certificate not yet valid\"}");
+            } else if (status & GNUTLS_CERT_REVOKED) {
+                papago_res_json(res, "{\"error\":\"client certificate revoked\"}");
+            } else if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
+                papago_res_json(res, "{\"error\":\"client certificate not signed by trusted CA\"}");
+            } else {
+                papago_res_json(res, "{\"error\":\"client certificate verification failed\"}");
+            }
+            goto send_response;
+        }
 
         if (cert_list != NULL && cert_list_size > 0) {
             gnutls_x509_crt_t peer_cert;
