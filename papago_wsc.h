@@ -74,6 +74,9 @@ typedef struct {
     const char *host;
     int port;
     const char *path;
+    const char *cert_file;
+    const char *key_file;
+    const char *ca_cert_file;
     bool use_ssl;
 } papago_wsc_config_t;
 

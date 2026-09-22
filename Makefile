@@ -122,7 +122,9 @@ EXAMPLES = example \
 	example_static_dir \
 	example_mtls \
 	example_cors \
-	example_multipart
+	example_multipart \
+	example_ws_mtls \
+	example_wsclient_mtls
 
 .PHONY: example
 example: clean
@@ -191,6 +193,14 @@ example_cors: clean
 .PHONY: example_multipart
 example_multipart: clean
 	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_ws_mtls
+example_ws_mtls: clean
+	$(CC) -o $@ papago.c examples/$@.c $(CFLAGS) $(LDFLAGS)
+
+.PHONY: example_wsclient_mtls
+example_wsclient_mtls: clean
+	$(CC) -o $@ papago_wsc.c examples/$@.c $(CFLAGS) -lwebsockets -lssl -lcrypto -lz -lm -lpthread
 
 .PHONY: examples_all
 examples_all: $(EXAMPLES)
