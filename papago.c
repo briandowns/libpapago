@@ -2474,6 +2474,7 @@ papago_start(papago_t *server, const papago_config_t *config)
                     server->config.ca_cert_file[0] == '\0') {
                     MHD_stop_daemon(server->mhd_daemon);
                     server->running = false;
+                    server->mhd_daemon = NULL;
                     papago_set_error(PAPAGO_ERR,
                         "require_client_cert is true but ca_cert_file is not set for WebSocket");
 
