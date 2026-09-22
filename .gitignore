@@ -25,6 +25,8 @@ example_static_dir
 example_mtls
 example_cors
 example_multipart
+example_ws_mtls
+example_wsclient_mtls
 debug_build
 
 libpapago.dylib

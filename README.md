@@ -5,7 +5,7 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 ## Features
 
 * RESTful Routing - GET, POST, PUT, DELETE, PATCH support
-* SSL/TLS Encryption - Server and client side
+* SSL/TLS Encryption - Server and client side (mTLS)
 * Path Parameters - Dynamic routes like `/users/:id`
 * Wildcard URIs - Example: `/api/v1/*` 
 * Query Parameters - Parse URL query strings
@@ -14,7 +14,7 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 * Middleware System - Global and path-specific middleware
 * File stream - video / audio / large files, zero-copy, automatic MIME type detection
 * Multipart Form Uploads - Stream file uploads (single or multiple) to disk without buffering the full body in memory
-* WebSocket Support - Real-time bidirectional communication, SSL secure transport
+* WebSocket Support - Real-time bidirectional communication, SSL secure transport and mTLS
 * WebSocket Client - included
 * Embedded File Support - Embed HTML, JS, CSS, etc into the application
 * JSON Responses - Built-in JSON helpers
@@ -215,6 +215,8 @@ Examples of some common middlewares (logger, rate-limiting) can be found in the 
 ### Websocket
 
 Below is example code of how to use the websocket functionality. For the available websocket client API, reference the [Papago Websocket Client Header](papago_wsc.h) file.
+
+mTLS is supported for both server and client side websocket connections. The `examples/example_ws_mtls.c` and `examples/example_wsclient_mtls.c` files show how this can be achieved.
 
 ```c
 void

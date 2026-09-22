@@ -48,6 +48,8 @@
 #include <microhttpd.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
 #include <zlib.h>
 
 #include "papago.h"
@@ -1999,6 +2001,47 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
         bool matched = false;
 
         server = (papago_t*)lws_context_user(lws_get_context(wsi));
+
+        conn->has_client_cert = false;
+        conn->client_cert_cn[0] = '\0';
+
+        if (server->config.enable_ssl && server->config.require_client_cert) {
+            SSL *ssl = lws_get_ssl(wsi);
+
+            if (ssl == NULL) {
+                fprintf(stderr, "papago: mTLS enabled but lws_get_ssl(wsi) "
+                    "returned NULL for this connection\n");
+                return 1;
+            }
+
+            X509 *peer_cert = SSL_get_peer_certificate(ssl);
+            if (peer_cert == NULL) {
+                fprintf(stderr, "papago: no client certificate presented\n");
+                return 1;
+            }
+
+            if (SSL_get_verify_result(ssl) != X509_V_OK) {
+                fprintf(stderr, "papago: client certificate failed "
+                    "verification (result=%ld)\n",
+                SSL_get_verify_result(ssl));
+                X509_free(peer_cert);
+                return 1;
+            }
+
+            X509_NAME *subject = X509_get_subject_name(peer_cert);
+            if (subject != NULL) {
+                int n = X509_NAME_get_text_by_NID(subject, NID_commonName,
+                    conn->client_cert_cn, sizeof(conn->client_cert_cn));
+                conn->has_client_cert = (n > 0);
+            }
+
+            X509_free(peer_cert);
+
+            if (!conn->has_client_cert) {
+                fprintf(stderr, "papago: client cert has no CN subject\n");
+                return 1;
+            }
+        }
 
         if (lws_hdr_copy(wsi, buf, sizeof(buf), WSI_TOKEN_GET_URI) < 0) {
             return 1;

@@ -224,7 +224,7 @@ papago_wsc_default_config(void)
     papago_wsc_config_t config;
     memset(&config, 0, sizeof(config));
     config.host    = "127.0.0.1";
-    config.port    = 8485;
+    config.port    = 8181;
     config.path    = "/ws";
     config.use_ssl = false;
 
@@ -251,7 +251,7 @@ papago_wsc_connect(papago_wsc_t *client,
     // copy config so we own the strings
     snprintf(client->host, sizeof(client->host), "%s",
         config->host != NULL ? config->host : "127.0.0.1");
-    client->port = config->port > 0 ? config->port : 8485;
+    client->port = config->port > 0 ? config->port : 8181;
     snprintf(client->path, sizeof(client->path), "%s",
         config->path != NULL ? config->path : "/ws");
     client->lws_ssl_flags = config->use_ssl ? LCCSCF_USE_SSL : 0;
@@ -263,6 +263,14 @@ papago_wsc_connect(papago_wsc_t *client,
     ctx_info.protocols = wsc_protocols;
     ctx_info.user = client;
     ctx_info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+
+    if (config->cert_file != NULL && config->key_file != NULL) {
+        ctx_info.client_ssl_cert_filepath = config->cert_file;
+        ctx_info.client_ssl_private_key_filepath = config->key_file;
+    }
+    if (config->ca_cert_file != NULL) {
+        ctx_info.client_ssl_ca_filepath = config->ca_cert_file;
+    }
 
     lws_set_log_level(0, NULL);
     client->lws_ctx = lws_create_context(&ctx_info);
