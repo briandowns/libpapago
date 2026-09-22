@@ -806,7 +806,7 @@ set_file_headers(papago_response_t *res, const char *filepath,
 }
 
 /**
- * Validate file for streaming. Returns file size on success or -1 on error.
+ * Validate file for streaming. Returns file size on success or 1 on error.
  */
 static int64_t
 validate_file(const char *filepath)
@@ -814,16 +814,16 @@ validate_file(const char *filepath)
     struct stat st;
  
     if (filepath == NULL)
-        return -1;
+        return 1;
  
     if (stat(filepath, &st) != 0) {
         fprintf(stderr, "file not found: %s\n", filepath);
-        return -1;
+        return 1;
     }
  
     if (!S_ISREG(st.st_mode)) {
         fprintf(stderr, "not a regular file: %s\n", filepath);
-        return -1;
+        return 1;
     }
  
     return (int64_t)st.st_size;
@@ -1611,22 +1611,30 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             gnutls_certificate_get_peers(session, &cert_list_size) : NULL;
 
         req->has_client_cert = false;
+        req->client_cert_cn[0] = '\0';
 
         if (cert_list != NULL && cert_list_size > 0) {
             gnutls_x509_crt_t peer_cert;
+
             int ret = gnutls_x509_crt_init(&peer_cert);
             if (ret != GNUTLS_E_SUCCESS) {
                 papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
-                papago_res_json(res, "{\"error\":\"failed loading client certificate\"}");
+                papago_res_json(res,
+                    "{\"error\":\"failed loading client certificate\"}");
                 goto send_response;
             }
 
             if (gnutls_x509_crt_import(peer_cert, &cert_list[0],
                     GNUTLS_X509_FMT_DER) == GNUTLS_E_SUCCESS) {
+                // cert is present and MHD/GnuTLS already validated the chain
+                // before invoking this handler; a missing CN does not make the
+                // cert invalid
+                req->has_client_cert = true;
+
                 size_t cn_len = sizeof(req->client_cert_cn);
-                req->has_client_cert = (gnutls_x509_crt_get_dn_by_oid(
-                    peer_cert, GNUTLS_OID_X520_COMMON_NAME, 0, 0,
-                    req->client_cert_cn, &cn_len) == GNUTLS_E_SUCCESS);
+                gnutls_x509_crt_get_dn_by_oid(peer_cert,
+                    GNUTLS_OID_X520_COMMON_NAME, 0, 0,
+                    req->client_cert_cn, &cn_len);
             }
 
             gnutls_x509_crt_deinit(peer_cert);
@@ -1966,6 +1974,10 @@ ws_queue_drain_and_free(papago_ws_connection_t *conn)
 {
     papago_ws_msg_t *msg;
 
+    if (!conn->send_mutex_ready) {
+        return;
+    }
+
     pthread_mutex_lock(&conn->send_mutex);
     msg = conn->send_head;
     conn->send_head = conn->send_tail = NULL;
@@ -1981,7 +1993,7 @@ ws_queue_drain_and_free(papago_ws_connection_t *conn)
 const char*
 papago_ws_client_cert_cn(const papago_ws_connection_t *conn)
 {
-    if (!conn->has_client_cert) {
+    if (conn == NULL || !conn->has_client_cert) {
         return NULL;
     }
 
@@ -2009,21 +2021,21 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
             SSL *ssl = lws_get_ssl(wsi);
 
             if (ssl == NULL) {
-                fprintf(stderr, "papago: mTLS enabled but lws_get_ssl(wsi) "
-                    "returned NULL for this connection\n");
+                papago_set_error(PAPAGO_ERR,
+                    "mTLS enabled but lws_get_ssl(wsi) returned NULL");
                 return 1;
             }
 
             X509 *peer_cert = SSL_get_peer_certificate(ssl);
             if (peer_cert == NULL) {
-                fprintf(stderr, "papago: no client certificate presented\n");
+                papago_set_error(PAPAGO_ERR, "no client certificate presented");
                 return 1;
             }
 
             if (SSL_get_verify_result(ssl) != X509_V_OK) {
-                fprintf(stderr, "papago: client certificate failed "
-                    "verification (result=%ld)\n",
-                SSL_get_verify_result(ssl));
+                papago_set_error(PAPAGO_ERR,
+                    "client certificate failed verification: %s",
+                    SSL_get_verify_result(ssl));
                 X509_free(peer_cert);
                 return 1;
             }
@@ -2038,11 +2050,11 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
             X509_free(peer_cert);
 
             if (!conn->has_client_cert) {
-                fprintf(stderr, "papago: client cert has no CN subject\n");
+                papago_set_error(PAPAGO_ERR, "client cert has no CN subject");
                 return 1;
             }
         }
-
+ 
         if (lws_hdr_copy(wsi, buf, sizeof(buf), WSI_TOKEN_GET_URI) < 0) {
             return 1;
         }
@@ -2454,13 +2466,20 @@ papago_start(papago_t *server, const papago_config_t *config)
         info.uid = (uid_t)-1;
         info.user = server;
 
+        if (!server->config.enable_ssl && server->config.require_client_cert) {
+            papago_set_error(PAPAGO_ERR,
+                "enable_ssl required with require_client_cert");
+            return 1;
+        }
+
         // SSL/TLS for websocket
         if (server->config.enable_ssl) {
             if (server->config.cert_file == NULL ||
                 server->config.key_file == NULL) {
                 MHD_stop_daemon(server->mhd_daemon);
                 server->running = false;
-                papago_set_error(PAPAGO_ERR, "SSL enabled but cert_file or key_file not set for WebSocket");
+                papago_set_error(PAPAGO_ERR,
+                    "SSL enabled but cert_file or key_file not set for WebSocket");
 
                 return 1;
             }
