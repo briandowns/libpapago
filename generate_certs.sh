@@ -24,12 +24,13 @@ if [ -f "server.crt" ] || [ -f "server.key" ]; then
 else
     SAN_FILE="$(mktemp)"
 
-    cat > "${SAN_FILE}" <<EOF
+    cat >"${SAN_FILE}" <<EOF
 [ v3_req ]
 subjectAltName = @alt_names
 
 [ alt_names ]
 DNS.1 = localhost
+IP.1 = 127.0.0.1
 $(printf '%s' "${SAN_CONFIG}")
 EOF
 
