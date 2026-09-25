@@ -28,6 +28,7 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <netinet/in.h>
@@ -2335,6 +2336,7 @@ int
 papago_start(papago_t *server, const papago_config_t *config)
 {
     if (server == NULL || config == NULL) {
+        papago_set_error(PAPAGO_ERR, "server or config is NULL");
         return 1;
     }
 
@@ -2355,7 +2357,7 @@ papago_start(papago_t *server, const papago_config_t *config)
             server->config.enable_rate_limiting = false;
         }
     }
-    
+
     server->config = *config;
     server->running = true;
 
@@ -2373,7 +2375,8 @@ papago_start(papago_t *server, const papago_config_t *config)
         if (server->template_ctx == NULL) {
             server->template_ctx = NULL;
             server->running = false;
-            papago_set_error(PAPAGO_ERR, "failed to initialize template engine");
+            papago_set_error(PAPAGO_ERR,
+                "failed to initialize template engine");
             return 1;
         }
     }
@@ -2390,7 +2393,8 @@ papago_start(papago_t *server, const papago_config_t *config)
     if (server->config.enable_ssl) {
         if (server->config.cert_file == NULL ||
             server->config.key_file == NULL) {
-            papago_set_error(PAPAGO_ERR, "SSL enabled but cert_file or key_file not set");
+            papago_set_error(PAPAGO_ERR,
+                "SSL enabled but cert_file or key_file not set");
             return 1;
         }
 
@@ -2467,7 +2471,7 @@ papago_start(papago_t *server, const papago_config_t *config)
         } else if (errno == EACCES) {
             papago_set_error(PAPAGO_ERR, "insufficient permissions to start HTTP server");
         } else {
-            perror("Failed to start HTTP server");
+            papago_set_error(PAPAGO_ERR, strerror(errno));
         }
 
         return 1;
