@@ -815,12 +815,13 @@ validate_file(const char *filepath)
     struct stat st;
  
     if (filepath == NULL) {
-        papago_set_error(PAPAGO_ERR, "file is NULL: %s", filepath);
+        papago_set_error(PAPAGO_ERR, "file is NULL");
         return 1;
     }
  
     if (stat(filepath, &st) != 0) {
-        papago_set_error(PAPAGO_ERR, "file not found: %s", filepath);
+        papago_set_error(PAPAGO_ERR, "failed to stat file: %s, %s",
+            filepath, strerror(errno));
         return 1;
     }
  
