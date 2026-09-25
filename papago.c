@@ -850,7 +850,7 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
  
     FILE *fp = fopen(filepath, "rb");
     if (fp == NULL) {
-        papago_set_error(PAPAGO_ERR, "failed ot open file for streaming");
+        papago_set_error(PAPAGO_ERR, "failed to open file for streaming");
 
         return 1;
     }
