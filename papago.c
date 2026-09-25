@@ -814,16 +814,18 @@ validate_file(const char *filepath)
 {
     struct stat st;
  
-    if (filepath == NULL)
+    if (filepath == NULL) {
+        papago_set_error(PAPAGO_ERR, "file is NULL: %s", filepath);
         return 1;
+    }
  
     if (stat(filepath, &st) != 0) {
-        fprintf(stderr, "file not found: %s\n", filepath);
+        papago_set_error(PAPAGO_ERR, "file not found: %s", filepath);
         return 1;
     }
  
     if (!S_ISREG(st.st_mode)) {
-        fprintf(stderr, "not a regular file: %s\n", filepath);
+        papago_set_error(PAPAGO_ERR, "not a regular file: %s", filepath);
         return 1;
     }
  
@@ -835,18 +837,20 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
                          const char *filepath, const char *mime_type)
 {
     if (server == NULL || res == NULL || filepath == NULL) {
+        papago_set_error(PAPAGO_ERR,
+            "server, res, or filepath is NULL");
         return 1;
     }
  
     int64_t file_size = validate_file(filepath);
     if (file_size == -1) {
+        papago_set_error(PAPAGO_ERR, "invalid file size: %s", filepath);
         return 1;
     }
  
     FILE *fp = fopen(filepath, "rb");
     if (fp == NULL) {
-        const char *err_msg = "failed to open file for streaming";
-        papago_set_error(PAPAGO_ERR, err_msg);
+        papago_set_error(PAPAGO_ERR, "failed ot open file for streaming");
 
         return 1;
     }
