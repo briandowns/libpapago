@@ -28,6 +28,7 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <netinet/in.h>
@@ -813,16 +814,19 @@ validate_file(const char *filepath)
 {
     struct stat st;
  
-    if (filepath == NULL)
+    if (filepath == NULL) {
+        papago_set_error(PAPAGO_ERR, "file is NULL");
         return 1;
+    }
  
     if (stat(filepath, &st) != 0) {
-        fprintf(stderr, "file not found: %s\n", filepath);
+        papago_set_error(PAPAGO_ERR, "failed to stat file: %s, %s",
+            filepath, strerror(errno));
         return 1;
     }
  
     if (!S_ISREG(st.st_mode)) {
-        fprintf(stderr, "not a regular file: %s\n", filepath);
+        papago_set_error(PAPAGO_ERR, "not a regular file: %s", filepath);
         return 1;
     }
  
@@ -834,18 +838,20 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
                          const char *filepath, const char *mime_type)
 {
     if (server == NULL || res == NULL || filepath == NULL) {
+        papago_set_error(PAPAGO_ERR,
+            "server, res, or filepath is NULL");
         return 1;
     }
  
     int64_t file_size = validate_file(filepath);
     if (file_size == -1) {
+        papago_set_error(PAPAGO_ERR, "invalid file size: %s", filepath);
         return 1;
     }
  
     FILE *fp = fopen(filepath, "rb");
     if (fp == NULL) {
-        const char *err_msg = "failed to open file for streaming";
-        papago_set_error(PAPAGO_ERR, err_msg);
+        papago_set_error(PAPAGO_ERR, "failed to open file for streaming");
 
         return 1;
     }
@@ -2335,6 +2341,7 @@ int
 papago_start(papago_t *server, const papago_config_t *config)
 {
     if (server == NULL || config == NULL) {
+        papago_set_error(PAPAGO_ERR, "server or config is NULL");
         return 1;
     }
 
@@ -2355,7 +2362,7 @@ papago_start(papago_t *server, const papago_config_t *config)
             server->config.enable_rate_limiting = false;
         }
     }
-    
+
     server->config = *config;
     server->running = true;
 
@@ -2373,7 +2380,8 @@ papago_start(papago_t *server, const papago_config_t *config)
         if (server->template_ctx == NULL) {
             server->template_ctx = NULL;
             server->running = false;
-            papago_set_error(PAPAGO_ERR, "failed to initialize template engine");
+            papago_set_error(PAPAGO_ERR,
+                "failed to initialize template engine");
             return 1;
         }
     }
@@ -2390,7 +2398,8 @@ papago_start(papago_t *server, const papago_config_t *config)
     if (server->config.enable_ssl) {
         if (server->config.cert_file == NULL ||
             server->config.key_file == NULL) {
-            papago_set_error(PAPAGO_ERR, "SSL enabled but cert_file or key_file not set");
+            papago_set_error(PAPAGO_ERR,
+                "SSL enabled but cert_file or key_file not set");
             return 1;
         }
 
@@ -2467,7 +2476,7 @@ papago_start(papago_t *server, const papago_config_t *config)
         } else if (errno == EACCES) {
             papago_set_error(PAPAGO_ERR, "insufficient permissions to start HTTP server");
         } else {
-            perror("Failed to start HTTP server");
+            papago_set_error(PAPAGO_ERR, strerror(errno));
         }
 
         return 1;
