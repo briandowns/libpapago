@@ -78,6 +78,7 @@ typedef struct {
     const char *key_file;
     const char *ca_cert_file;
     bool use_ssl;
+    bool allow_self_signed;
 } papago_wsc_config_t;
 
 /**
@@ -126,6 +127,7 @@ papago_wsc_new(void);
  *   host = "127.0.0.1"
  *   path = "/ws"
  *   use_ssl = false
+ *   allow_self_signed = false
  */
 papago_wsc_config_t
 papago_wsc_default_config(void);
