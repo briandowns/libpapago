@@ -136,8 +136,23 @@ wsc_lws_callback(struct lws *wsi, enum lws_callback_reasons reason,
 {
     PAPAGO_WSC_UNUSED(user);
 
-    papago_wsc_t *client =
-        (papago_wsc_t *)lws_context_user(lws_get_context(wsi));
+    papago_wsc_t *client = NULL;
+
+    if (wsi != NULL) {
+        client = (papago_wsc_t*)lws_context_user(lws_get_context(wsi));
+    } else {
+        switch (reason) {
+        case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
+        case LWS_CALLBACK_VHOST_CERT_AGING:
+            if (in != NULL) {
+                client =
+                    (papago_wsc_t*)lws_get_vhost_user((struct lws_vhost *)in);
+            }
+            break;
+        default:
+            break;
+        }
+    }
 
     if (client == NULL) {
         return 0;
@@ -184,6 +199,8 @@ wsc_lws_callback(struct lws *wsi, enum lws_callback_reasons reason,
     case LWS_CALLBACK_CLIENT_WRITEABLE:
         wsc_flush_one(client);
         break;
+    case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
+        break;
     default:
         break;
     }
@@ -193,7 +210,7 @@ wsc_lws_callback(struct lws *wsi, enum lws_callback_reasons reason,
 
 static const struct lws_protocols wsc_protocols[] = {
     {
-        "papago-ws", //protocol name
+        "papago-ws", // protocol name
         wsc_lws_callback, // callback 
         0, // per-session data size (we use context_user)
         65536, // rx buffer size
@@ -223,17 +240,18 @@ papago_wsc_default_config(void)
 {
     papago_wsc_config_t config;
     memset(&config, 0, sizeof(config));
-    config.host    = "127.0.0.1";
-    config.port    = 8181;
-    config.path    = "/ws";
+
+    config.host = "127.0.0.1";
+    config.port = 8181;
+    config.path = "/ws";
     config.use_ssl = false;
+    config.allow_self_signed = false;
 
     return config;
 }
 
 int
-papago_wsc_connect(papago_wsc_t *client,
-                   const papago_wsc_config_t *config,
+papago_wsc_connect(papago_wsc_t *client, const papago_wsc_config_t *config,
                    papago_wsc_on_connect_t on_connect,
                    papago_wsc_on_message_t on_message,
                    papago_wsc_on_close_t on_close,
@@ -251,10 +269,19 @@ papago_wsc_connect(papago_wsc_t *client,
     // copy config so we own the strings
     snprintf(client->host, sizeof(client->host), "%s",
         config->host != NULL ? config->host : "127.0.0.1");
+
     client->port = config->port > 0 ? config->port : 8181;
+
     snprintf(client->path, sizeof(client->path), "%s",
         config->path != NULL ? config->path : "/ws");
+
     client->lws_ssl_flags = config->use_ssl ? LCCSCF_USE_SSL : 0;
+
+    if (config->use_ssl && config->allow_self_signed) {
+        client->lws_ssl_flags |= LCCSCF_ALLOW_SELFSIGNED
+            | LCCSCF_ALLOW_INSECURE
+            | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+    }
 
     struct lws_context_creation_info ctx_info;
     memset(&ctx_info, 0, sizeof(ctx_info));
