@@ -26,7 +26,7 @@ ifneq ($(UNAME_S),Linux)
 endif
 
 TEST_CFLAGS = $(CFLAGS) -g
-LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread -lgnutls \
+LDFLAGS = -lwebsockets -lmicrohttpd -lssl -lcrypto -lz -lm -lpthread -lgnutls -lmaple \
 	-Wl,-z,nodlopen -Wl,-z,noexecstack \
 	-Wl,-z,relro -Wl,-z,now \
 	-Wl,--as-needed -Wl,--no-copy-dt-needed-entries
@@ -37,13 +37,7 @@ ifeq ($(UNAME_S),FreeBSD)
 	LDFLAGS += -L$(LIBDIR)
 endif
 
-PAPAGO_USE_MAPLE ?= 0
 PAPAGO_WITH_WSC ?= 0
-
-ifeq ($(PAPAGO_USE_MAPLE),1)
-	CFLAGS += -DPAPAGO_USE_MAPLE
-	LDFLAGS += -lmaple
-endif
 
 ifeq ($(UNAME_S),Darwin)
 $(NAME).dylib: clean
