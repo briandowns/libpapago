@@ -43,9 +43,7 @@
 #include <unistd.h>
 
 #include <libwebsockets.h>
-#ifdef PAPAGO_USE_MAPLE
 #include <maple.h>
-#endif
 #include <microhttpd.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
@@ -256,9 +254,7 @@ struct papago_server {
     papago_ws_endpoint_t ws_endpoints[PAPAGO_MAX_WS_ENDPOINTS];
     size_t ws_endpoint_count;
     pthread_t lws_thread;
-#ifdef PAPAGO_USE_MAPLE
     mp_context_t *template_ctx;
-#endif
     papago_ws_connection_t *ws_connections[MAX_WS_CONNECTIONS]; // websocket connection tracking
     size_t ws_connection_count;
     pthread_mutex_t ws_mutex;
@@ -2374,7 +2370,6 @@ papago_start(papago_t *server, const papago_config_t *config)
         mhd_flags |= MHD_USE_POLL; // *BSD, macOS
     }
 
-#ifdef PAPAGO_USE_MAPLE
     if (server->config.enable_template_rendering) {
         server->template_ctx = mp_init();
         if (server->template_ctx == NULL) {
@@ -2385,7 +2380,6 @@ papago_start(papago_t *server, const papago_config_t *config)
             return 1;
         }
     }
-#endif
 
     if (existing_config.require_client_cert && 
        (config->ca_cert_file == NULL || config->ca_cert_file[0] == '\0')) {
@@ -2635,11 +2629,9 @@ papago_destroy(papago_t *server)
     pthread_cond_destroy(&server->shutdown_cond);
 
     // free template engine memory
-#ifdef PAPAGO_USE_MAPLE
     if (server->template_ctx != NULL) {
         mp_free(server->template_ctx);
     }
-#endif
 
     if (server->metrics != NULL) {
         free(server->metrics);
@@ -3103,7 +3095,6 @@ papago_url_decode(const char *str)
     return decoded;
 }
 
-#ifdef PAPAGO_USE_MAPLE
 typedef struct {
     char *data;
     size_t size;
@@ -3330,7 +3321,6 @@ memstream_size(const memstream_t *m)
 {
     return m->size;
 }
-#endif
 
 void
 papago_enable_rate_limit(papago_t *server, uint16_t max_requests,
@@ -3587,7 +3577,6 @@ papago_cors_mw(papago_request_t *req, papago_response_t *res, void *user_data)
     return true;
 }
 
-#ifdef PAPAGO_USE_MAPLE
 int
 papago_render_file(papago_t *server, const char *tmpl_path, char *output,
                    size_t output_size, ...)
@@ -3744,7 +3733,6 @@ papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
  
     return papago_res_send(res, output);
 }
-#endif
 
 // streaming
 

@@ -45,8 +45,6 @@ WOFF, WOFF2, TTF
 
 ## Build
 
-Papago has the template engine (Maple) disabled by default. If this component is required, add `PAPAGO_USE_MAPLE=1` to the `make` command when building. 
-
 ```sh 
 make
 ```
@@ -108,7 +106,7 @@ curl http://localhost:8080/hello
 
 More examples can be found in the [examples](/examples) directory. Each example has a `make` target.
 
-You can make all examples with `make examples_all PAPAGO_USE_MAPLE=1`.
+You can make all examples with `make examples_all`.
 
 ```sh
 make example
