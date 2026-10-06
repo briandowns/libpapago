@@ -703,6 +703,7 @@ main(void)
 
     papago_config_t config = papago_default_config();
     config.http_port = 8484;
+    config.ws_port = 8485;
 
     // start server (blocking)
     if (papago_start(server, &config) != 0) {
