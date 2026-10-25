@@ -728,7 +728,7 @@ papago_multipart_size(const papago_file_upload_t *pfu)
 
 // response helpers
 
-int
+uint16_t
 papago_res_status(papago_response_t *res)
 {
     return res->status;
@@ -746,7 +746,7 @@ papago_res_header(papago_response_t *res, const char *key, const char *value)
     add_kv(&res->headers, &res->header_count, key, value);
 }
 
-int
+uint8_t
 papago_res_send(papago_response_t *res, const char *body)
 {
     if (res->body != NULL) {
@@ -765,7 +765,7 @@ papago_res_send(papago_response_t *res, const char *body)
     return 0;
 }
 
-int
+uint8_t
 papago_res_json(papago_response_t *res, const char *json)
 {
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
@@ -773,7 +773,7 @@ papago_res_json(papago_response_t *res, const char *json)
     return papago_res_send(res, json);
 }
 
-int
+uint8_t
 papago_res_html(papago_response_t *res, const char *html)
 {
     papago_res_header(res, PAPAGO_RESPONSE_HEADER_CONTENT_TYPE,
@@ -829,7 +829,7 @@ validate_file(const char *filepath)
     return (int64_t)st.st_size;
 }
 
-int
+uint8_t
 papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
                          const char *filepath, const char *mime_type)
 {
@@ -877,7 +877,7 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
     return 0;
 }
 
-int
+uint8_t
 papago_res_sendfile(papago_t *server, papago_response_t *res,
                     const char *filepath)
 {
@@ -2861,7 +2861,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 
 // websocket Functions
 
-int
+uint8_t
 papago_ws_endpoint(papago_t *server, const char *path,
                    papago_ws_on_connect_t on_connect,
                    papago_ws_on_message_t on_message,
@@ -2887,7 +2887,7 @@ papago_ws_endpoint(papago_t *server, const char *path,
     return 0;
 }
 
-int
+uint8_t
 papago_ws_send(papago_ws_connection_t *conn, const char *message)
 {
     if (conn == NULL || message == NULL) {
@@ -2919,7 +2919,7 @@ papago_ws_send(papago_ws_connection_t *conn, const char *message)
     return 0;
 }
 
-int
+uint8_t
 papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
                       size_t length)
 {
@@ -3577,7 +3577,7 @@ papago_cors_mw(papago_request_t *req, papago_response_t *res, void *user_data)
     return true;
 }
 
-int
+uint8_t
 papago_render_file(papago_t *server, const char *tmpl_path, char *output,
                    size_t output_size, ...)
 {
@@ -3630,7 +3630,7 @@ papago_render_file(papago_t *server, const char *tmpl_path, char *output,
     return 0;
 }
  
-int
+uint8_t
 papago_render_template(papago_t *server, const char *tmpl, char *output,
                        size_t output_size, ...)
 {
@@ -3682,7 +3682,7 @@ papago_render_template(papago_t *server, const char *tmpl, char *output,
     return 0;
 }
  
-int
+uint8_t
 papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
                   char *output, size_t output_size, ...)
 {

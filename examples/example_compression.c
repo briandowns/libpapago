@@ -26,6 +26,7 @@
  */
 
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -65,7 +66,7 @@ large_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 
     strcpy(large_text, "{\"data\":[");
 
-    for (int i = 0; i < 100; i++) {
+    for (uint8_t i = 0; i < 100; i++) {
         char item[100];
         snprintf(item, sizeof(item), 
             "{\"id\":%d,\"name\":\"Item %d\",\"value\":\"data\"}%s",

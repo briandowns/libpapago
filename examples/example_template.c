@@ -26,6 +26,7 @@
  */
 
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -64,7 +65,7 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         "</html>";
 
     char rendered[1024];
-    int result = papago_res_render(server, res, html, rendered,
+    uint8_t result = papago_res_render(server, res, html, rendered,
         sizeof(rendered), "name", "Papago", NULL);
     if (result != 0) {
         fprintf(stderr, "failed to render template\n");

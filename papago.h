@@ -419,7 +419,7 @@ papago_multipart_size(const papago_file_upload_t *pfu);
 /**
  * Retrieve response status code.
  */
-int
+uint16_t
 papago_res_status(papago_response_t *res);
 
 /**
@@ -438,21 +438,21 @@ papago_res_header(papago_response_t *res, const char *key, const char *value);
  * Send a response body. Appropriate headers should be set before this
  * function. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_res_send(papago_response_t *res, const char *body);
 
 /**
  * Send a JSON response. Expected headers set. Returns 0 on success or 1 on
  * failure.
  */
-int
+uint8_t
 papago_res_json(papago_response_t *res, const char *json);
 
 /**
  * Send an HTML response. Expected headers set. Returns 0 on success or 1 on
  * failure.
  */
-int
+uint8_t
 papago_res_html(papago_response_t *res, const char *html);
 
 // static content embedding
@@ -494,7 +494,7 @@ papago_serve_static_handler(papago_request_t *req, papago_response_t *res,
 /**
  * Register websocket endpoint. Returns 0 on success or 1 on failure.
  */
-int
+uint8_t
 papago_ws_endpoint(papago_t *server, const char *path,
                    papago_ws_on_connect_t on_connect,
                    papago_ws_on_message_t on_message,
@@ -505,14 +505,14 @@ papago_ws_endpoint(papago_t *server, const char *path,
  * Send text message to websocket client. Returns 0 on success or 1 on
  * failure.
  */
-int
+uint8_t
 papago_ws_send(papago_ws_connection_t *conn, const char *message);
 
 /**
  * Send binary message to websocket client. Returns 0 on success or 1 on
  * failure.
  */
-int
+uint8_t
 papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
                       size_t length);
 
@@ -611,7 +611,7 @@ papago_cors_mw(papago_request_t *req, papago_response_t *res, void *user_data);
  * Render template string with variables. Returns 0 on success or 1 on
  * failure.
  */
-int
+uint8_t
 papago_render_file(papago_t *server, const char *tmpl_path, char *output,
                    size_t output_size, ...);
 
@@ -619,7 +619,8 @@ papago_render_file(papago_t *server, const char *tmpl_path, char *output,
  * Render template with variables. Returns 0 on success or 1 on failure. Since
  * this is a variadic function, make sure to include the NULL sentinel.
  */
-int
+
+uint8_t
 papago_render_template(papago_t *server, const char *tmpl, char *output,
                        size_t output_size, ...);
 
@@ -627,7 +628,7 @@ papago_render_template(papago_t *server, const char *tmpl, char *output,
  * Send rendered template as response. Returns 0 on success or 1 on failure.
  * Since this is a variadic function, make sure to include the NULL sentinel.
  */
-int
+uint8_t
 papago_res_render(papago_t *server, papago_response_t *res, const char *tmpl,
                   char *output, size_t output_size, ...);
 
@@ -647,14 +648,14 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res,
  * file extension. Efficiently serves files of any size without loading into
  * memory. Returns 0 on success or 1 on error.
  */
-int
+uint8_t
 papago_res_sendfile(papago_t *server, papago_response_t *res,
                     const char *filepath);
  
 /**
  * Stream a file with custom MIME type. Returns 0 on success or 1 on error.
  */
-int
+uint8_t
 papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
                          const char *filepath, const char *mime_type);
  
