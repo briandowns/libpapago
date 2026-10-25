@@ -22,8 +22,8 @@ RUN git clone --depth 1 https://github.com/briandowns/libmaple && \
     gmake && \
     gmake install
 
-RUN gmake PAPAGO_USE_MAPLE=1 PAPAGO_WITH_WSC=1 && \
-    gmake install PAPAGO_USE_MAPLE=1 PAPAGO_WITH_WSC=1
+RUN gmake PAPAGO_WITH_WSC=1 && \
+    gmake install PAPAGO_WITH_WSC=1
 
 FROM ghcr.io/freebsd/freebsd-notoolchain:15.1
 
