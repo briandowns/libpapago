@@ -1,0 +1,31 @@
+name: Sanitizers
+
+on:
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  asan-ubsan:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential clang pkg-config libssl-dev \
+            libgnutls28-dev libjansson-dev libwebsockets-dev libmicrohttpd-dev git
+          for r in libmaple libcrosscheck; do
+            git clone --depth 1 https://github.com/briandowns/$r.git /tmp/$r
+            make -C /tmp/$r && sudo make -C /tmp/$r install
+          done
+          sudo ldconfig
+      - name: Tests under ASan/UBSan
+        run: |
+          make tests CC=clang \
+            CFLAGS="-O1 -g -fPIC -fsanitize=address,undefined -fno-omit-frame-pointer -Wall -Wextra"
+
