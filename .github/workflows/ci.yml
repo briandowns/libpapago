@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    paths-ignore: ["**.md", ".gitignore", "LICENSE"]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04, ubuntu-26.04-arm]
+        cc: [gcc, clang]
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends -o Acquire::Retries=5 \
+            build-essential clang make git pkg-config valgrind \
+            libssl-dev libgnutls28-dev libjansson-dev zlib1g-dev \
+            libwebsockets-dev libmicrohttpd-dev
+
+      - name: Build and install libmaple
+        run: |
+          git clone --depth 1 https://github.com/briandowns/libmaple.git /tmp/libmaple
+          make -C /tmp/libmaple
+          sudo make -C /tmp/libmaple install
+          sudo ldconfig
+
+      - name: Build and install libcrosscheck
+        run: |
+          git clone --depth 1 https://github.com/briandowns/libcrosscheck.git /tmp/libcrosscheck
+          make -C /tmp/libcrosscheck
+          sudo make -C /tmp/libcrosscheck install
+          sudo ldconfig
+
+      - name: Build library (with websocket client)
+        run: make PAPAGO_WITH_WSC=1
+
+      - name: Build examples
+        run: make examples_all
+
+      - name: Run tests
+        run: make tests
+
+      - name: Valgrind (gcc/amd64 only)
+        if: matrix.cc == 'gcc' && matrix.os == 'ubuntu-26.04'
+        run: make valgrind
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: brew install pkg-config openssl@3 libwebsockets libmicrohttpd gnutls jansson
+      - name: Build libmaple
+        run: |
+          git clone --depth 1 https://github.com/briandowns/libmaple.git /tmp/libmaple
+          make -C /tmp/libmaple && sudo make -C /tmp/libmaple install
+      - name: Build
+        run: make
+        env:
+          PKG_CONFIG_PATH: /opt/homebrew/opt/openssl@3/lib/pkgconfig
+
+  container:
+    strategy:
+      fail-fast: false
+      matrix:
+        file: [Dockerfile.ubuntu, Dockerfile.alpine]
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ${{ matrix.file }}
+        run: docker build -f ${{ matrix.file }} -t libpapago:${{ matrix.file }} .
+
+  freebsd:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          prepare: pkg install -y gmake pkgconf libwebsockets libmicrohttpd jansson gnutls openssl git
+          run: |
+            git clone --depth 1 https://github.com/briandowns/libmaple.git /tmp/libmaple
+            gmake -C /tmp/libmaple && gmake -C /tmp/libmaple install
+            gmake
+
