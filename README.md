@@ -301,7 +301,7 @@ papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, NULL);
 
 # Container Builds
 
-Container building can be done wit the provided Docker and Podman files.
+Container building can be done with the provided Docker and Podman files.
 
 ## Contributing
 
