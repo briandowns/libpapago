@@ -24,5 +24,6 @@ RUN git clone --depth 1 https://github.com/briandowns/libmaple && \
     make install
 
 RUN make PAPAGO_WITH_WSC=1 && \
-    make install PAPAGO_WITH_WSC=1
+    make install PAPAGO_WITH_WSC=1 && \
+    ldconfig
 
