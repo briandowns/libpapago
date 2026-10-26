@@ -35,6 +35,8 @@ jobs:
           PKG=libpapago-${VER}-linux-${{ matrix.arch }}
           mkdir -p $PKG/usr/local/{include,lib} $PKG/usr/local/share/man/man3 $PKG/DEBIAN
           cp papago.h $PKG/usr/local/include/
+          cp papago_wsc.h $PKG/usr/local/include/
+          cp papago_client.h $PKG/usr/local/include/
           cp libpapago*.so $PKG/usr/local/lib/
           cp papago.3 $PKG/usr/local/share/man/man3/
           cat > $PKG/DEBIAN/control <<EOF

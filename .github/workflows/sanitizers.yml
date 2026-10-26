@@ -16,8 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential clang pkg-config libssl-dev \
+          sudo apt update
+          sudo apt install -y build-essential clang pkg-config libssl-dev \
             libgnutls28-dev libjansson-dev libwebsockets-dev libmicrohttpd-dev git
           for r in libmaple libcrosscheck; do
             git clone --depth 1 https://github.com/briandowns/$r.git /tmp/$r

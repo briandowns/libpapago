@@ -55,7 +55,7 @@ endif
 
 .PHONY: tests
 tests: clean
-	$(CC) -o tests/tests tests/papago_test.c papago.c $(TEST_CFLAGS) $(LDFLAGS) -lcrosscheck
+	$(CC) -o tests/tests tests/tests.c papago.c $(TEST_CFLAGS) $(LDFLAGS) -lcrosscheck
 	tests/tests
 	rm -f tests/tests
 
