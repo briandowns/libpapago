@@ -1,0 +1,26 @@
+FROM alpine:3.24.3
+
+RUN apk update && \
+    apk add --no-cache \
+        git \
+        ca-certificates \
+        libmicrohttpd-dev \
+        libwebsockets-dev \
+        jansson-dev \
+        openssl-dev \
+        gnutls-dev \
+        build-base && \
+    update-ca-certificates
+
+WORKDIR /app
+COPY . .
+
+RUN git clone --depth 1 https://github.com/briandowns/libmaple && \
+    cd libmaple && \
+    make && \
+    mkdir -p /usr/local/include /usr/local/lib && \
+    make install
+
+RUN make PAPAGO_WITH_WSC=1 && \
+    make install PAPAGO_WITH_WSC=1
+
