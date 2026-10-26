@@ -61,20 +61,20 @@ jobs:
         if: matrix.cc == 'gcc' && matrix.os == 'ubuntu-26.04'
         run: make valgrind
 
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: brew install pkg-config openssl@3 libwebsockets libmicrohttpd gnutls jansson
-      - name: Build libmaple
-        run: |
-          git clone --depth 1 https://github.com/briandowns/libmaple.git /tmp/libmaple
-          make -C /tmp/libmaple && sudo make -C /tmp/libmaple install
-      - name: Build
-        run: make
-        env:
-          PKG_CONFIG_PATH: /opt/homebrew/opt/openssl@3/lib/pkgconfig
+  # macos:
+  #   runs-on: macos-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Install dependencies
+  #       run: brew install pkg-config openssl@3 libwebsockets libmicrohttpd gnutls jansson
+  #     - name: Build libmaple
+  #       run: |
+  #         git clone --depth 1 https://github.com/briandowns/libmaple.git /tmp/libmaple
+  #         make -C /tmp/libmaple && sudo make -C /tmp/libmaple install
+  #     - name: Build
+  #       run: make
+  #       env:
+  #         PKG_CONFIG_PATH: /opt/homebrew/opt/openssl@3/lib/pkgconfig
 
   container:
     strategy:

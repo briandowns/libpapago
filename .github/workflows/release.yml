@@ -34,10 +34,9 @@ jobs:
           VER=${GITHUB_REF_NAME#v}
           PKG=libpapago-${VER}-linux-${{ matrix.arch }}
           mkdir -p $PKG/usr/local/{include,lib} $PKG/usr/local/share/man/man3 $PKG/DEBIAN
-          cp papago.h $PKG/usr/local/include/
-          cp papago_wsc.h $PKG/usr/local/include/
+          cp papago.h papago_wcs.h $PKG/usr/local/include/
           cp papago_client.h $PKG/usr/local/include/
-          cp libpapago*.so $PKG/usr/local/lib/
+          cp libpapago*.so /usr/local/lib/libmaple.so $PKG/usr/local/lib/
           cp papago.3 $PKG/usr/local/share/man/man3/
           cat > $PKG/DEBIAN/control <<EOF
           Package: libpapago
@@ -47,6 +46,7 @@ jobs:
           Depends: libmicrohttpd-dev, libwebsockets-dev, libssl3t64, libgnutls30t64
           Description: libpapago C HTTP/WebSocket library
           EOF
+          echo 'activate-noawait ldconfig' > $PKG/DEBIAN/triggers
           dpkg-deb --build $PKG ${PKG}.deb
           tar czf ${PKG}.tar.gz -C $PKG usr
           sha256sum ${PKG}.deb ${PKG}.tar.gz > ${PKG}.sha256
