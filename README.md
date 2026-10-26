@@ -299,6 +299,10 @@ papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, NULL);
 - WebSocket: Event loop in separate thread
 - Broadcast: Thread-safe with mutex protection
 
+# Container Builds
+
+Container building can be done with the provided Docker and Podman files.
+
 ## Contributing
 
 Please feel free to open a PR!

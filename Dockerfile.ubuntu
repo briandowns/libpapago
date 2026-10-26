@@ -1,0 +1,29 @@
+FROM ubuntu:26.04
+
+RUN apt update && apt upgrade -y && \
+    apt install -y --no-install-recommends \
+        build-essential \
+        make \
+        libmicrohttpd-dev \
+        libwebsockets-dev \
+        libjansson-dev \
+        libssl-dev \
+        libgnutls28-dev \
+        curl \
+        ca-certificates \
+        git && \
+        rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . .
+
+RUN git clone --depth 1 https://github.com/briandowns/libmaple && \
+    cd libmaple && \
+    make && \
+    mkdir -p /usr/local/include /usr/local/lib && \
+    make install
+
+RUN make PAPAGO_WITH_WSC=1 && \
+    make install PAPAGO_WITH_WSC=1 && \
+    ldconfig
+
