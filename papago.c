@@ -1414,6 +1414,72 @@ free_file_uploads(papago_file_upload_t *files)
     }
 }
 
+struct method_map {
+    const char *name;
+    papago_method_t method;
+};
+
+static const struct method_map methods[] = {
+    {"GET", PAPAGO_GET},
+    {"POST", PAPAGO_POST},
+    {"PUT", PAPAGO_PUT},
+    {"DELETE", PAPAGO_DELETE},
+    {"PATCH", PAPAGO_PATCH},
+    {"HEAD", PAPAGO_HEAD},
+    {"OPTIONS", PAPAGO_OPTIONS},
+    {"CONNECT", PAPAGO_CONNECT},
+    {"TRACE", PAPAGO_TRACE}
+};
+
+/**
+ * parse_method maps the request-line method token to a papago_method_t.
+ * HTTP methods are case-sensitive (RFC 9110, 9.1) so no case folding is done.
+ * Anything not recognized yields PAPAGO_UNKNOWN, never a real method, so an
+ * unsupported verb can't be dispatched to another method's handler.
+ */
+static papago_method_t
+parse_method(const char *method)
+{
+    if (method == NULL) {
+        return PAPAGO_UNKNOWN;
+    }
+
+    for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
+        if (strcmp(method, methods[i].name) == 0) {
+            return methods[i].method;
+        }
+    }
+
+    return PAPAGO_UNKNOWN;
+}
+
+/**
+ * set_allow_header sets the Allow header on a 405 response from the methods
+ * that have a route matching the request path.
+ */
+static void
+set_allow_header(papago_response_t *res, unsigned int allowed)
+{
+    char buf[64];
+    buf[0] = '\0';
+    size_t off = 0;
+
+    for (size_t i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
+        if ((allowed & (1u << methods[i].method)) == 0) {
+            continue;
+        }
+
+        int n = snprintf(buf + off, sizeof(buf) - off, "%s%s",
+            off > 0 ? ", " : "", methods[i].name);
+        if (n < 0 || (size_t)n >= sizeof(buf) - off) {
+            break;
+        }
+        off += (size_t)n;
+    }
+
+    papago_res_header(res, "Allow", buf);
+}
+
 static enum MHD_Result
 header_iterator(void *cls, enum MHD_ValueKind kind, const char *key,
                 const char *value)
@@ -1456,25 +1522,8 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
         req->path = _strdup(url);
         req->connection = connection;
+        req->method = parse_method(method);
 
-        // parse method
-        if (strcmp(method, "GET") == 0) {
-            req->method = PAPAGO_GET;
-        } else if (strcmp(method, "POST") == 0) {
-            req->method = PAPAGO_POST;
-        } else if (strcmp(method, "PUT") == 0) {
-            req->method = PAPAGO_PUT;
-        } else if (strcmp(method, "DELETE") == 0) {
-            req->method = PAPAGO_DELETE;
-        } else if (strcmp(method, "PATCH") == 0) {
-            req->method = PAPAGO_PATCH;
-        } else if (strcmp(method, "HEAD") == 0) {
-            req->method = PAPAGO_HEAD;
-        } else if (strcmp(method, "OPTIONS") == 0) {
-            req->method = PAPAGO_OPTIONS;
-        } else {
-            req->method = PAPAGO_GET;
-        }
         *con_cls = req;
 
         const char *content_type = MHD_lookup_connection_value(connection,
@@ -1712,24 +1761,43 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
     // find matching route
     route_found = false;
-    for (size_t i = 0; i < server->route_count; i++) {
-        papago_route_t *route = &server->routes[i];
+    if (req->method != PAPAGO_UNKNOWN) {
+        for (size_t i = 0; i < server->route_count; i++) {
+            papago_route_t *route = &server->routes[i];
 
-        if (route->method != req->method) {
-            continue;
-        }
+            if (route->method != req->method) {
+                continue;
+            }
 
-        if (match_route(route->path, req->path, &req->params,
-                &req->param_count)) {
-            route->handler(req, res, route->user_data);
-            route_found = true;
-            break;
+            if (match_route(route->path, req->path, &req->params,
+                    &req->param_count)) {
+                route->handler(req, res, route->user_data);
+                route_found = true;
+                break;
+            }
         }
     }
 
     if (!route_found) {
-        papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
-        papago_res_json(res, "{\"error\":\"not found\"}");
+        // the path may exist under other methods, if so it's a 405, not a 404
+        unsigned int allowed = 0;
+        for (size_t i = 0; i < server->route_count; i++) {
+            papago_route_t *route = &server->routes[i];
+
+            if (route->method != req->method &&
+                match_route(route->path, req->path, NULL, NULL)) {
+                allowed |= 1u << route->method;
+            }
+        }
+
+        if (allowed != 0 || req->method == PAPAGO_UNKNOWN) {
+            papago_res_set_status(res, PAPAGO_STATUS_METHOD_NOT_ALLOWED);
+            set_allow_header(res, allowed);
+            papago_res_json(res, "{\"error\":\"method not allowed\"}");
+        } else {
+            papago_res_set_status(res, PAPAGO_STATUS_NOT_FOUND);
+            papago_res_json(res, "{\"error\":\"not found\"}");
+        }
     }
 
     // run all after() functions (reverse order)
@@ -2647,6 +2715,7 @@ papago_route(papago_t *server, papago_method_t method,
              const char *path, papago_handler_t handler, void *user_data)
 {
     if (server == NULL || path == NULL || handler == NULL ||
+        method < PAPAGO_GET || method >= PAPAGO_UNKNOWN ||
         server->route_count >= PAPAGO_MAX_ROUTES) {
         return 1;
     }
