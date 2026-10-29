@@ -1780,7 +1780,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
 
     if (!route_found) {
         // the path may exist under other methods, if so it's a 405, not a 404
-        uint8_t allowed = 0;
+        unsigned int allowed = 0;
         for (size_t i = 0; i < server->route_count; i++) {
             papago_route_t *route = &server->routes[i];
 
