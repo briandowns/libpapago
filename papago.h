@@ -49,7 +49,8 @@ typedef enum {
     PAPAGO_HEAD,
     PAPAGO_CONNECT,
     PAPAGO_OPTIONS,
-    PAPAGO_TRACE
+    PAPAGO_TRACE,
+    PAPAGO_UNKNOWN
 } papago_method_t;
 
 typedef enum {
