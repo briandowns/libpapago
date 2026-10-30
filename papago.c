@@ -417,6 +417,25 @@ papago_default_config(void)
 
 // path parameter matching
 
+// drop entries added after the first new_count so a failed candidate
+// leaves the array as it found it
+static void
+truncate_kv(papago_kv_t *arr, size_t *count, size_t new_count)
+{
+    if (arr == NULL || count == NULL) {
+        return;
+    }
+
+    for (size_t i = new_count; i < *count; i++) {
+        free(arr[i].key);
+        free(arr[i].value);
+    }
+
+    if (new_count < *count) {
+        *count = new_count;
+    }
+}
+
 static bool
 match_route(const char *pattern, const char *path, papago_kv_t **params,
             size_t *param_count)
@@ -440,6 +459,9 @@ match_route(const char *pattern, const char *path, papago_kv_t **params,
 
         return false;
     }
+
+    // params captured here are only kept if the whole pattern matches
+    size_t base_count = (param_count != NULL) ? *param_count : 0;
 
     bool match = true;
     char *pattern_saveptr = NULL;
@@ -494,6 +516,10 @@ match_route(const char *pattern, const char *path, papago_kv_t **params,
     if ((pattern_token != NULL || path_token != NULL) &&
         !(pattern_token != NULL && strcmp(pattern_token, "*") == 0)) {
         match = false;
+    }
+
+    if (!match && params != NULL && param_count != NULL) {
+        truncate_kv(*params, param_count, base_count);
     }
 
     free((void*)pattern_copy);
