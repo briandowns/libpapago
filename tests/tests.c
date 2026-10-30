@@ -1,5 +1,5 @@
-#include <time.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <crosscheck.h>
 
@@ -22,8 +22,5 @@ main(void)
 
     CC_INIT;
 
-    // test runs here
-
     CC_COMPLETE;
-
 }
