@@ -83,8 +83,11 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
+    papago_config_t config = papago_config_new();
+    config.enable_template_rendering = true;
+
     // create server
-    server = papago_new();
+    server = papago_new(&config);
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
@@ -93,14 +96,11 @@ main(void)
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
 
-    papago_config_t config = papago_default_config();
-    config.enable_template_rendering = true;
-
     printf("Server starting on:\n");
     printf("  HTTP:      http://%s:%d\n", config.host, config.http_port);
 
     // start server (blocking)
-    if (papago_start(server, &config) != 0) {
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

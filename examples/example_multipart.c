@@ -256,8 +256,11 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
+    papago_config_t config = papago_config_new();
+    config.max_body_size = 25 * 1024 * 1024; // 25MB cap for this example
+
     // create server
-    server = papago_new();
+    server = papago_new(&config);
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
@@ -268,11 +271,9 @@ main(void)
     papago_route(server, PAPAGO_POST, "/upload/avatar", upload_avatar_handler, NULL);
     papago_route(server, PAPAGO_POST, "/upload/gallery", upload_gallery_handler, NULL);
 
-    papago_config_t config = papago_default_config();
-    config.max_body_size = 25 * 1024 * 1024; // 25MB cap for this example
 
     // start server (blocking)
-    if (papago_start(server, &config) != 0) {
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

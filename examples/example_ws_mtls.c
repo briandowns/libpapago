@@ -123,16 +123,7 @@ main(void)
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-	server = papago_new();
-	if (server == NULL) {
-		fprintf(stderr, "failed to create server\n");
-		return 1;
-	}
-
-	papago_ws_endpoint(server, "/ws", ws_on_connect, ws_on_message,
-	    ws_on_close, ws_on_error);
-
-	papago_config_t config = papago_default_config();
+    papago_config_t config = papago_config_new();
 	config.http_port = 8080;
 	config.ws_port = 8181;
 	config.enable_ssl = true;
@@ -140,6 +131,15 @@ main(void)
 	config.key_file = "server.key";
 	config.ca_cert_file = "ca.crt";
 	config.require_client_cert = true;
+
+	server = papago_new(&config);
+	if (server == NULL) {
+		fprintf(stderr, "failed to create server\n");
+		return 1;
+	}
+
+	papago_ws_endpoint(server, "/ws", ws_on_connect, ws_on_message,
+	    ws_on_close, ws_on_error);
 
 	printf("Papago WebSocket mTLS Configuration:\n");
 	printf("  Server cert: %s\n", config.cert_file);
@@ -158,7 +158,7 @@ main(void)
 
 	printf("Press Ctrl+C to stop\n");
 
-	if (papago_start(server, &config) != 0) {
+	if (papago_start(server) != 0) {
 		fprintf(stderr, "%s\n", papago_error());
 		papago_destroy(server);
 

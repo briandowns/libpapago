@@ -199,11 +199,12 @@ typedef struct {
 // server management
 
 /**
- * New Papago server value. NULL is returned on failure. User is responsible
- * for freeing returned memory.
+ * New Papago server value. NULL is returned on failure which can result from
+ * an error allocating memory for the server or the user providing a bad
+ * configuration. User is responsible for freeing returned memory.
  */
 papago_t*
-papago_new(void);
+papago_new(papago_config_t *config);
 
 /**
  * Retrieve current error message. Returns error message string or empty string
@@ -214,10 +215,11 @@ const char*
 papago_error(void);
 
 /**
- * Retrieves default configuration.
+ * Returns a papago_config_t struct with default values. User can modify the
+ * returned value.
  */
 papago_config_t
-papago_default_config(void);
+papago_config_new(void);
 
 /**
  * CORS configuration
@@ -226,10 +228,10 @@ papago_cors_config_t
 papago_cors_default_config(void);
 
 /**
- * Start the server, (blocking). Returns 0 on success or 1 on failure.
+ * Start the server. Blocking operation. Returns 0 on success or 1 on failure.
  */
 int
-papago_start(papago_t *server, const papago_config_t *config);
+papago_start(papago_t *server);
 
 /**
  * Stop the server.

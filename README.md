@@ -77,12 +77,12 @@ hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 int
 main(void)
 {
-	papago_t *server = papago_new();
+    papago_config_t config = papago_config_new();
+	papago_t *server = papago_new(&config);
 	
 	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
 	
-    papago_config_t config = papago_default_config();
-	papago_start(server, &config); // blocking
+	papago_start(server); // blocking
 	
 	papago_destroy(server);
 
@@ -174,7 +174,7 @@ papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
 
 ### Convenience Functions
 
-Convenience functions are provided to make seneding responses even easier.
+Convenience functions are provided to make sending responses even easier.
 
 `papago_res_send`, `papago_res_html`, `papago_res_json` are meant to be used when sending simple text, HTML, and JSON respectively. The last 2 set appropriate headers for the payload while the first leaves this to the user.
 
@@ -229,10 +229,10 @@ ws_on_message(papago_ws_connection_t *conn, const char *message,
               size_t length, bool is_binary)
 {
     printf("Received: %s\n", message);
-    
+
     // echo back
     papago_ws_send(conn, message);
-    
+ 
     // or broadcast to all
     papago_ws_broadcast(papago_get_current_server(), message);
 }
@@ -275,7 +275,7 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
     const char *id = papago_req_param(req, "id");
     const char *search = papago_req_query(req, "q");
     const char *body = papago_req_body(req);
-    
+ 
     // send response
     papago_res_status(res, PAPAGO_STATUS_OK);
     papago_res_header(res, "X-Custom", "value");
