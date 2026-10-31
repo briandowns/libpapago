@@ -2428,6 +2428,9 @@ papago_new(papago_config_t *config)
         return NULL;
     }
     server->config = *config;
+    server->ws_connection_count = 0;
+    server->embedded_files = NULL;
+    server->rate_limit_map = NULL;
 
     if (server->config.enable_rate_limiting) {
         server->rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
@@ -2439,10 +2442,6 @@ papago_new(papago_config_t *config)
     pthread_mutex_init(&server->shutdown_mutex, NULL);
     pthread_mutex_init(&server->rate_limit_mutex, NULL);
     pthread_cond_init(&server->shutdown_cond, NULL);
-
-    server->ws_connection_count = 0;
-    server->rate_limit_map = NULL;
-    server->embedded_files = NULL;
 
     server->metrics = calloc(1, sizeof(papago_metrics_t));
     if (server->metrics == NULL) {

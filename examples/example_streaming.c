@@ -288,7 +288,7 @@ main(void)
     papago_route(server, PAPAGO_GET, "/video/:filename", video_handler, NULL);
 
     printf("Serving files from: %s\n\n", files_dir);
-    printf("Server running on http://localhost:8484\n\n");
+    printf("Server running on http://localhost:8080\n\n");
 
     // start server (blocking)
     if (papago_start(server) != 0) {
