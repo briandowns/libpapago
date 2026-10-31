@@ -123,7 +123,7 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    papago_config_t config = papago_default_config();
+    papago_config_t config = papago_config_new();
     config.enable_compression = true;
 
     server = papago_new(&config);

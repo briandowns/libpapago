@@ -77,7 +77,7 @@ hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 int
 main(void)
 {
-    papago_config_t config = papago_default_config();
+    papago_config_t config = papago_config_new();
 	papago_t *server = papago_new(&config);
 	
 	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);

@@ -389,10 +389,10 @@ find_kv(const papago_kv_t *arr, size_t count, const char *key)
 #define DEFAULT_HTTP_PORT 8080
 #define DEFAULT_WS_PORT 8081
 #define DEFAULT_HOST "0.0.0.0"
-#define DEFAULT_BODY_SIZE 10 * 1024 * 1024 /* 10MB */
+#define DEFAULT_BODY_SIZE 10 * 1024 * 1024 // 10MB
 
 papago_config_t
-papago_default_config(void)
+papago_config_new(void)
 {
     papago_config_t config = {0};
 

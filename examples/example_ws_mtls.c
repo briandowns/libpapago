@@ -123,7 +123,7 @@ main(void)
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-    papago_config_t config = papago_default_config();
+    papago_config_t config = papago_config_new();
 	config.http_port = 8080;
 	config.ws_port = 8181;
 	config.enable_ssl = true;

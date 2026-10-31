@@ -30,7 +30,7 @@
 int
 main(void)
 {
-    papago_config_t config = papago_default_config();
+    papago_config_t config = papago_config_new();
     config.static_dir = "./public";
 
     papago_t *server = papago_new(&config);

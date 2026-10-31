@@ -215,10 +215,11 @@ const char*
 papago_error(void);
 
 /**
- * Retrieves default configuration.
+ * Returns a papago_config_t struct with default values. User can modify the
+ * returned value.
  */
 papago_config_t
-papago_default_config(void);
+papago_config_new(void);
 
 /**
  * CORS configuration
