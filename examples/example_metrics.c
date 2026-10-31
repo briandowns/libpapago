@@ -58,22 +58,22 @@ index_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
     PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
-    
+
     const char *html = 
         "<html>"
-        "<body>"
-        "<h1>Prometheus Metrics Example</h1>"
-        "<h2>Test Endpoints:</h2>"
-        "<ul>"
-        "<li><a href='/slow'>/slow</a> (1 second delay)</li>"
-        "<li><a href='/error'>/error</a> (500 error)</li>"
-        "</ul>"
-        "<h2>Metrics:</h2>"
-        "<ul>"
-        "<li><a href='/metrics'>/metrics</a> (Prometheus format)</li>"
-        "<li><a href='/health'>/health</a> (Health check)</li>"
-        "</ul>"
-        "</body>"
+        "  <body>"
+        "    <h1>Prometheus Metrics Example</h1>"
+        "    <h2>Test Endpoints:</h2>"
+        "    <ul>"
+        "      <li><a href='/slow'>/slow</a> (1 second delay)</li>"
+        "      <li><a href='/error'>/error</a> (500 error)</li>"
+        "    </ul>"
+        "    <h2>Metrics:</h2>"
+        "    <ul>"
+        "      <li><a href='/metrics'>/metrics</a> (Prometheus format)</li>"
+        "      <li><a href='/health'>/health</a> (Health check)</li>"
+        "    </ul>"
+        "  </body>"
         "</html>";
 
     papago_res_html(res, html);
@@ -162,8 +162,10 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
+    papago_config_t config = papago_default_config();
+
     // create server
-    server = papago_new();
+    server = papago_new(&config);
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
@@ -178,10 +180,9 @@ main(void)
     papago_route(server, PAPAGO_GET, "/metrics", papago_metrics_handler, server);
     papago_route(server, PAPAGO_GET, "/health", health_handler, NULL);
 
-    papago_config_t config = papago_default_config();
 
     // start server (blocking)
-    if (papago_start(server, &config) != 0) {
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

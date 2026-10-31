@@ -93,8 +93,10 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
+    papago_config_t config = papago_default_config();
+
     // create server
-    server = papago_new();
+    server = papago_new(&config);
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
@@ -111,12 +113,12 @@ main(void)
     cors_cfg.max_cache_age = 600;
 
     papago_enable_cors(server);
-    papago_middleware_t rate_cors_mw = {
+    papago_middleware_t cors_mw = {
         .before    = papago_cors_mw,
         .after     = NULL,
         .user_data = &cors_cfg
     };
-    papago_middleware_add(server, &rate_cors_mw);
+    papago_middleware_add(server, &cors_mw);
 
     // register HTTP routes
     papago_route(server, PAPAGO_GET, "/", index_handler, NULL);
@@ -125,10 +127,8 @@ main(void)
     papago_route(server, PAPAGO_POST, "/api/widgets", api_widget_create_handler, NULL);
     papago_route(server, PAPAGO_OPTIONS, "/api/widgets", api_widget_create_handler, NULL);
 
-    papago_config_t config = papago_default_config();
-
     // start server (blocking)
-    if (papago_start(server, &config) != 0) {
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

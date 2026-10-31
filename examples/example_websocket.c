@@ -634,7 +634,11 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    server = papago_new();
+    papago_config_t config = papago_default_config();
+    config.http_port = 8484;
+    config.ws_port = 8485;
+
+    server = papago_new(&config);
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
@@ -701,12 +705,8 @@ main(void)
 
     printf("Press Ctrl+C to stop\n");
 
-    papago_config_t config = papago_default_config();
-    config.http_port = 8484;
-    config.ws_port = 8485;
-
     // start server (blocking)
-    if (papago_start(server, &config) != 0) {
+    if (papago_start(server) != 0) {
         printf("failed to start server: %s\n", papago_error());
         papago_destroy(server);
 

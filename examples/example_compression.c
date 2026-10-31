@@ -74,7 +74,7 @@ large_handler(papago_request_t *req, papago_response_t *res, void *user_data)
         strcat(large_text, item);
     }
     strcat(large_text, "]}");
-    
+ 
     printf("sending large text: %zu bytes\n", strlen(large_text));
     papago_res_send(res, large_text);
     free(large_text);
@@ -123,7 +123,10 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    server = papago_new();
+    papago_config_t config = papago_default_config();
+    config.enable_compression = true;
+
+    server = papago_new(&config);
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
@@ -134,10 +137,7 @@ main(void)
     papago_route(server, PAPAGO_GET, "/info", info_handler, NULL);
     papago_route(server, PAPAGO_GET, "/", info_handler, NULL);
 
-    papago_config_t config = papago_default_config();
-    config.enable_compression = true;
-
-    papago_start(server, &config);
+    papago_start(server);
     papago_destroy(server);
 
     return 0;

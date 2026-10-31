@@ -134,8 +134,10 @@ main(void)
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
+    papago_config_t config = papago_default_config();
+
     // create server
-    server = papago_new();
+    server = papago_new(&config);
     if (server == NULL) {
         fprintf(stderr, "failed to create server\n");
         return 1;
@@ -150,8 +152,6 @@ main(void)
     papago_ws_endpoint(server, "/ws",
         ws_on_connect, ws_on_message, ws_on_close, ws_on_error);
 
-    papago_config_t config = papago_default_config();
-    config.http_port = 8282;
 
     printf("Server starting on:\n");
     printf("  HTTP:      http://%s:%d\n", config.host, config.http_port);
@@ -162,7 +162,7 @@ main(void)
     printf("curl http://%s:%d/user/alice\n\n", config.host, config.http_port);
 
     // start server (blocking)
-    if (papago_start(server, &config) != 0) {
+    if (papago_start(server) != 0) {
         fprintf(stderr, "%s\n", papago_error());
         papago_destroy(server);
 

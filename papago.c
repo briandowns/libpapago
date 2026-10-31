@@ -2386,16 +2386,54 @@ load_file(const char *filepath)
 
 // server Management
 
-papago_t*
-papago_new(void)
+/**
+ * valid_config validates that the given configuration is correct and complete.
+ */
+bool
+valid_config(const papago_config_t *config)
 {
+    if (config == NULL) {
+        return false;
+    }
+
+    if (config->enable_ssl) {
+        if (config->cert_file == NULL || config->key_file == NULL) {
+            return false;
+        }
+    }
+
+    if (config->enable_rate_limiting) {
+        if (config->rate_limit_requests == 0 || config->rate_limit_window == 0) {
+            return false;
+        }
+    }
+
+    if (config->require_client_cert &&
+        (config->ca_cert_file == NULL || config->ca_cert_file[0] == '\0')) {
+        return false;
+    }
+
+    return true;
+}
+
+papago_t*
+papago_new(papago_config_t *config)
+{
+    if (!valid_config(config)) {
+        return NULL;
+    }
+
     papago_t *server = calloc(1, sizeof(papago_t));
     if (server == NULL) {
         return NULL;
     }
+    server->config = *config;
 
-    server->config = papago_default_config();
-
+    if (server->config.enable_rate_limiting) {
+        server->rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
+            sizeof(papago_rate_limit_entry_t));
+    }
+ 
     pthread_mutex_init(&server->ws_mutex, NULL);
     pthread_mutex_init(&server->template_mutex, NULL);
     pthread_mutex_init(&server->shutdown_mutex, NULL);
@@ -2428,32 +2466,13 @@ suppress_lws_output(int level, const char *line)
 #endif
 
 int
-papago_start(papago_t *server, const papago_config_t *config)
+papago_start(papago_t *server)
 {
-    if (server == NULL || config == NULL) {
-        papago_set_error(PAPAGO_ERR, "server or config is NULL");
+    if (server == NULL) {
+        papago_set_error(PAPAGO_ERR, "server is NULL");
         return 1;
     }
 
-    papago_config_t existing_config = server->config;
-
-    if (existing_config.enable_rate_limiting) {
-        server->config.enable_rate_limiting = true;
-        server->config.rate_limit_requests = existing_config.rate_limit_requests;
-        server->config.rate_limit_window = existing_config.rate_limit_window;
-    }
-    if (server->config.static_dir == NULL && existing_config.static_dir != NULL) {
-        server->config.static_dir = existing_config.static_dir;
-    }
-    if (server->config.enable_rate_limiting && server->rate_limit_map == NULL) {
-        server->rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
-            sizeof(papago_rate_limit_entry_t));
-        if (server->rate_limit_map == NULL) {
-            server->config.enable_rate_limiting = false;
-        }
-    }
-
-    server->config = *config;
     server->running = true;
 
     unsigned int mhd_flags = MHD_USE_INTERNAL_POLLING_THREAD;
@@ -2473,13 +2492,6 @@ papago_start(papago_t *server, const papago_config_t *config)
                 "failed to initialize template engine");
             return 1;
         }
-    }
-
-    if (existing_config.require_client_cert && 
-       (config->ca_cert_file == NULL || config->ca_cert_file[0] == '\0')) {
-        papago_set_error(PAPAGO_ERR,
-            "require_client_cert is true but ca_cert_file is not set");
-        return 1;
     }
 
     // start libmicrohttpd daemon with optional SSL
