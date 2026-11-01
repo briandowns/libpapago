@@ -389,7 +389,7 @@ find_kv(const papago_kv_t *arr, size_t count, const char *key)
 #define DEFAULT_HTTP_PORT 8080
 #define DEFAULT_WS_PORT 8081
 #define DEFAULT_HOST "0.0.0.0"
-#define DEFAULT_BODY_SIZE 10 * 1024 * 1024 // 10MB
+#define DEFAULT_BODY_SIZE 10 * 1024 * 1024 // 10 MB
 
 papago_config_t
 papago_config_new(void)
@@ -629,7 +629,7 @@ papago_req_host(const papago_request_t *req)
 
 const char*
 papago_req_user_agent(const papago_request_t *req)
-{   
+{
     return req->user_agent;
 }
 
@@ -1220,7 +1220,7 @@ query_string_parser(void *cls, enum MHD_ValueKind kind, const char *key,
     if (ret == 1) {
         return MHD_NO;
     }
-    
+
     return MHD_YES;
 }
 
@@ -1438,6 +1438,36 @@ free_file_uploads(papago_file_upload_t *files)
         free(files);
         files = next;
     }
+}
+
+static void
+request_completed(void *cls, struct MHD_Connection *connection,
+                  void **con_cls, enum MHD_RequestTerminationCode reason)
+{
+    PAPAGO_UNUSED(cls);
+    PAPAGO_UNUSED(connection);
+    PAPAGO_UNUSED(reason);
+
+    papago_request_t *req = *con_cls;
+    if (req == NULL) {
+        return;
+    }
+
+    if (req->mhd_post_processor != NULL) {
+        MHD_destroy_post_processor(req->mhd_post_processor);
+    }
+
+    multipart_proc_current_field(req, false);
+    free(req->multipart_field);
+    free_file_uploads(req->files);
+    free(req->path);
+    free(req->body);
+    free_kv_array(req->headers, req->header_count);
+    free_kv_array(req->params, req->param_count);
+    free_kv_array(req->query, req->query_count);
+    free_kv_array(req->form, req->form_count);
+    free(req);
+    *con_cls = NULL;
 }
 
 struct method_map {
@@ -1660,18 +1690,6 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     // create response
     papago_response_t *res = calloc(1, sizeof(papago_response_t));
     if (res == NULL) {
-        free(req->path);
-        free(req->body);
-
-        free_kv_array(req->headers, req->header_count);
-        free_kv_array(req->params, req->param_count);
-        free_kv_array(req->query, req->query_count);
-        free_kv_array(req->form, req->form_count);
-
-        free_file_uploads(req->files);
-
-        free(req);
-
         return MHD_NO;
     }
     res->status = PAPAGO_STATUS_OK;
@@ -1841,7 +1859,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     }
 
     double duration_ms = 0;
-    
+
 send_response:
     clock_gettime(CLOCK_MONOTONIC, &now);
     duration_ms = (now.tv_sec  - papago_req_start_time(req).tv_sec) *
@@ -1867,18 +1885,6 @@ send_response:
         // send response
         ret = MHD_queue_response(connection, res->status, mhd_response);
         MHD_destroy_response(mhd_response);
-
-        // file will be closed by MHD after sending
-
-        free(req->path);
-        free(req->body);
-        free_kv_array(req->headers, req->header_count);
-        free_kv_array(req->params, req->param_count);
-        free_kv_array(req->query, req->query_count);
-        free_kv_array(req->form, req->form_count);
-
-        free_file_uploads(req->files);
-        free(req);
 
         free_kv_array(res->headers, res->header_count);
         free(res);
@@ -1948,15 +1954,6 @@ send_response:
     ret = MHD_queue_response(connection, res->status, mhd_response);
     MHD_destroy_response(mhd_response);
 
-    free(req->path);
-    free(req->body);
-
-    free_kv_array(req->headers, req->header_count);
-    free_kv_array(req->params, req->param_count);
-    free_kv_array(req->query, req->query_count);
-    free_kv_array(req->form, req->form_count);
-
-    free(req);
     free(res->body);
     free_kv_array(res->headers, res->header_count);
     free(res);
@@ -2540,6 +2537,7 @@ papago_start(papago_t *server)
                 MHD_OPTION_HTTPS_MEM_TRUST, ca_pem,
                 MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
                 MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
+                MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
                 MHD_OPTION_END);
         } else {
             server->mhd_daemon = MHD_start_daemon(
@@ -2551,6 +2549,7 @@ papago_start(papago_t *server)
                 MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
                 MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
                 MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
+                MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
                 MHD_OPTION_END);
         }
 
@@ -2566,6 +2565,7 @@ papago_start(papago_t *server)
             &mhd_handler, server,
             MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
             MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
+            MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
             MHD_OPTION_END);
     }
 
