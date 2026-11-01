@@ -409,7 +409,7 @@ papago_config_new(void)
     config.cert_file = NULL;
     config.key_file = NULL;
     config.static_dir = NULL;
-    config.thread_pool_size = 4;
+    config.thread_pool_size = 1;
     config.max_body_size = DEFAULT_BODY_SIZE;
 
     return config;
