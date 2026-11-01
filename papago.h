@@ -162,7 +162,7 @@ typedef struct {
     char *ca_cert_file;
     bool require_client_cert;
     char *static_dir;
-    int thread_pool_size;
+    uint16_t thread_pool_size;
     size_t max_body_size;
     bool enable_ssl;
     bool enable_template_rendering;

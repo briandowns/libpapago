@@ -409,7 +409,7 @@ papago_config_new(void)
     config.cert_file = NULL;
     config.key_file = NULL;
     config.static_dir = NULL;
-    config.thread_pool_size = 4;
+    config.thread_pool_size = 1;
     config.max_body_size = DEFAULT_BODY_SIZE;
 
     return config;
@@ -2536,6 +2536,7 @@ papago_start(papago_t *server)
                 MHD_OPTION_HTTPS_MEM_KEY, key_pem,
                 MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
                 MHD_OPTION_HTTPS_MEM_TRUST, ca_pem,
+                MHD_OPTION_THREAD_POOL_SIZE, server->config.thread_pool_size,
                 MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
                 MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
                 MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
@@ -2548,6 +2549,7 @@ papago_start(papago_t *server)
                 &mhd_handler, server,
                 MHD_OPTION_HTTPS_MEM_KEY, key_pem,
                 MHD_OPTION_HTTPS_MEM_CERT, cert_pem,
+                MHD_OPTION_THREAD_POOL_SIZE, server->config.thread_pool_size,
                 MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
                 MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
                 MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
@@ -2564,6 +2566,7 @@ papago_start(papago_t *server)
             server->config.http_port,
             NULL, NULL,
             &mhd_handler, server,
+            MHD_OPTION_THREAD_POOL_SIZE, server->config.thread_pool_size,
             MHD_OPTION_CONNECTION_TIMEOUT, server->config.connection_timeout,
             MHD_OPTION_CONNECTION_LIMIT, server->config.connection_limit,
             MHD_OPTION_NOTIFY_COMPLETED, request_completed, NULL,
