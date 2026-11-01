@@ -2406,7 +2406,8 @@ valid_config(const papago_config_t *config)
     }
 
     if (config->require_client_cert &&
-        (config->ca_cert_file == NULL || config->ca_cert_file[0] == '\0')) {
+        (!config->enable_ssl ||
+        config->ca_cert_file == NULL || config->ca_cert_file[0] == '\0')) {
         return false;
     }
 
@@ -2723,6 +2724,10 @@ papago_destroy(papago_t *server)
     // free websocket endpoint data
     for (size_t i = 0; i < server->ws_endpoint_count; i++) {
         free(server->ws_endpoints[i].path);
+    }
+
+    if (server->rate_limit_map != NULL) {
+        free(server->rate_limit_map);
     }
 
     // destroy synchronization primitives
