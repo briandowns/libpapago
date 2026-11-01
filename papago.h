@@ -28,7 +28,6 @@
 #ifndef __PAPAGO_H
 #define __PAPAGO_H
 
-#include <cstdint>
 #ifdef __cplusplus
 extern "C" {
 #endif
