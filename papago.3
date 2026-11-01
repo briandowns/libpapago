@@ -8,7 +8,7 @@ Modern web framework designed to be simple, full featured, and powerful all whil
 .IP \(bu 2
 RESTful Routing - GET, POST, PUT, DELETE, PATCH support
 .IP \(bu 2
-SSL/TLS Encryption - Server and client side
+SSL/TLS Encryption - Server and client side (mTLS)
 .IP \(bu 2
 Path Parameters - Dynamic routes like \fB/users/:id\fR
 .IP \(bu 2
@@ -26,7 +26,7 @@ File stream - video / audio / large files, zero-copy, automatic MIME type detect
 .IP \(bu 2
 Multipart Form Uploads - Stream file uploads (single or multiple) to disk without buffering the full body in memory
 .IP \(bu 2
-WebSocket Support - Real-time bidirectional communication, SSL secure transport
+WebSocket Support - Real-time bidirectional communication, SSL secure transport and mTLS
 .IP \(bu 2
 WebSocket Client - included
 .IP \(bu 2
@@ -78,9 +78,6 @@ libmaple - Maple Template Engine
 .RE
 
 .SH Build
-.PP
-Papago has the template engine (Maple) disabled by default. If this component is required, add \fBPAPAGO_USE_MAPLE=1\fR to the \fBmake\fR command when building.
-
 .EX
 make
 .EE
@@ -114,12 +111,12 @@ hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 int
 main(void)
 {
-	papago_t *server = papago_new();
+    papago_config_t config = papago_config_new();
+	papago_t *server = papago_new(&config);
 	
 	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
 	
-    papago_config_t config = papago_default_config();
-	papago_start(server, &config); // blocking
+	papago_start(server); // blocking
 	
 	papago_destroy(server);
 
@@ -148,7 +145,7 @@ More examples can be found in the examples
 \[la]/examples\[ra] directory. Each example has a \fBmake\fR target.
 
 .PP
-You can make all examples with \fBmake examples_all PAPAGO_USE_MAPLE=1\fR\&.
+You can make all examples with \fBmake examples_all\fR\&.
 
 .EX
 make example
@@ -228,7 +225,7 @@ papago_route(server, PAPAGO_GET, "/search", search_handler, NULL);
 
 .SS Convenience Functions
 .PP
-Convenience functions are provided to make seneding responses even easier.
+Convenience functions are provided to make sending responses even easier.
 
 .PP
 \fBpapago_res_send\fR, \fBpapago_res_html\fR, \fBpapago_res_json\fR are meant to be used when sending simple text, HTML, and JSON respectively. The last 2 set appropriate headers for the payload while the first leaves this to the user.
@@ -273,6 +270,9 @@ Examples of some common middlewares (logger, rate-limiting) can be found in the 
 Below is example code of how to use the websocket functionality. For the available websocket client API, reference the Papago Websocket Client Header
 \[la]papago_wsc.h\[ra] file.
 
+.PP
+mTLS is supported for both server and client side websocket connections. The \fBexamples/example_ws_mtls.c\fR and \fBexamples/example_wsclient_mtls.c\fR files show how this can be achieved.
+
 .EX
 void
 ws_on_connect(papago_ws_connection_t *conn)
@@ -286,10 +286,10 @@ ws_on_message(papago_ws_connection_t *conn, const char *message,
               size_t length, bool is_binary)
 {
     printf("Received: %s\\n", message);
-    
+
     // echo back
     papago_ws_send(conn, message);
-    
+ 
     // or broadcast to all
     papago_ws_broadcast(papago_get_current_server(), message);
 }
@@ -332,7 +332,7 @@ handler(papago_request_t *req, papago_response_t *res, void *user_data)
     const char *id = papago_req_param(req, "id");
     const char *search = papago_req_query(req, "q");
     const char *body = papago_req_body(req);
-    
+ 
     // send response
     papago_res_status(res, PAPAGO_STATUS_OK);
     papago_res_header(res, "X-Custom", "value");
@@ -361,6 +361,11 @@ WebSocket: Event loop in separate thread
 Broadcast: Thread-safe with mutex protection
 
 .RE
+
+
+.SH Container Builds
+.PP
+Container building can be done with the provided Docker and Podman files.
 
 .SH Contributing
 .PP

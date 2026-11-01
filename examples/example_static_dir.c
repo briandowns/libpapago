@@ -30,15 +30,15 @@
 int
 main(void)
 {
-    papago_t *server = papago_new();
+    papago_config_t config = papago_config_new();
+    config.static_dir = "./public";
+
+    papago_t *server = papago_new(&config);
 
     papago_route(server, PAPAGO_GET, "/*", papago_serve_static_handler,
         server);
 
-    papago_config_t cfg = papago_default_config();
-    cfg.static_dir = "./public";
-
-    papago_start(server, &cfg);
+    papago_start(server);
 
     papago_destroy(server);
 
