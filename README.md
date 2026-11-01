@@ -68,10 +68,10 @@ Default server runs on port `8080`.
 void
 hello_handler(papago_request_t *req, papago_response_t *res, void *user_data)
 {
-	PAPAGO_UNUSED(req);
+    PAPAGO_UNUSED(req);
     PAPAGO_UNUSED(user_data);
 
-	papago_res_json(res, "{\"message\":\"Hello, World!\"}");
+    papago_res_json(res, "{\"message\":\"Hello, World!\"}");
 }
 
 int
@@ -126,7 +126,7 @@ make example_ssl
 make example_websocket
 ```
 
-## Config Defaults
+## Configuration Defaults
 
 * Port = 8080
 * Host = 0.0.0.0
@@ -137,9 +137,9 @@ make example_websocket
 * Template rendering = off
 * Compression = off
 * Max body size = 10485760 (10 * 1024 * 1024)
-* Thread pool size = 4
+* Thread pool size = 1
 
-All config values can be easily set on the `papago_config_t` value. Check the examples for more details.
+All configuration values can be easily set on the `papago_config_t` value. Check the examples for more details.
 
 ## Core Concepts
 
