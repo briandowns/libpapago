@@ -204,7 +204,7 @@ typedef struct {
  * configuration. User is responsible for freeing returned memory.
  */
 papago_t*
-papago_new(papago_config_t *config);
+papago_new(const papago_config_t *config);
 
 /**
  * Retrieve current error message. Returns error message string or empty string
