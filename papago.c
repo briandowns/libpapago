@@ -2487,7 +2487,7 @@ load_file(const char *filepath)
 /**
  * valid_config validates that the given configuration is correct and complete.
  */
-bool
+static bool
 valid_config(const papago_config_t *config)
 {
     if (config == NULL) {
