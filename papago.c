@@ -274,7 +274,7 @@ struct papago_server {
  */
 typedef struct {
     char ip[INET6_ADDRSTRLEN];
-    uint16_t count;
+    uint32_t count;
     time_t window_start;
 } papago_rate_limit_entry_t;
 
@@ -2534,6 +2534,10 @@ papago_new(papago_config_t *config)
     if (server->config.enable_rate_limiting) {
         server->rate_limit_map = calloc(MAX_RATE_LIMIT_ENTRIES,
             sizeof(papago_rate_limit_entry_t));
+        if (server->rate_limit_map == NULL) {
+            free(server);
+            return NULL;
+        }
     }
  
     pthread_mutex_init(&server->ws_mutex, NULL);
@@ -2544,6 +2548,7 @@ papago_new(papago_config_t *config)
 
     server->metrics = calloc(1, sizeof(papago_metrics_t));
     if (server->metrics == NULL) {
+        free(server->rate_limit_map);
         free(server);
         return NULL;
     }
