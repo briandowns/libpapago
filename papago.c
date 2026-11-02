@@ -73,10 +73,9 @@ typedef struct {
 typedef struct {
     papago_method_t method;
     char *path;
-    char *path_pattern;
     papago_handler_t handler;
     void *user_data;
-    bool has_params;
+    bool is_static; // no ':' or '*' in path, compared with strcmp()
 } papago_route_t;
 
 typedef struct {
@@ -340,32 +339,60 @@ free_kv_array(papago_kv_t *arr, size_t count)
     free(arr);
 }
 
+static char*
+dup_n(const char *str, size_t len)
+{
+    char *dup = malloc(len + 1);
+    if (dup != NULL) {
+        memcpy(dup, str, len);
+        dup[len] = '\0';
+    }
+
+    return dup;
+}
+
+/**
+ * Appends a copy of key and value to arr. The array is only touched once
+ * everything has been allocated so a failure leaves it exactly as it was.
+ */
 static int
-add_kv(papago_kv_t **arr, size_t *count, const char *key, const char *value)
+add_kv_n(papago_kv_t **arr, size_t *count, const char *key, size_t key_len,
+         const char *value, size_t value_len)
 {
     if (arr == NULL || count == NULL || key == NULL || value == NULL) {
         return 1;
     }
 
-    papago_kv_t *new_arr = realloc(*arr, (*count + 1) * sizeof(papago_kv_t));
+    char *k = dup_n(key, key_len);
+    char *v = dup_n(value, value_len);
+    papago_kv_t *new_arr = NULL;
+
+    if (k != NULL && v != NULL) {
+        new_arr = realloc(*arr, (*count + 1) * sizeof(papago_kv_t));
+    }
     if (new_arr == NULL) {
+        free(k);
+        free(v);
+
         return 1;
     }
 
-    new_arr[*count].key = _strdup(key);
-    new_arr[*count].value = _strdup(value);
-
-    if (new_arr[*count].key == NULL || new_arr[*count].value == NULL) {
-        free(new_arr[*count].key);
-        free(new_arr[*count].value);
-        free(new_arr);
-        return 1;
-    }
-
+    new_arr[*count].key = k;
+    new_arr[*count].value = v;
     *arr = new_arr;
     (*count)++;
 
     return 0;
+}
+
+static int
+add_kv(papago_kv_t **arr, size_t *count, const char *key, const char *value)
+{
+    if (key == NULL || value == NULL) {
+        return 1;
+    }
+
+    return add_kv_n(arr, count, key, strlen(key), value, strlen(value));
 }
 
 static const char*
@@ -417,115 +444,177 @@ papago_config_new(void)
 
 // path parameter matching
 
-// drop entries added after the first new_count so a failed candidate
-// leaves the array as it found it
-static void
-truncate_kv(papago_kv_t *arr, size_t *count, size_t new_count)
+#define PAPAGO_MAX_ROUTE_PARAMS 16
+
+/**
+ * A parameter captured while matching. key points into the route pattern and
+ * val into the request path, nothing is allocated until a route has matched
+ * in full, so a candidate that fails leaves the request untouched.
+ */
+typedef struct {
+    const char *key;
+    size_t key_len;
+    const char *val;
+    size_t val_len;
+    bool wildcard;
+} param_span_t;
+
+/**
+ * Returns the first non-empty segment at or after s and stores its length in
+ * len. len is 0 when there are no segments left.
+ */
+static const char*
+next_segment(const char *s, size_t *len)
 {
-    if (arr == NULL || count == NULL) {
-        return;
+    while (*s == '/') {
+        s++;
+    }
+    *len = strcspn(s, "/");
+
+    return s;
+}
+
+static size_t
+count_route_params(const char *pattern)
+{
+    size_t n = 0;
+    size_t len;
+    const char *seg = next_segment(pattern, &len);
+
+    while (len > 0) {
+        if (seg[0] == ':' || (len == 1 && seg[0] == '*')) {
+            n++;
+        }
+        seg = next_segment(seg + len, &len);
     }
 
-    for (size_t i = new_count; i < *count; i++) {
-        free(arr[i].key);
-        free(arr[i].value);
+    return n;
+}
+
+/**
+ * Matches path against a pattern with ':name' and '*' segments. When spans is
+ * not NULL, up to PAPAGO_MAX_ROUTE_PARAMS captures are written to it and their
+ * number to count. Empty segments are ignored on both sides.
+ */
+static bool
+match_route(const char *pattern, const char *path, param_span_t *spans,
+            size_t *count)
+{
+    size_t n = 0;
+    size_t plen;
+    size_t qlen;
+    const char *pt = next_segment(pattern, &plen);
+    const char *qt = next_segment(path, &qlen);
+
+    while (plen > 0 && qlen > 0) {
+        if (plen == 1 && pt[0] == '*') {
+            // wildcard captures everything that is left of the path
+            if (spans != NULL && n < PAPAGO_MAX_ROUTE_PARAMS) {
+                spans[n++] = (param_span_t){
+                    "*", 1, qt, strlen(qt), true
+                };
+            }
+            if (count != NULL) {
+                *count = n;
+            }
+
+            return true;
+        }
+
+        if (pt[0] == ':') {
+            if (spans != NULL && n < PAPAGO_MAX_ROUTE_PARAMS) {
+                spans[n++] = (param_span_t){
+                    pt + 1, plen - 1, qt, qlen, false
+                };
+            }
+        } else if (plen != qlen || memcmp(pt, qt, plen) != 0) {
+            return false;
+        }
+
+        pt = next_segment(pt + plen, &plen);
+        qt = next_segment(qt + qlen, &qlen);
     }
 
-    if (new_count < *count) {
-        *count = new_count;
+    // the path must be used up, the pattern too unless all that is left of it
+    // is a '*' matching nothing
+    if (qlen > 0 || (plen > 0 && !(plen == 1 && pt[0] == '*'))) {
+        return false;
     }
+    if (count != NULL) {
+        *count = n;
+    }
+
+    return true;
 }
 
 static bool
-match_route(const char *pattern, const char *path, papago_kv_t **params,
-            size_t *param_count)
+route_matches(const char *pattern, bool is_static, const char *path,
+              param_span_t *spans, size_t *count)
 {
-    if (pattern == NULL || path == NULL) {
-        return false;
-    }
-
-    // simple comparison if no parameters
-    if (strchr(pattern, ':') == NULL && strchr(pattern, '*') == NULL) {
+    if (is_static) {
         return strcmp(pattern, path) == 0;
     }
 
-    // parse path with parameters
-    const char *pattern_copy = _strdup(pattern);
-    const char *path_copy = _strdup(path);
+    return match_route(pattern, path, spans, count);
+}
 
-    if (pattern_copy == NULL || path_copy == NULL) {
-        free((void*)pattern_copy);
-        free((void*)path_copy);
-
-        return false;
+static char*
+collapse_slashes(const char *s, size_t len)
+{
+    char *out = malloc(len+1);
+    if (out == NULL) {
+        return NULL;
     }
 
-    // params captured here are only kept if the whole pattern matches
-    size_t base_count = (param_count != NULL) ? *param_count : 0;
+    size_t o = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (s[i] == '/' && (o == 0 || out[o-1] == '/')) {
+            continue;
+        }
+        out[o++] = s[i];
+    }
+    if (o > 0 && out[o-1] == '/') {
+        o--;
+    }
+    out[o] = '\0';
 
-    bool match = true;
-    char *pattern_saveptr = NULL;
-    char *path_saveptr = NULL;
-    const char *pattern_token = strtok_r((char*)pattern_copy, "/", &pattern_saveptr);
-    const char *path_token = strtok_r((char*)path_copy, "/", &path_saveptr);
+    return out;
+}
 
-    while (pattern_token != NULL && path_token != NULL) {
-        if (strcmp(pattern_token, "*") == 0) {
-            // wildcard: matches all remaining path segments
-            // reconstruct the remainder and store it as param "*"
-            if (params != NULL && param_count != NULL) {
-                char remainder[4096];
-                remainder[0] = '\0';
-                size_t off = 0;
-                const char *pt = path_token;
-                char *ps = path_saveptr;
+/**
+ * Copies the captures of the route that matched into the request. Returns 1 on
+ * allocation failure, in which case no params are left behind.
+ */
+static int
+commit_params(papago_request_t *req, const param_span_t *spans, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        int rc;
 
-                while (pt != NULL) {
-                    size_t seg_len = strlen(pt);
-
-                    if (off + seg_len + 2 < sizeof(remainder)) {
-                        if (off > 0) {
-                            remainder[off++] = '/';
-                        }
-
-                        memcpy(remainder + off, pt, seg_len);
-                        off += seg_len;
-                        remainder[off] = '\0';
-                    }
-                    pt = strtok_r(NULL, "/", &ps);
-                }
-                add_kv(params, param_count, "*", remainder);
+        if (spans[i].wildcard) {
+            char *val = collapse_slashes(spans[i].val, spans[i].val_len);
+            if (val == NULL) {
+                rc = 1;
+            } else {
+                rc = add_kv_n(&req->params, &req->param_count, spans[i].key,
+                    spans[i].key_len, val, strlen(val));
+                free(val);
             }
-            match = true;
-            break;
-        } else if (pattern_token[0] == ':') {
-            // extract named parameter
-            const char *param_name = pattern_token + 1;
-            if (params != NULL && param_count != NULL) {
-                add_kv(params, param_count, param_name, path_token);
-            }
-        } else if (strcmp(pattern_token, path_token) != 0) {
-            match = false;
-            break;
+        } else {
+            rc = add_kv_n(&req->params, &req->param_count, spans[i].key,
+                spans[i].key_len, spans[i].val, spans[i].val_len);
         }
 
-        pattern_token = strtok_r(NULL, "/", &pattern_saveptr);
-        path_token = strtok_r(NULL, "/", &path_saveptr);
+        if (rc != 0) {
+            free_kv_array(req->params, req->param_count);
+            req->params = NULL;
+            req->param_count = 0;
+
+            return 1;
+        }
     }
 
-    if ((pattern_token != NULL || path_token != NULL) &&
-        !(pattern_token != NULL && strcmp(pattern_token, "*") == 0)) {
-        match = false;
-    }
-
-    if (!match && params != NULL && param_count != NULL) {
-        truncate_kv(*params, param_count, base_count);
-    }
-
-    free((void*)pattern_copy);
-    free((void*)path_copy);
-
-    return match;
+    return 0;
 }
 
 // request/Response Helpers
@@ -1806,19 +1895,30 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
     // find matching route
     route_found = false;
     if (req->method != PAPAGO_UNKNOWN) {
+        param_span_t spans[PAPAGO_MAX_ROUTE_PARAMS];
+
         for (size_t i = 0; i < server->route_count; i++) {
             papago_route_t *route = &server->routes[i];
+            size_t span_count = 0;
 
             if (route->method != req->method) {
                 continue;
             }
 
-            if (match_route(route->path, req->path, &req->params,
-                    &req->param_count)) {
-                route->handler(req, res, route->user_data);
-                route_found = true;
-                break;
+            if (!route_matches(route->path, route->is_static, req->path,
+                    spans, &span_count)) {
+                continue;
             }
+
+            // params are only copied in for the route that is going to run
+            if (commit_params(req, spans, span_count) != 0) {
+                papago_res_set_status(res, PAPAGO_STATUS_INTERNAL_ERROR);
+                papago_res_json(res, "{\"error\":\"out of memory\"}");
+            } else {
+                route->handler(req, res, route->user_data);
+            }
+            route_found = true;
+            break;
         }
     }
 
@@ -1829,7 +1929,8 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
             papago_route_t *route = &server->routes[i];
 
             if (route->method != req->method &&
-                match_route(route->path, req->path, NULL, NULL)) {
+                route_matches(route->path, route->is_static, req->path,
+                    NULL, NULL)) {
                 allowed |= 1u << route->method;
             }
         }
@@ -2716,7 +2817,6 @@ papago_destroy(papago_t *server)
     // free route data
     for (size_t i = 0; i < server->route_count; i++) {
         free(server->routes[i].path);
-        free(server->routes[i].path_pattern);
     }
 
     // free middleware data
@@ -2765,12 +2865,23 @@ papago_route(papago_t *server, papago_method_t method,
         return 1;
     }
 
+    if (count_route_params(path) > PAPAGO_MAX_ROUTE_PARAMS) {
+        papago_set_error(PAPAGO_ERR, "route has more than %d parameters",
+            PAPAGO_MAX_ROUTE_PARAMS);
+        return 1;
+    }
+
+    char *path_copy = _strdup(path);
+    if (path_copy == NULL) {
+        papago_set_error(PAPAGO_ERR, "failed to allocate route");
+        return 1;
+    }
+
     papago_route_t *route = &server->routes[server->route_count];
     route->method = method;
-    route->path = _strdup(path);
-    route->path_pattern = _strdup(path);
+    route->path = path_copy;
     route->handler = handler;
-    route->has_params = (strchr(path, ':') != NULL);
+    route->is_static = (strchr(path, ':') == NULL && strchr(path, '*') == NULL);
     route->user_data = user_data;
 
     server->route_count++;
