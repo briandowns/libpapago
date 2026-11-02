@@ -29,6 +29,7 @@
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <netinet/in.h>
@@ -161,8 +162,8 @@ struct papago_response {
     size_t body_length;
     papago_kv_t *headers;
     size_t header_count;
-    FILE *stream_file;
-    size_t stream_file_size;
+    int stream_fd;
+    uint64_t stream_file_size;
     bool sent;
     bool is_stream_file;
 };
@@ -917,33 +918,6 @@ set_file_headers(papago_response_t *res, const char *filepath,
         "nosniff");
 }
 
-/**
- * Validate file for streaming. Returns file size on success or 1 on error.
- */
-static int64_t
-validate_file(const char *filepath)
-{
-    struct stat st;
- 
-    if (filepath == NULL) {
-        papago_set_error(PAPAGO_ERR, "file is NULL");
-        return 1;
-    }
- 
-    if (stat(filepath, &st) != 0) {
-        papago_set_error(PAPAGO_ERR, "failed to stat file: %s, %s",
-            filepath, strerror(errno));
-        return 1;
-    }
- 
-    if (!S_ISREG(st.st_mode)) {
-        papago_set_error(PAPAGO_ERR, "not a regular file: %s", filepath);
-        return 1;
-    }
- 
-    return (int64_t)st.st_size;
-}
-
 uint8_t
 papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
                          const char *filepath, const char *mime_type)
@@ -953,29 +927,33 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
             "server, res, or filepath is NULL");
         return 1;
     }
- 
-    int64_t file_size = validate_file(filepath);
-    if (file_size == -1) {
-        papago_set_error(PAPAGO_ERR, "invalid file size: %s", filepath);
-        return 1;
-    }
- 
-    FILE *fp = fopen(filepath, "rb");
-    if (fp == NULL) {
-        papago_set_error(PAPAGO_ERR, "failed to open file for streaming");
 
-        return 1;
-    }
- 
-    int fd = fileno(fp);
+    // O_NONBLOCK keeps open() from waiting on a FIFO. It is cleared below once
+    // we know this is a regular file, MHD wants a blocking descriptor.
+    int fd = open(filepath, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0) {
-        fclose(fp);
-        papago_set_error(PAPAGO_ERR, "failed to get file descriptor");
-
-        return 1;
-    }
+        papago_set_error(PAPAGO_ERR, "failed to open file for streaming: "
+            "%s, %s", filepath, strerror(errno));
+         return 1;
+     }
  
-    set_file_headers(res, filepath, mime_type, file_size);
+    // check the descriptor we hold rather than the path so the file can't be
+    // swapped for something else between the check and the open
+    struct stat st;
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        papago_set_error(PAPAGO_ERR, "not a regular file: %s", filepath);
+        close(fd);
+         return 1;
+    }
+
+    if (fcntl(fd, F_SETFL, 0) != 0) {
+        papago_set_error(PAPAGO_ERR, "failed to configure file: %s, %s",
+            filepath, strerror(errno));
+        close(fd);
+        return 1;
+     }
+
+    set_file_headers(res, filepath, mime_type, (int64_t)st.st_size);
 
     if (res->body != NULL) {
         free(res->body);
@@ -983,11 +961,15 @@ papago_res_sendfile_mime(papago_t *server, papago_response_t *res,
         res->body_length = 0;
         res->sent = true;
     }
+
+    if (res->stream_fd >= 0) {
+        close(res->stream_fd);
+    }
  
     // mark response as file-based for special handling in send_response
     res->is_stream_file = true;
-    res->stream_file = fp; // MHD will close fd
-    res->stream_file_size = (unsigned)file_size;
+    res->stream_fd = fd; // handled by MHD when the response is sent
+    res->stream_file_size = (uint64_t)st.st_size;
 
     return 0;
 }
@@ -1782,6 +1764,7 @@ mhd_handler(void *cls, struct MHD_Connection *connection, const char *url,
         return MHD_NO;
     }
     res->status = PAPAGO_STATUS_OK;
+    res->stream_fd = -1;
 
     if (server->config.enable_ssl && server->config.require_client_cert) {
         const union MHD_ConnectionInfo *session_info = MHD_get_connection_info(
@@ -1968,14 +1951,17 @@ send_response:
     update_metrics(server, req->path, papago_req_method(req),
         res->status, (uint64_t)duration_ms);
 
-    if (res->is_stream_file && res->stream_file != NULL) {
-        int fd = fileno(res->stream_file);
-
-        mhd_response = MHD_create_response_from_fd(res->stream_file_size, fd);
+    if (res->is_stream_file && res->stream_fd >= 0) {
+        mhd_response = MHD_create_response_from_fd64(res->stream_file_size,
+            res->stream_fd);
         if (mhd_response == NULL) {
-            fclose(res->stream_file);
+            close(res->stream_fd);
+            free_kv_array(res->headers, res->header_count);
+            free(res);
             return MHD_NO;
         }
+
+        res->stream_fd = -1;
 
         // add headers
         for (size_t i = 0; i < res->header_count; i++) {
