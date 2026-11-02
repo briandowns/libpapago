@@ -541,6 +541,10 @@ match_route(const char *pattern, const char *path, param_span_t *spans,
     if (qlen > 0 || (plen > 0 && !(plen == 1 && pt[0] == '*'))) {
         return false;
     }
+    if (plen == 1 && pt[0] == '*' && spans != NULL &&
+        n < PAPAGO_MAX_ROUTE_PARAMS) {
+        spans[n++] = (param_span_t){ "*", 1, qt, 0, true };
+    }
     if (count != NULL) {
         *count = n;
     }
@@ -552,6 +556,10 @@ static bool
 route_matches(const char *pattern, bool is_static, const char *path,
               param_span_t *spans, size_t *count)
 {
+    if (pattern == NULL || path == NULL) {
+         return false;
+    }
+
     if (is_static) {
         return strcmp(pattern, path) == 0;
     }
