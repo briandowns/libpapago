@@ -2502,7 +2502,7 @@ valid_config(const papago_config_t *config)
 }
 
 papago_t*
-papago_new(papago_config_t *config)
+papago_new(const papago_config_t *config)
 {
     if (!valid_config(config)) {
         return NULL;
