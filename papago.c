@@ -2773,10 +2773,9 @@ void
 papago_stop(papago_t *server)
 {
     if (server != NULL) {
-        server->running = false;
-
         // signal condition variable for instant wakeup
         pthread_mutex_lock(&server->shutdown_mutex);
+        server->running = false;
         pthread_cond_signal(&server->shutdown_cond);
         pthread_mutex_unlock(&server->shutdown_mutex);
 
