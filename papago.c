@@ -1241,7 +1241,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
  * Compress data using gzip.
  */
 static char*
-compress_gzip(const char *data, size_t data_len, uint64_t *compressed_len)
+compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
 {
     // estimate maximum compressed size
     size_t max_compressed = compressBound(data_len);

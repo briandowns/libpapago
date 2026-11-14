@@ -80,7 +80,7 @@ token_auth_before(papago_request_t *req, papago_response_t *res, void *user_data
     const char *token = papago_req_header(req, "X-Auth-Token");
 
     const char *env_token = getenv("AUTH_TOKEN");
-    if (token == NULL || strcmp(token, env_token) != 0) {
+    if (env_token == NULL || token == NULL || strcmp(token, env_token) != 0) {
         papago_res_set_status(res, PAPAGO_STATUS_UNAUTHORIZED);
         papago_res_json(res, "{\"error\":\"unauthorized\"}");
         return false;
