@@ -1982,7 +1982,6 @@ send_response:
         mhd_response = MHD_create_response_from_fd64(res->stream_file_size,
             res->stream_fd);
         if (mhd_response == NULL) {
-            close(res->stream_fd);
             free_response(res);
             return MHD_NO;
         }
@@ -2025,7 +2024,6 @@ send_response:
             } else {
                 // compression failed or not beneficial
                 free(compressed_body);
-                free_response(res);
                 compressed_body = NULL;
             }
         }
@@ -2067,7 +2065,6 @@ send_response:
     ret = MHD_queue_response(connection, res->status, mhd_response);
     MHD_destroy_response(mhd_response);
 
-    free(res->body);
     free_response(res);
 
     return ret;
