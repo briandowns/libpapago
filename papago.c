@@ -2055,7 +2055,8 @@ send_response:
         }
 
         if (use_compression && compressed_body != NULL) {
-            mhd_response = create_body_response(res);
+            mhd_response = MHD_create_response_from_buffer(compressed_len,
+                compressed_body, MHD_RESPMEM_MUST_FREE);
             if (mhd_response == NULL) {
                 free(compressed_body);
                 free_response(res);
