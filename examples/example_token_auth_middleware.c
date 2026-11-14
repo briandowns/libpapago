@@ -27,6 +27,7 @@
 
 #define _POSIX_C_SOURCE 199309L
 #include <signal.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -78,7 +79,8 @@ token_auth_before(papago_request_t *req, papago_response_t *res, void *user_data
 
     const char *token = papago_req_header(req, "X-Auth-Token");
 
-    if (token == NULL || strcmp(token, "asdf1234") != 0) {
+    const char *env_token = getenv("AUTH_TOKEN");
+    if (env_token == NULL || token == NULL || strcmp(token, env_token) != 0) {
         papago_res_set_status(res, PAPAGO_STATUS_UNAUTHORIZED);
         papago_res_json(res, "{\"error\":\"unauthorized\"}");
         return false;

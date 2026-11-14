@@ -159,7 +159,7 @@ struct papago_request {
 struct papago_response {
     papago_status_code_t status;
     char *body;
-    size_t body_length;
+    uint64_t body_length;
     papago_kv_t *headers;
     size_t header_count;
     int stream_fd;
@@ -4073,3 +4073,4 @@ papago_mime_type(const char *filename)
  
     return "application/octet-stream";
 }
+
