@@ -159,7 +159,7 @@ struct papago_request {
 struct papago_response {
     papago_status_code_t status;
     char *body;
-    size_t body_length;
+    uint64_t body_length;
     papago_kv_t *headers;
     size_t header_count;
     int stream_fd;
@@ -1241,7 +1241,7 @@ papago_metrics_handler(papago_request_t *req, papago_response_t *res, void *user
  * Compress data using gzip.
  */
 static char*
-compress_gzip(const char *data, size_t data_len, size_t *compressed_len)
+compress_gzip(const char *data, size_t data_len, uint64_t *compressed_len)
 {
     // estimate maximum compressed size
     size_t max_compressed = compressBound(data_len);
@@ -4073,3 +4073,4 @@ papago_mime_type(const char *filename)
  
     return "application/octet-stream";
 }
+
