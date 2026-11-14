@@ -1519,6 +1519,26 @@ free_file_uploads(papago_file_upload_t *files)
     }
 }
 
+/**
+ * free_response releases everything owned by a response, including an
+ * unclaimed stream fd.
+ */
+static void
+free_response(papago_response_t *res)
+{
+    if (res == NULL) {
+        return;
+    }
+
+    if (res->stream_fd >= 0) {
+        close(res->stream_fd);
+    }
+
+    free(res->body);
+    free_kv_array(res->headers, res->header_count);
+    free(res);
+}
+
 static void
 request_completed(void *cls, struct MHD_Connection *connection,
                   void **con_cls, enum MHD_RequestTerminationCode reason)
@@ -1963,9 +1983,7 @@ send_response:
         mhd_response = MHD_create_response_from_fd64(res->stream_file_size,
             res->stream_fd);
         if (mhd_response == NULL) {
-            close(res->stream_fd);
-            free_kv_array(res->headers, res->header_count);
-            free(res);
+            free_response(res);
             return MHD_NO;
         }
 
@@ -1980,9 +1998,7 @@ send_response:
         // send response
         ret = MHD_queue_response(connection, res->status, mhd_response);
         MHD_destroy_response(mhd_response);
-
-        free_kv_array(res->headers, res->header_count);
-        free(res);
+        free_response(res);
 
         return ret;
     }
@@ -2017,6 +2033,7 @@ send_response:
             mhd_response = MHD_create_response_from_buffer(compressed_len,
                 compressed_body, MHD_RESPMEM_MUST_FREE);
             if (mhd_response == NULL) {
+                free_response(res);
                 return MHD_NO;
             }
 
@@ -2027,6 +2044,7 @@ send_response:
                 res->body != NULL ? res->body : "", MHD_RESPMEM_MUST_COPY);
             if (mhd_response == NULL) {
                 free(compressed_body);
+                free_response(res);
                 return MHD_NO;
             }
         }
@@ -2049,9 +2067,7 @@ send_response:
     ret = MHD_queue_response(connection, res->status, mhd_response);
     MHD_destroy_response(mhd_response);
 
-    free(res->body);
-    free_kv_array(res->headers, res->header_count);
-    free(res);
+    free_response(res);
 
     return ret;
 }
