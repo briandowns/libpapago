@@ -434,7 +434,7 @@ papago_res_set_status(papago_response_t *res, papago_status_code_t status);
 /**
  * Set response header.
  */
-void 
+uint8_t
 papago_res_header(papago_response_t *res, const char *key, const char *value);
 
 /**

@@ -356,7 +356,7 @@ dup_n(const char *str, size_t len)
  * Appends a copy of key and value to arr. The array is only touched once
  * everything has been allocated so a failure leaves it exactly as it was.
  */
-static int
+static uint8_t
 add_kv_n(papago_kv_t **arr, size_t *count, const char *key, size_t key_len,
          const char *value, size_t value_len)
 {
@@ -386,7 +386,7 @@ add_kv_n(papago_kv_t **arr, size_t *count, const char *key, size_t key_len,
     return 0;
 }
 
-static int
+static uint8_t
 add_kv(papago_kv_t **arr, size_t *count, const char *key, const char *value)
 {
     if (key == NULL || value == NULL) {
@@ -864,10 +864,10 @@ papago_res_set_status(papago_response_t *res, papago_status_code_t status)
     res->status = status;
 }
 
-void
+uint8_t
 papago_res_header(papago_response_t *res, const char *key, const char *value)
 {
-    add_kv(&res->headers, &res->header_count, key, value);
+    return add_kv(&res->headers, &res->header_count, key, value);
 }
 
 uint8_t
