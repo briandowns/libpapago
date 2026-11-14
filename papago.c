@@ -340,6 +340,29 @@ free_kv_array(papago_kv_t *arr, size_t count)
     free(arr);
 }
 
+/**
+ * create_body_response builds an MHD response from res->body with no copying.
+ * On success MHD owns the buffer and res->body is cleared.
+ */
+static struct MHD_Response*
+create_body_response(papago_response_t *res)
+{
+    struct MHD_Response *mhd_response;
+
+    if (res->body == NULL || res->body_length == 0) {
+        return MHD_create_response_from_buffer(0, "", MHD_RESPMEM_PERSISTENT);
+    }
+
+    mhd_response = MHD_create_response_from_buffer(res->body_length, res->body,
+        MHD_RESPMEM_MUST_FREE);
+    if (mhd_response != NULL) {
+        res->body = NULL;
+        res->body_length = 0;
+    }
+
+    return mhd_response;
+}
+
 static char*
 dup_n(const char *str, size_t len)
 {
@@ -875,6 +898,8 @@ papago_res_send(papago_response_t *res, const char *body)
 {
     if (res->body != NULL) {
         free(res->body);
+        res->body = NULL;
+        res->body_length = 0;
     }
 
     if (res->is_stream_file) {
@@ -883,7 +908,7 @@ papago_res_send(papago_response_t *res, const char *body)
     }
 
     res->body = _strdup(body);
-    res->body_length = (body != NULL) ? strlen(body) : 0;
+    res->body_length = (res->body != NULL) ? strlen(res->body) : 0;
     res->sent = true;
 
     return 0;
@@ -2030,9 +2055,9 @@ send_response:
         }
 
         if (use_compression && compressed_body != NULL) {
-            mhd_response = MHD_create_response_from_buffer(compressed_len,
-                compressed_body, MHD_RESPMEM_MUST_FREE);
+            mhd_response = create_body_response(res);
             if (mhd_response == NULL) {
+                free(compressed_body);
                 free_response(res);
                 return MHD_NO;
             }
@@ -2050,8 +2075,7 @@ send_response:
         }
     } else {
         // create MHD response
-        mhd_response = MHD_create_response_from_buffer(res->body_length,
-            res->body != NULL ? res->body : "", MHD_RESPMEM_MUST_COPY);
+        mhd_response = create_body_response(res);
         if (mhd_response == NULL) {
             return MHD_NO;
         }
