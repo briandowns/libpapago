@@ -1520,7 +1520,8 @@ free_file_uploads(papago_file_upload_t *files)
 }
 
 /**
- * Releases everything owned by a response, including an unclaimed stream fd.
+ * free_response releases everything owned by a response, including an
+ * unclaimed stream fd.
  */
 static void
 free_response(papago_response_t *res)
@@ -2032,6 +2033,7 @@ send_response:
             mhd_response = MHD_create_response_from_buffer(compressed_len,
                 compressed_body, MHD_RESPMEM_MUST_FREE);
             if (mhd_response == NULL) {
+                free_response(res);
                 return MHD_NO;
             }
 
