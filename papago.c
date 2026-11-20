@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -171,9 +172,19 @@ struct papago_response {
 /**
  * Outgoing WebSocket message structure for deferred/thread-safe writes.
  */
+typedef struct papago_ws_payload {
+    unsigned char *data;
+    size_t len; // excludes LWS_PRE
+    atomic_size_t refs;
+} papago_ws_payload_t;
+
+/**
+ * Represents a queued message. It only references a payload so broadcasting
+ * one message to N connections allocates and copies the data once.
+ */
 typedef struct papago_ws_msg {
-    unsigned char *data; // includes LWS_PRE headroom
-    size_t len; // payload length (excludes LWS_PRE)
+    papago_ws_payload_t *payload;
+    size_t len; // payload length
     int binary; // 1 = LWS_WRITE_BINARY, 0 = LWS_WRITE_TEXT
     struct papago_ws_msg *next;
 } papago_ws_msg_t;
@@ -188,9 +199,9 @@ struct papago_ws_connection {
     papago_ws_endpoint_t *endpoint;
     struct papago_server *server;
 
-    pthread_mutex_t   send_mutex;
-    papago_ws_msg_t  *send_head;
-    papago_ws_msg_t  *send_tail;
+    pthread_mutex_t send_mutex;
+    papago_ws_msg_t *send_head;
+    papago_ws_msg_t *send_tail;
 
     size_t queue_msg_count;
     size_t queue_byte_count;
@@ -2129,22 +2140,57 @@ ws_conn_release(papago_ws_connection_t *conn)
     pthread_mutex_unlock(&conn->server->ws_mutex);
 }
 
+/**
+ * Allocate a payload with LWS_PRE headroom and copy data into it. The caller
+ * holds the initial reference.
+ */
+static papago_ws_payload_t*
+ws_payload_create(const void *data, size_t len)
+{
+    papago_ws_payload_t *payload = malloc(sizeof(*payload));
+    if (payload == NULL) {
+        return NULL;
+    }
+
+    payload->data = malloc(LWS_PRE + len);
+    if (payload->data == NULL) {
+        free(payload);
+        return NULL;
+    }
+
+    memcpy(&payload->data[LWS_PRE], data, len);
+    payload->len = len;
+    atomic_init(&payload->refs, 1);
+
+    return payload;
+}
+
+static void
+ws_payload_unref(papago_ws_payload_t *payload)
+{
+    if (payload != NULL &&
+        atomic_fetch_sub_explicit(&payload->refs, 1,
+                                  memory_order_acq_rel) == 1) {
+        free(payload->data);
+        free(payload);
+    }
+}
+
+/**
+ * Create a queue entry that references payload. Takes its own reference, so
+ * the caller still owns (and must release) the reference it holds.
+ */
 static papago_ws_msg_t*
-ws_msg_create(const void *data, size_t len, int binary)
+ws_msg_create(papago_ws_payload_t *payload, int binary)
 {
     papago_ws_msg_t *msg = malloc(sizeof(*msg));
     if (msg == NULL) {
         return NULL;
     }
 
-    msg->data = malloc(LWS_PRE + len);
-    if (msg->data == NULL) {
-        free(msg);
-        return NULL;
-    }
-
-    memcpy(&msg->data[LWS_PRE], data, len);
-    msg->len = len;
+    atomic_fetch_add_explicit(&payload->refs, 1, memory_order_relaxed);
+    msg->payload = payload;
+    msg->len = payload->len;
     msg->binary = binary;
     msg->next = NULL;
 
@@ -2155,7 +2201,7 @@ static void
 ws_msg_free(papago_ws_msg_t *msg)
 {
     if (msg != NULL) {
-        free(msg->data);
+        ws_payload_unref(msg->payload);
         free(msg);
     }
 }
@@ -2368,9 +2414,8 @@ lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user,
 
         papago_ws_msg_t *msg = ws_queue_pop(conn);
         if (msg != NULL) {
-            int n = lws_write(wsi, &msg->data[LWS_PRE], msg->len,
-                            msg->binary ? LWS_WRITE_BINARY : LWS_WRITE_TEXT);
-
+            int n = lws_write(wsi, &msg->payload->data[LWS_PRE], msg->len,
+                msg->binary ? LWS_WRITE_BINARY : LWS_WRITE_TEXT);
             if (n < 0) {
                 ws_msg_free(msg);
                 if (conn->endpoint != NULL && conn->endpoint->on_error != NULL) {
@@ -3162,7 +3207,14 @@ papago_ws_send(papago_ws_connection_t *conn, const char *message)
         return 1;
     }
 
-    papago_ws_msg_t *msg = ws_msg_create(message, strlen(message), 0);
+    papago_ws_payload_t *payload = ws_payload_create(message, strlen(message));
+    if (payload == NULL) {
+        ws_conn_release(conn);
+        return 1;
+    }
+
+    papago_ws_msg_t *msg = ws_msg_create(payload, 0);
+    ws_payload_unref(payload);
     if (msg == NULL) {
         ws_conn_release(conn);
         return 1;
@@ -3191,7 +3243,13 @@ papago_ws_send_binary(papago_ws_connection_t *conn, const void *data,
         return 1;
     }
 
-    papago_ws_msg_t *msg = ws_msg_create(data, length, 1);
+    papago_ws_payload_t *payload = ws_payload_create(data, length);
+    if (payload == NULL) {
+        return 1;
+    }
+
+    papago_ws_msg_t *msg = ws_msg_create(payload, 1);
+    ws_payload_unref(payload);
     if (msg == NULL) {
         return 1;
     }
@@ -3217,7 +3275,11 @@ papago_ws_broadcast(papago_t *server, const char *message)
         return 0;
     }
 
-    size_t len = strlen(message);
+    // copy the message once and share it with every connection
+    papago_ws_payload_t *payload = ws_payload_create(message, strlen(message));
+    if (payload == NULL) {
+        return 0;
+    }
 
     pthread_mutex_lock(&server->ws_mutex);
 
@@ -3229,7 +3291,7 @@ papago_ws_broadcast(papago_t *server, const char *message)
             continue;
         }
 
-        papago_ws_msg_t *msg = ws_msg_create(message, len, 0);
+        papago_ws_msg_t *msg = ws_msg_create(payload, 0);
         if (msg == NULL) {
             continue;
         }
@@ -3243,6 +3305,8 @@ papago_ws_broadcast(papago_t *server, const char *message)
         count++;
     }
     pthread_mutex_unlock(&server->ws_mutex);
+
+    ws_payload_unref(payload);
 
     if (server->lws_context != NULL) {
         lws_cancel_service(server->lws_context);
