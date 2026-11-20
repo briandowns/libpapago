@@ -86,7 +86,7 @@ main(void)
 	
     papago_destroy(server);
 
-	return 0;
+    return 0;
 }
 ```
 
