@@ -56,7 +56,7 @@ sudo make install
 
 ## Quick Start
 
-Below is a very simple demonstration of how to create a handler for a `GET` request.
+Below is a very simple demonstration of how to create a handler for a `GET` request. Error handling is omitted for brevity.
 
 Default server runs on port `8080`.
 
@@ -78,13 +78,13 @@ int
 main(void)
 {
     papago_config_t config = papago_config_new();
-	papago_t *server = papago_new(&config);
+    papago_t *server = papago_new(&config);
 	
-	papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
+    papago_route(server, PAPAGO_GET, "/hello", hello_handler, NULL);
 	
-	papago_start(server); // blocking
+    papago_start(server); // blocking
 	
-	papago_destroy(server);
+    papago_destroy(server);
 
 	return 0;
 }
